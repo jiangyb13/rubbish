@@ -1,28 +1,33 @@
-import torch
-import torch_npu  # 910B 必须导入 NPU 支持
-from omegaconf import OmegaConf
-from hydra.utils import instantiate
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-
-# 1. 指定绝对路径 (请确保这两个路径是正确的)
-yaml_path = "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/utils/sam2/sam2_configs/sam2_hiera_l.yaml"
-ckpt_path = "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/pretrained_models/sam2-hiera-large/sam2_hiera_large.pt"
-
-# 2. 绕过 Hydra 全局搜索，直接读取本地 YAML
-cfg = OmegaConf.load(yaml_path)
-
-# 3. 强行通过配置实例化真正的 PyTorch 模型
-# 如果这里报错，说明你的 PYTHONPATH 没配置 utils/sam2
-sam2_core_model = instantiate(cfg.model, _recursive_=True)
-
-# 4. 手动加载权重并分配到 NPU
-device = "npu"
-state_dict = torch.load(ckpt_path, map_location="cpu", weights_only=True)
-if "model" in state_dict:
-    state_dict = state_dict["model"]
-
-sam2_core_model.load_state_dict(state_dict)
-sam2_core_model.to(device).eval()
-
-# 5. 包装成 Predictor 供后续推理使用
-seg_model = SAM2ImagePredictor(sam2_core_model)
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/main.py", line 101, in <module>
+    mainForOneShot()
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/main.py", line 61, in mainForOneShot
+    pipeline = OneShotProcessPipeline(config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/utils/one_shot.py", line 652, in __init__
+    self.person_detector = PersonDetector(config)
+                           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/utils/one_shot.py", line 357, in __init__
+    self.deca_model = DECA(config=deca_cfg, device=self.device)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/utils/DECA/decalib/deca.py", line 58, in __init__
+    self._create_model(self.cfg.model)
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/utils/DECA/decalib/deca.py", line 93, in _create_model
+    self.flame = FLAME(model_cfg).to(self.device)
+                 ^^^^^^^^^^^^^^^^
+  File "/data/huanan/code/jwx1416454/HUAWEI_CrossPairDataset/utils/DECA/decalib/models/FLAME.py", line 47, in __init__
+    ss = pickle.load(f, encoding='latin1')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda3/envs/PyTorch-2.6.0/lib/python3.11/site-packages/chumpy/__init__.py", line 1, in <module>
+    from .ch import *
+  File "/home/ma-user/anaconda3/envs/PyTorch-2.6.0/lib/python3.11/site-packages/chumpy/ch.py", line 1319, in <module>
+    from . import linalg
+  File "/home/ma-user/anaconda3/envs/PyTorch-2.6.0/lib/python3.11/site-packages/chumpy/linalg.py", line 178, in <module>
+    class SvdD(Ch):
+  File "/home/ma-user/anaconda3/envs/PyTorch-2.6.0/lib/python3.11/site-packages/chumpy/linalg.py", line 181, in SvdD
+    @depends_on('x')
+     ^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda3/envs/PyTorch-2.6.0/lib/python3.11/site-packages/chumpy/ch.py", line 1203, in _depends_on
+    want_out = 'out' in inspect.getargspec(func).args
+                        ^^^^^^^^^^^^^^^^^^
+AttributeError: module 'inspect' has no attribute 'getargspec'. Did you mean: 'getargs'?
+[ERROR] 2026-03-21-16:22:49 (PID:76968, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
