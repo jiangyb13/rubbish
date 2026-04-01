@@ -1,20 +1,19 @@
-from pathlib import Path
+### WEb 前段使用方法
+#### 数据准备
+假设当前目录为/root
+Step 1：解压代码：将flask.rar解压到/root目录下
+Step 2: 在/root目录下创建outputs文件夹。复制原始数据，目前我们准备的数据在bucket-8713-huanan ＞ code ＞ jwx1416454 ＞ HUAWEI_CrossPairDataset ＞ outputs ＞ one_shot_process_huawei_final，将数据复制到outputs文件夹下。
 
-def get_dirname_up_to_target(path_str, target_folder="data"):
-    # 1. 把字符串转换成 Path 对象
-    p = Path(path_str)
-    
-    # 2. p.parts 会把路径拆成元组
-    # 例如 "/home/flask/data/images/1.jpg" 变成 ('/', 'home', 'flask', 'data', 'images', '1.jpg')
-    parts = p.parts
-    
-    if target_folder in parts:
-        # 3. 找到目标文件夹的索引
-        idx = parts.index(target_folder)
-        
-        # 4. 切片：取从开头到目标文件夹（包含目标文件夹，所以要 idx + 1）的所有部分
-        # 然后用 Path(*...) 重新组装成路径，并转回字符串
-        return str(Path(*parts[:idx + 1]))
-    else:
-        # 如果路径里根本没有 data，就返回原路或报错，看你的需求
-        return path_str
+#### 运行代码
+
+##### 文件夹格式
+|--root
+|----flask
+|----outputs
+|------one_shot_process_huawei_final
+
+##### 运行命令
+python flask/app.py --data-dir outputs/one_shot_process_huawei_final --port 7860
+
+####注意事项
+由于目前s3的磁盘解压比较慢，目前只解压出了phase0和phase2，还有3个phase正在解压当中，目前能看的只有phase0和phase2。
