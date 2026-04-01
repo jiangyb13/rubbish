@@ -4,9 +4,11 @@ from pathlib import Path
 
 def convert_to_target_relative(data, target_folder_name="data"):
     """
-    不管前面是 /mnt/ 还是 /root/autodl-tmp/，
-    只要在路径里碰到 target_folder_name (比如 'data')，
-    就把前面的全砍掉，只保留从 'data' 开始的部分。
+    终极截断逻辑：
+    不管是 "/mnt/data/uuu" (绝对)
+    还是 "../../mnt/data/uuu" (被搞坏的相对)
+    甚至是 "data/uuu" (已经是正确的)
+    只要切分后包含 target_folder_name，全部统一修正为 "data/..."
     """
     if isinstance(data, dict):
         return {k: convert_to_target_relative(v, target_folder_name) for k, v in data.items()}
@@ -16,18 +18,19 @@ def convert_to_target_relative(data, target_folder_name="data"):
         # 1. 统一斜杠，防止系统差异
         normalized_str = data.replace('\\', '/')
         
-        # 2. 判断是不是绝对路径（以 '/' 开头或包含 ':/'）
-        if normalized_str.startswith('/') or ':/' in normalized_str:
-            # 拆分路径，比如 "/mnt/data/uuu" 会变成 ['', 'mnt', 'data', 'uuu']
+        # 2. 只要字符串里有 '/'，就说明它可能是一个路径
+        if '/' in normalized_str:
+            # 例如 "../../mnt/data/uuu" 会被拆成 ['..', '..', 'mnt', 'data', 'uuu']
             parts = normalized_str.split('/')
             
-            # 3. 核心：寻找目标文件夹名并截断
+            # 3. 如果我们找到了目标锚点文件夹（例如 'data'）
             if target_folder_name in parts:
+                # 找到它的索引位置
                 idx = parts.index(target_folder_name)
-                # 重新拼接成 "data/uuu"
+                # 直接从该位置重新拼接，前面的 '..' 和 'mnt' 全都丢弃！
                 return "/".join(parts[idx:])
                 
-        # 如果不是绝对路径，或者没找到目标文件夹，就原样返回
+        # 如果不符合条件（比如普通文本），原样返回
         return data
     else:
         return data
