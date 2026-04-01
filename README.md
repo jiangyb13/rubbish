@@ -2,109 +2,83 @@ import os
 import json
 from pathlib import Path
 
-def is_absolute_path(val_str):
+def convert_to_target_relative(data, target_folder_name="data"):
     """
-    判断一个字符串是否是绝对路径。
-    注意：在 Linux 系统中，任何以 '/' 开头的字符串都会被判定为绝对路径。
-    如果你的 json 包含以 '/' 开头的普通非路径文本，建议在这里增加额外判断（比如后缀名检查）。
-    """
-    if not isinstance(val_str, str):
-        return False
-    # 排除空字符串或纯空格
-    if not val_str.strip():
-        return False
-    return os.path.isabs(val_str)
-
-def convert_paths_in_data(data, reference_dir):
-    """
-    递归遍历字典或列表，将绝对路径转换为相对路径。
+    不管前面是 /mnt/ 还是 /root/autodl-tmp/，
+    只要在路径里碰到 target_folder_name (比如 'data')，
+    就把前面的全砍掉，只保留从 'data' 开始的部分。
     """
     if isinstance(data, dict):
-        return {k: convert_paths_in_data(v, reference_dir) for k, v in data.items()}
+        return {k: convert_to_target_relative(v, target_folder_name) for k, v in data.items()}
     elif isinstance(data, list):
-        return [convert_paths_in_data(item, reference_dir) for item in data]
+        return [convert_to_target_relative(item, target_folder_name) for item in data]
     elif isinstance(data, str):
-        if is_absolute_path(data):
-            try:
-                # 转为相对于 reference_dir 的相对路径
-                return os.path.relpath(data, reference_dir)
-            except ValueError:
-                # 在 Windows 下，如果跨盘符（例如 C: 到 D:），relpath 会报错
-                # 这种情况下直接返回原路径
-                return data
-        return data
-    else:
-        # 其他类型（int, float, bool, None 等）保持不变
-        return data
-
-def process_json_file(file_path, reference_dir):
-    """处理单个 .json 文件"""
-    with open(file_path, 'r', encoding='utf-8') as f:
-        try:
-            data = json.load(f)
-        except json.JSONDecodeError:
-            print(f"⚠️ 跳过: 无法解析 JSON 格式 - {file_path}")
-            return
-
-    new_data = convert_paths_in_data(data, reference_dir)
-
-    # 将修改后的内容写回文件，覆盖原文件
-    with open(file_path, 'w', encoding='utf-8') as f:
-        # ensure_ascii=False 保证中文字符正常显示
-        json.dump(new_data, f, ensure_ascii=False, indent=4)
-
-def process_jsonl_file(file_path, reference_dir):
-    """处理单个 .jsonl 文件"""
-    new_lines = []
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line_num, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-                new_data = convert_paths_in_data(data, reference_dir)
-                new_lines.append(json.dumps(new_data, ensure_ascii=False))
-            except json.JSONDecodeError:
-                print(f"⚠️ 警告: 无法解析 {file_path} 的第 {line_num} 行，已保持原样。")
-                new_lines.append(line)
-
-    # 将修改后的内容写回文件
-    with open(file_path, 'w', encoding='utf-8') as f:
-        for line in new_lines:
-            f.write(line + '\n')
-
-def main(target_folder, relative_to_folder=None):
-    """
-    主函数
-    :param target_folder: 需要遍历的根目录
-    :param relative_to_folder: 计算相对路径的基准目录。如果为 None，则默认使用 target_folder 作为基准。
-    """
-    target_path = Path(target_folder).resolve()
-    
-    if relative_to_folder is None:
-        reference_dir = target_path
-    else:
-        reference_dir = Path(relative_to_folder).resolve()
-
-    print(f"🚀 开始遍历目录: {target_path}")
-    print(f"📍 相对路径基准: {reference_dir}\n")
-
-    # rglob('*') 递归遍历该文件夹下的所有文件
-    for file_path in target_path.rglob('*'):
-        if file_path.is_file():
-            if file_path.suffix.lower() == '.json':
-                print(f"处理 JSON: {file_path}")
-                process_json_file(file_path, reference_dir)
-            elif file_path.suffix.lower() == '.jsonl':
-                print(f"处理 JSONL: {file_path}")
-                process_jsonl_file(file_path, reference_dir)
+        # 1. 统一斜杠，防止系统差异
+        normalized_str = data.replace('\\', '/')
+        
+        # 2. 判断是不是绝对路径（以 '/' 开头或包含 ':/'）
+        if normalized_str.startswith('/') or ':/' in normalized_str:
+            # 拆分路径，比如 "/mnt/data/uuu" 会变成 ['', 'mnt', 'data', 'uuu']
+            parts = normalized_str.split('/')
+            
+            # 3. 核心：寻找目标文件夹名并截断
+            if target_folder_name in parts:
+                idx = parts.index(target_folder_name)
+                # 重新拼接成 "data/uuu"
+                return "/".join(parts[idx:])
                 
-    print("\n✅ 处理完成！")
+        # 如果不是绝对路径，或者没找到目标文件夹，就原样返回
+        return data
+    else:
+        return data
+
+def process_file(file_path, target_folder_name):
+    # 根据后缀判断是 json 还是 jsonl
+    is_jsonl = file_path.suffix.lower() == '.jsonl'
+    
+    if is_jsonl:
+        new_lines = []
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip(): continue
+                try:
+                    data = json.loads(line)
+                    new_data = convert_to_target_relative(data, target_folder_name)
+                    new_lines.append(json.dumps(new_data, ensure_ascii=False))
+                except json.JSONDecodeError:
+                    new_lines.append(line.strip())
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(new_lines) + '\n')
+            
+    else: # json
+        with open(file_path, 'r', encoding='utf-8') as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError:
+                return
+        new_data = convert_to_target_relative(data, target_folder_name)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(new_data, f, ensure_ascii=False, indent=4)
+
+def main(dataset_root, target_folder_name):
+    base_dir = Path(dataset_root).resolve()
+    print(f"🚀 开始扫描: {base_dir}")
+    print(f"✂️  截断规则: 将绝对路径截断为以 '{target_folder_name}/' 开头\n")
+
+    count = 0
+    for file_path in base_dir.rglob('*'):
+        if file_path.is_file() and file_path.suffix.lower() in ['.json', '.jsonl']:
+            process_file(file_path, target_folder_name)
+            print(f"✅ 已处理: {file_path}")
+            count += 1
+
+    print(f"\n🎉 搞定！共修改了 {count} 个文件。")
 
 if __name__ == "__main__":
-    # 替换为你实际想要遍历的文件夹路径
-    FOLDER_TO_PROCESS = "./my_dataset_folder" 
+    # 1. 你要处理的文件夹所在路径
+    FOLDER_TO_PROCESS = "./my_dataset" 
     
-    # 运行代码
-    main(FOLDER_TO_PROCESS)
+    # 2. 你想保留的起点文件夹名（比如你想留下 data/uuu，这里就填 data）
+    STARTING_FOLDER = "data" 
+    
+    main(FOLDER_TO_PROCESS, STARTING_FOLDER)
