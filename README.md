@@ -7,10 +7,10 @@ Step 2: 在/root目录下创建outputs文件夹。复制原始数据，目前我
 #### 运行代码
 
 ##### 文件夹格式
-|--root
-|----flask
-|----outputs
-|------one_shot_process_huawei_final
+|--root \
+|----flask \
+|----outputs \
+|------one_shot_process_huawei_final 
 
 ##### 运行命令
 python flask/app.py --data-dir outputs/one_shot_process_huawei_final --port 7860
