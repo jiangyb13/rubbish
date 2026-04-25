@@ -153,4 +153,85 @@ def main():
 
     # 逐条处理并写入 JSONL
     file_out = open(args.output_jsonl, "a", encoding="utf-8")
-    correct
+    correct_count = 0
+    incorrect_count = 0
+
+    try:
+        for item in tqdm(worker_files, desc=f"Worker {args.phase}"):
+            img_path = item["path"]
+            expected = item["expected_label"]
+            
+            prompt_text = get_robust_verification_prompt(expected)
+
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": img_path},
+                        {"type": "text", "text": prompt_text},
+                    ],
+                }
+            ]
+
+            try:
+                inputs = processor.apply_chat_template(
+                    messages,
+                    tokenize=True,
+                    add_generation_prompt=True,
+                    return_dict=True,
+                    return_tensors="pt",
+                )
+                inputs = inputs.to(model.device)
+
+                with torch.no_grad():
+                    generated_ids = model.generate(**inputs, max_new_tokens=args.max_new_tokens)
+
+                generated_ids_trimmed = [
+                    out_ids[len(in_ids):]
+                    for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+                ]
+                output_text = processor.batch_decode(
+                    generated_ids_trimmed,
+                    skip_special_tokens=True,
+                    clean_up_tokenization_spaces=False,
+                )[0]
+                
+            except Exception as exc:
+                print(f"  [ERROR] 推理失败 {img_path}: {exc}")
+                continue
+
+            # 解析结果
+            vlm_result = parse_vlm_response(output_text, expected)
+            
+            # 双重保险：修正 vlm 可能的 is_correct 矛盾
+            # 如果 VLM 认为的 actual_orientation 恰好等于预期标签，那 is_correct 强制设为 True
+            if vlm_result.get("actual_orientation") == expected:
+                vlm_result["is_correct"] = True
+            
+            if vlm_result.get("is_correct", False):
+                correct_count += 1
+            else:
+                incorrect_count += 1
+
+            # 组装最终结果
+            output_record = {
+                "file_path": img_path,
+                "expected_label": expected,
+                "vlm_verification": vlm_result,
+                "raw_response": output_text
+            }
+
+            file_out.write(json.dumps(output_record, ensure_ascii=False) + "\n")
+            file_out.flush()
+
+    finally:
+        file_out.close()
+
+    print(f"\n[Worker {args.phase}] 处理完成！")
+    print(f"  校验一致 (正确): {correct_count}")
+    print(f"  校验不一致 (错误): {incorrect_count}")
+    print(f"  输出保存至: {args.output_jsonl}")
+
+
+if __name__ == "__main__":
+    main()
