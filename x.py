@@ -339,7 +339,7 @@ def main():
         prompts = [user_prompt]
         model_args = text_encoder.encode(prompts)
         y       = model_args["y"].to(DEVICE, dtype)
-        y_mask  = model_args["y_mask"].to(DEVICE)
+        y_mask  = model_args["mask"].to(DEVICE)
 
         # Build noisy latent
         fn, lh, lw = latent_size
