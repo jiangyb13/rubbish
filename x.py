@@ -59,8 +59,9 @@ from torchvision import transforms as T
 from torchvision.io import write_video
 
 from mimogpt.models import build_backbone, AttnMapCollector
-from mimogpt.models.dit.parallel_states import initialize_distributed
+from mimogpt.models.dit.parallel_states import initialize_distributed, get_context_parallel_group
 from mimogpt.utils.load_optimizations import skip_torch_weight_init, convert_to_dir_dist
+from mimogpt.utils.vid_utils import pad_and_resize, face_preprocess
 from mimogpt.utils.log_utils import rank0_print
 from mimogpt.functional import to_torch_dtype
 
@@ -335,66 +336,141 @@ def main():
         video_sub = video_t.unsqueeze(0).to(DEVICE, dtype)
         cond_input = vae_en.encode(video_sub)[0].unsqueeze(0)
 
-        # Encode text
-        prompts = [user_prompt]
-        model_args = text_encoder.encode(prompts)
-        y       = model_args["y"].to(DEVICE, dtype)
-        y_mask  = model_args["mask"].to(DEVICE)
-
-        # Build noisy latent
         fn, lh, lw = latent_size
-        z = torch.randn(1, 16, fn, lh, lw, device=DEVICE, dtype=dtype)
 
-        # Prepare ref_x (reference image in latent space)
-        # cond_input shape: [1, 1, C_lat, fnr, H_lat, W_lat]  → squeeze as needed
-        ref_x = cond_input  # already latent-encoded
+        # ── Build first-frame cond + mask (mirrors original inference script) ─
+        given_len = 1
+        cond_lat = torch.zeros([1, vae.out_channels, fn, lh, lw], device=DEVICE, dtype=dtype)
+        cond_lat[:, :, :given_len] = (
+            (cond_input[:, :, :given_len] - frame_bias[None, None, :given_len, None, None])
+            * frame_scale[None, None, :given_len, None, None]
+        )
+        mask_lat = torch.zeros(1, 8, fn, lh, lw, device=DEVICE, dtype=dtype)
+        mask_lat[:, :, :given_len] = 1
+        if cfg.first_image == "false":
+            cond_lat[:, :, :given_len] = 0
+            mask_lat[:, :, :given_len] = 0
 
-        # ------------------------------------------------------------------
-        # Run denoising steps; capture attn map at step `attn_step`
-        # ------------------------------------------------------------------
-        timesteps = scheduler.get_timesteps(cfg.num_sampling_steps if hasattr(cfg, "num_sampling_steps") else 50)
-        x_cur = z.clone()
+        # ── Build ref_x from face images (mirrors original inference script) ──
+        ref_img_for_attn = ref_img_pil
+        ref_x = None
+        if cfg.ref_image == "true":
+            face_paths = item.get("in_cross_pair_face_fn", [])
+            face_img_list = []
+            for fp in face_paths:
+                full_fp = os.path.join(cfg.face_aug_dir, fp)
+                if os.path.exists(full_fp):
+                    face_img_list.append(Image.open(full_fp).convert("RGB"))
+            if not face_img_list:
+                face_img_list = [ref_img_pil]
+            ref_img_for_attn = face_img_list[0]
+            rank0_print(f"  Using {len(face_img_list)} ref face images")
 
-        for step_i, t in enumerate(timesteps):
-            t_batch = t.expand(x_cur.shape[0]).to(DEVICE, dtype)
-            ref_t_batch = torch.zeros_like(t_batch)  # reference image timestep = 0
-
-            model_kwargs = dict(
-                y=y,
-                y_mask=y_mask,
-                ref_x=ref_x,
-                ref_timestep=ref_t_batch,
-                hh=lh // 2,   # base_size_h after patch_size=2
-                ww=lw // 2,   # base_size_w after patch_size=2
+            pad_resize_list = [
+                pad_and_resize([fi], cond_input.shape[3] * 8, cond_input.shape[4] * 8)
+                for fi in face_img_list
+            ]
+            face_video = face_preprocess([np.array(fi) for fi in pad_resize_list]).unsqueeze(0)
+            null_video = torch.zeros_like(face_video)
+            ref_vae_list, null_ref_vae_list = [], []
+            for fv in torch.split(face_video, 1, dim=2):
+                ref_vae_list.append(vae_en.encode(fv.to(DEVICE, torch.bfloat16))[0].unsqueeze(0))
+            for nv in torch.split(null_video, 1, dim=2):
+                null_ref_vae_list.append(vae_en.encode(nv.to(DEVICE, torch.bfloat16))[0].unsqueeze(0))
+            ref_vae_t = torch.cat(ref_vae_list, dim=2)
+            ref_vae_t = ((ref_vae_t - frame_bias[None, None, :ref_vae_t.shape[2], None, None])
+                         * frame_scale[None, None, :ref_vae_t.shape[2], None, None])
+            null_ref_vae_t = torch.cat(null_ref_vae_list, dim=2)
+            null_ref_vae_t = ((null_ref_vae_t - frame_bias[None, None, :null_ref_vae_t.shape[2], None, None])
+                              * frame_scale[None, None, :null_ref_vae_t.shape[2], None, None])
+            ref_mask_t = torch.ones(
+                ref_vae_t.shape[0], 8, ref_vae_t.shape[2], ref_vae_t.shape[3], ref_vae_t.shape[4],
+                device=DEVICE, dtype=dtype,
             )
+            ref_x = torch.cat([ref_vae_t, ref_vae_t, ref_mask_t], dim=1)
 
-            if step_i == attn_step:
-                rank0_print(f"  Capturing attention maps at denoising step {step_i} ...")
-                # Only rank-0 captures to avoid redundant files with CP
-                if dist.get_rank() == 0:
-                    with AttnMapCollector() as attn_store:
-                        v_pred = model(x_cur, t_batch, **model_kwargs)
-                    # Build helper to save
-                    capt = AttnCapturingScheduler(
-                        scheduler=scheduler,
-                        capture_step=step_i,
-                        attn_layers=attn_layers if attn_layers else list(range(model.depth if hasattr(model, "depth") else 24)),
-                        output_dir=attn_save_dir,
-                        sample_id=sample_id,
-                        fn=fn,
-                        lh=lh,
-                        lw=lw,
-                        fnr=ref_x.shape[3] if ref_x is not None else 1,
-                    )
-                    capt._post_capture(attn_store, step_i, ref_img_pil)
-                else:
-                    v_pred = model(x_cur, t_batch, **model_kwargs)
-            else:
-                v_pred = model(x_cur, t_batch, **model_kwargs)
+        cond_lat = torch.cat([cond_lat, mask_lat], dim=1)  # [1, C+8, fn, lh, lw]
 
-            # Euler step
-            dt = timesteps[step_i + 1] - t if step_i + 1 < len(timesteps) else -t
-            x_cur = x_cur + dt.to(dtype) * v_pred
+        # ── Text encoding (cond + uncond) ───────────────────────────────────
+        prompts = [user_prompt]
+        if scheduler.system_prompt is not None:
+            prompts = [user_prompt + scheduler.system_prompt[0]]
+        neg_prompts = scheduler.negative_prompt
+        model_args = text_encoder.encode(prompts)
+        model_args_neg = text_encoder.encode(neg_prompts)
+
+        # ── Noisy latent (doubled for CFG) ───────────────────────────────────
+        cfg_scale = scheduler.cfg_scale
+        z = torch.randn(1, vae.out_channels, fn, lh, lw, device=DEVICE, dtype=dtype)
+        if cfg_scale != 1.0:
+            z = torch.cat([z, z], 0)
+
+        # ── Assemble model_args (mirrors original inference script) ──────────
+        model_args["x_mask"] = None
+        model_args["y"] = torch.cat([model_args["y"], model_args_neg["y"]], 0)
+        model_args["y_mask"] = torch.cat([model_args["mask"], model_args_neg["mask"]], 0)
+        model_args["cond"] = torch.cat([cond_lat] * 2) if cfg_scale != 1.0 else cond_lat
+        if ref_x is not None:
+            model_args["ref_x"] = torch.cat([ref_x, ref_x], 0) if cfg_scale != 1.0 else ref_x
+            model_args["ref_timestep"] = torch.ones(
+                2 if cfg_scale != 1.0 else 1, device=DEVICE
+            ).type_as(ref_x)
+
+        # ── Step-capturing wrapper ────────────────────────────────────────────
+        # forward_with_cfg calls model.forward(x, t, y, **kwargs) at each step.
+        # We count calls and toggle _COLLECT_ATTN_MAPS at the target step.
+        import mimogpt.models.dit.mmdit_blocks as _blk
+
+        class _StepCapture:
+            def __init__(self, inner, target):
+                self._inner = inner
+                self._step = 0
+                self.target = target
+                self.captured = {}
+
+            def forward(self, x, t, y, **kw):
+                if self._step == self.target:
+                    _blk._COLLECT_ATTN_MAPS = True
+                    _blk._ATTN_MAP_STORE.clear()
+                out = self._inner.forward(x, t, y, **kw)
+                if self._step == self.target:
+                    self.captured = dict(_blk._ATTN_MAP_STORE)
+                    _blk._COLLECT_ATTN_MAPS = False
+                self._step += 1
+                return out
+
+            def __getattr__(self, name):
+                return getattr(self._inner, name)
+
+        rank0_print(f"  Running denoising; will capture attn at step {attn_step} ...")
+        capture_wrapper = _StepCapture(model, target=attn_step)
+        samples = scheduler.sample_pure(capture_wrapper, z, model_args)
+
+        # ── Gather partial head maps across CP ranks ──────────────────────────
+        # With CP, each rank holds n_head/cp_size heads after all_to_all.
+        # all_gather on dim=1 reassembles the full [B, n_head, T_vid, T_ref] map.
+        attn_store = capture_wrapper.captured
+        cp_group = get_context_parallel_group()
+        cp_sz = dist.get_world_size(cp_group)
+        if cp_sz > 1 and attn_store:
+            for key in list(attn_store.keys()):
+                local_map = attn_store[key].to(DEVICE)
+                gathered = [torch.zeros_like(local_map) for _ in range(cp_sz)]
+                dist.all_gather(gathered, local_map, group=cp_group)
+                attn_store[key] = torch.cat(gathered, dim=1).cpu()
+
+        # ── Save on rank 0 ────────────────────────────────────────────────────
+        if dist.get_rank() == 0 and attn_store:
+            capt = AttnCapturingScheduler(
+                scheduler=scheduler,
+                capture_step=attn_step,
+                attn_layers=attn_layers if attn_layers else list(range(24)),
+                output_dir=attn_save_dir,
+                sample_id=sample_id,
+                fn=fn, lh=lh, lw=lw,
+                fnr=ref_x.shape[3] if ref_x is not None else 1,
+            )
+            capt._post_capture(attn_store, attn_step, ref_img_for_attn)
 
         rank0_print(f"  Finished sample {idx}. Attention maps saved to: {attn_save_dir}/{sample_id}/")
 
