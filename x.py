@@ -56,18 +56,28 @@ def extract_and_visualize_attn_map(avg_attn_map, ref_lat_size, ref_img_size, sav
     global_min = min(m.min() for m in ref_maps_up)
     global_max = max(m.max() for m in ref_maps_up)
 
-    for ref_idx in range(n_ref):
-        ref_map_up = ref_maps_up[ref_idx]
-
-        # 4. 用全局 min/max 归一化到 [0, 255]，不同 ref 视频亮度可比
+    # 4. 用全局 min/max 归一化到 [0, 255]
+    ref_maps_np = []
+    for ref_map_up in ref_maps_up:
         ref_map_np = ((ref_map_up - global_min) / (global_max - global_min + 1e-8) * 255).numpy().astype(np.uint8)
+        ref_maps_np.append(ref_map_np)  # [T_lat, H_ref, W_ref]
 
-        # 5. 保存灰度视频
-        fname = f"{base}_ref{ref_idx}{ext}" if n_ref > 1 else save_name
-        save_path = os.path.join(save_dir, fname)
+    # 5. 保存合并视频（所有 ref 横向拼接）
+    if n_ref == 1:
+        save_path = os.path.join(save_dir, save_name)
         writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), 8, (W_ref, H_ref))
         for t in range(T_lat):
-            gray = ref_map_np[t]
+            gray = ref_maps_np[0][t]
             writer.write(cv2.merge([gray, gray, gray]))
         writer.release()
         print(f"Saved attn map video to {save_path}")
+    else:
+        # 多张 ref 横向拼接为一个视频，宽度 = W_ref * n_ref
+        combined_w = W_ref * n_ref
+        save_path = os.path.join(save_dir, save_name)
+        writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), 8, (combined_w, H_ref))
+        for t in range(T_lat):
+            row = np.concatenate([cv2.merge([ref_maps_np[i][t]] * 3) for i in range(n_ref)], axis=1)
+            writer.write(row)
+        writer.release()
+        print(f"Saved combined attn map video ({n_ref} refs side by side) to {save_path}")
