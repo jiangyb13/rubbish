@@ -1,18 +1,30 @@
 """
-把 attn map 视频和生成视频的帧拼在一起，方便查看每一帧的 ref 注意力情况。
+把 attn map 视频和生成视频的帧拼在一起，每帧保存为一张图片。
 
 用法：
-  # 单个 attn 视频 + 生成视频
-  python test_viz.py --attn path/to/t049.mp4 --gen path/to/sample_00.mp4 --output out.mp4
+  # 单个 attn 视频 + 生成视频 → 输出到一个文件夹
+  python test_viz.py --attn path/to/t049.mp4 --gen path/to/sample_00.mp4 --output out_dir/
 
-  # 文件夹（所有 t*.mp4）+ 生成视频，每个 attn 视频都会生成一个对应的输出
+  # 文件夹（所有 t*.mp4）+ 生成视频 → 每个 attn 视频对应一个子文件夹
   python test_viz.py --attn path/to/attn_maps/sample00/ --gen path/to/sample_00.mp4 --output path/to/output_dir/
 
 拼接方式（横向）：
   [ 生成视频帧 | ref0 attn | ref1 attn | ref2 attn ]
 
-attn 视频帧数 (T_lat=16) 通常少于生成视频帧数，
-脚本会按比例把生成视频帧映射到 attn 帧上（最近邻）。
+输出结构（单个 attn 视频）：
+  out_dir/
+    frame_00.jpg
+    frame_01.jpg
+    ...
+
+输出结构（文件夹模式）：
+  output_dir/
+    t000/
+      frame_00.jpg
+      ...
+    t001/
+      frame_00.jpg
+      ...
 """
 
 import cv2
@@ -58,7 +70,8 @@ def combine_videos(attn_video_path, gen_video_path, output_path):
     # 等比缩放生成视频帧到 target_h
     gen_w_scaled = int(gen_w_orig * target_h / gen_h_orig)
 
-    combined_frames = []
+    os.makedirs(output_path, exist_ok=True)
+
     for i, attn_frame in enumerate(attn_frames):
         # 按比例找对应的生成帧（最近邻）
         gen_idx = round(i * (n_gen - 1) / max(n_attn - 1, 1))
@@ -74,15 +87,10 @@ def combine_videos(attn_video_path, gen_video_path, output_path):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
         combined = np.concatenate([gen_resized, attn_labeled], axis=1)
-        combined_frames.append(combined)
+        save_path = os.path.join(output_path, f"frame_{i:02d}.jpg")
+        cv2.imwrite(save_path, combined)
 
-    out_h, out_w = combined_frames[0].shape[:2]
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    writer = cv2.VideoWriter(str(output_path), cv2.VideoWriter_fourcc(*'mp4v'), 8, (out_w, out_h))
-    for frame in combined_frames:
-        writer.write(frame)
-    writer.release()
-    print(f"  已保存: {output_path}")
+    print(f"  已保存 {n_attn} 张图片到: {output_path}")
 
 
 def main():
@@ -99,21 +107,18 @@ def main():
     gen_path = Path(args.gen)
 
     if attn_path.is_file():
-        # 单个 attn 视频
-        out = args.output if args.output.endswith('.mp4') else args.output + '.mp4'
+        # 单个 attn 视频 → 输出到一个文件夹
         print(f"处理: {attn_path.name}")
-        combine_videos(attn_path, gen_path, out)
+        combine_videos(attn_path, gen_path, args.output)
     elif attn_path.is_dir():
-        # 文件夹：处理所有 .mp4
+        # 文件夹：每个 .mp4 对应一个子文件夹
         videos = sorted(attn_path.glob('*.mp4'))
         if not videos:
             print(f"[ERROR] 文件夹中没有 .mp4 文件: {attn_path}")
             return
-        out_dir = Path(args.output)
-        out_dir.mkdir(parents=True, exist_ok=True)
         for v in videos:
             print(f"处理: {v.name}")
-            combine_videos(v, gen_path, out_dir / v.name)
+            combine_videos(v, gen_path, os.path.join(args.output, v.stem))
     else:
         print(f"[ERROR] --attn 路径不存在: {attn_path}")
 
