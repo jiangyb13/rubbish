@@ -1,40 +1,80 @@
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman slowly turns her head from a full frontal view to a side profile, her expression calm and composed, cinematic lighting."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman slowly turns her head from a full frontal view to a side profile, her expression calm and composed, cinematic lighting."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman slowly turns her head from a full frontal view to a side profile, her expression calm and composed, cinematic lighting."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman slowly turns her head from a full frontal view to a side profile, her expression calm and composed, cinematic lighting."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman breaks into a warm radiant smile, her eyes crinkling with joy, subtle laugh lines forming naturally, soft lighting illuminating her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman breaks into a warm radiant smile, her eyes crinkling with joy, subtle laugh lines forming naturally, soft lighting illuminating her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman breaks into a warm radiant smile, her eyes crinkling with joy, subtle laugh lines forming naturally, soft lighting illuminating her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman breaks into a warm radiant smile, her eyes crinkling with joy, subtle laugh lines forming naturally, soft lighting illuminating her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman begins to weep, tears streaming slowly down her cheeks, her expression shifting from composure to grief, lips trembling softly, close-up shot."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman begins to weep, tears streaming slowly down her cheeks, her expression shifting from composure to grief, lips trembling softly, close-up shot."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman begins to weep, tears streaming slowly down her cheeks, her expression shifting from composure to grief, lips trembling softly, close-up shot."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman begins to weep, tears streaming slowly down her cheeks, her expression shifting from composure to grief, lips trembling softly, close-up shot."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman speaks earnestly, her lips moving naturally, face animated with emotion, eyes conveying deep feeling as she delivers her words."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman speaks earnestly, her lips moving naturally, face animated with emotion, eyes conveying deep feeling as she delivers her words."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman speaks earnestly, her lips moving naturally, face animated with emotion, eyes conveying deep feeling as she delivers her words."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman speaks earnestly, her lips moving naturally, face animated with emotion, eyes conveying deep feeling as she delivers her words."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman slowly bows her head downward, her face tilting from a frontal view to a downward angle, a gentle and graceful movement."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman slowly bows her head downward, her face tilting from a frontal view to a downward angle, a gentle and graceful movement."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman slowly bows her head downward, her face tilting from a frontal view to a downward angle, a gentle and graceful movement."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman slowly bows her head downward, her face tilting from a frontal view to a downward angle, a gentle and graceful movement."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman runs swiftly, her face shown in dynamic angles with an urgent breathless expression, hair flying in the wind, cinematic slow motion."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman runs swiftly, her face shown in dynamic angles with an urgent breathless expression, hair flying in the wind, cinematic slow motion."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman runs swiftly, her face shown in dynamic angles with an urgent breathless expression, hair flying in the wind, cinematic slow motion."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman runs swiftly, her face shown in dynamic angles with an urgent breathless expression, hair flying in the wind, cinematic slow motion."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The camera slowly pulls back from a close-up of the woman's face to a wide shot revealing her full figure, standing gracefully in the scene."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The camera slowly pulls back from a close-up of the woman's face to a wide shot revealing her full figure, standing gracefully in the scene."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The camera slowly pulls back from a close-up of the woman's face to a wide shot revealing her full figure, standing gracefully in the scene."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The camera slowly pulls back from a close-up of the woman's face to a wide shot revealing her full figure, standing gracefully in the scene."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman raises her hand to cover half her face shyly, peeking over her fingers with bright curious eyes, a playful and coy expression visible."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman raises her hand to cover half her face shyly, peeking over her fingers with bright curious eyes, a playful and coy expression visible."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman raises her hand to cover half her face shyly, peeking over her fingers with bright curious eyes, a playful and coy expression visible."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman raises her hand to cover half her face shyly, peeking over her fingers with bright curious eyes, a playful and coy expression visible."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman stands completely still, her gaze fixed forward with a serene and composed expression, subtle breathing visible, soft light flickering on her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman stands completely still, her gaze fixed forward with a serene and composed expression, subtle breathing visible, soft light flickering on her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman stands completely still, her gaze fixed forward with a serene and composed expression, subtle breathing visible, soft light flickering on her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman stands completely still, her gaze fixed forward with a serene and composed expression, subtle breathing visible, soft light flickering on her face."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["white_image_pillow.png"], "prompt": "The woman turns from a back view toward the camera, her face gradually revealed showing a shocked and fearful expression, dramatic lighting, suspenseful atmosphere."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg"], "prompt": "The woman turns from a back view toward the camera, her face gradually revealed showing a shocked and fearful expression, dramatic lighting, suspenseful atmosphere."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_1.jpg"], "prompt": "The woman turns from a back view toward the camera, her face gradually revealed showing a shocked and fearful expression, dramatic lighting, suspenseful atmosphere."}
-{"first_frame": "fbb_1_720x1280.jpg", "in_cross_pair_face_fn": ["fbb_1_720x1280_0.jpg", "fbb_1_720x1280_1.jpg", "fbb_1_720x1280_2.jpg"], "prompt": "The woman turns from a back view toward the camera, her face gradually revealed showing a shocked and fearful expression, dramatic lighting, suspenseful atmosphere."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The camera slowly zooms in on the person's face, keeping the facial details sharp and consistent."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The camera slowly zooms out from a close-up of the face to a seated upper-body shot."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person slowly turns their head to the left, then looks back at the camera."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person slowly turns their head to the right, then returns to face the camera."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person looks down for a moment, then raises their head and looks at the camera."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person gently tilts their head to one side with a curious expression."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person slowly smiles while looking at the camera."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person speaks softly to the camera with natural lip movement."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person raises one hand and gently scratches their head while staying seated."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person brushes their hair back with one hand while keeping their face visible."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person gently touches their cheek with one hand."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person covers their mouth briefly as if laughing, then lowers their hand."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person raises one hand near the face as if adjusting their expression, then lowers it naturally while looking at the camera."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person slowly stands up from the seated position while keeping their face visible."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person shifts their seated posture and settles back down while facing the camera."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person rises from the seat and takes a slow step toward the camera while keeping their face visible."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person slowly turns their upper body in place and then faces the camera again."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person lifts a small drink or cup, takes a small sip, and keeps the movement natural."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The person's hand briefly passes in front of the face and then moves away."}
+{"first_frame":"hg/hg_720x1024.png","prompt":"The lighting gradually becomes brighter while the person looks at the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The camera slowly zooms in on the person's face, keeping the facial details sharp and consistent."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The camera slowly zooms out from a close-up of the face to a half-body shot."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person slowly turns their head to the left, then looks back at the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person slowly turns their head to the right, then returns to face the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person looks down for a moment, then raises their head and looks at the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person gently tilts their head to one side with a curious expression."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person slowly smiles while looking at the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person speaks softly to the camera with natural lip movement."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person raises one hand and gently scratches their head while standing."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person brushes their hair back with one hand while keeping their face visible."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person gently touches their cheek with one hand."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person covers their mouth briefly as if laughing, then lowers their hand."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person raises one hand near the face as if adjusting their expression, then lowers it naturally while looking at the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person straightens from the standing pose and shifts weight forward while keeping their face visible."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person slowly lowers into a seated pose while facing the camera."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person walks slowly toward the camera while keeping their face visible."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person slowly turns around in place and then faces the camera again."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person picks up a cup and takes a small sip while looking natural."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The person's hand briefly passes in front of the face and then moves away."}
+{"first_frame":"myl/myl_720x1024.png","prompt":"The lighting gradually becomes brighter while the person looks at the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The camera slowly zooms in on the person's face, keeping the facial details sharp and consistent."}
+{"first_frame":"way/way_720x1024.png","prompt":"The camera slowly zooms out from a close-up of the face to a crouched half-body shot."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person slowly turns their head to the left, then looks back at the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person slowly turns their head to the right, then returns to face the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person looks down for a moment, then raises their head and looks at the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person gently tilts their head to one side with a curious expression."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person slowly smiles while looking at the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person speaks softly to the camera with natural lip movement."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person raises one hand and gently scratches their head while staying in the crouched pose."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person brushes their hair back with one hand while keeping their face visible."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person gently touches their cheek with one hand."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person covers their mouth briefly as if laughing, then lowers their hand."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person raises one hand near the face as if adjusting their expression, then lowers it naturally while looking at the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person slowly stands up from the crouched position while keeping their face visible."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person slowly lowers from the crouched pose into a seated position while facing the camera."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person rises from the crouch and walks slowly toward the camera while keeping their face visible."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person slowly turns around in place from the crouched pose and then faces the camera again."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person picks up a cup and takes a small sip while looking natural."}
+{"first_frame":"way/way_720x1024.png","prompt":"The person's hand briefly passes in front of the face and then moves away."}
+{"first_frame":"way/way_720x1024.png","prompt":"The lighting gradually becomes brighter while the person looks at the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The camera slowly zooms in on the person's face, keeping the facial details sharp and consistent."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The camera slowly zooms out from a close-up of the face to a seated half-body shot."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person slowly turns their head to the left, then looks back at the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person slowly turns their head to the right, then returns to face the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person looks down for a moment, then raises their head and looks at the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person gently tilts their head to one side with a curious expression."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person slowly smiles while looking at the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person speaks softly to the camera with natural lip movement."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person raises one hand and gently scratches their head while staying seated."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person brushes their hair back with one hand while keeping their face visible."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person gently touches their cheek with one hand."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person covers their mouth briefly as if laughing, then lowers their hand."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person adjusts their glasses with one hand while looking at the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person slowly stands up from the seated position while keeping their face visible."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person shifts their seated posture and settles back down while facing the camera."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person stands up and walks slowly toward the camera while keeping their face visible."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person slowly turns their upper body in place and then faces the camera again."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person picks up a cup and takes a small sip while looking natural."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The person's hand briefly passes in front of the face and then moves away."}
+{"first_frame":"wq/wx_720x1024.png","prompt":"The lighting gradually becomes brighter while the person looks at the camera."}
