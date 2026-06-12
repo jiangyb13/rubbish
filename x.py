@@ -1010,6 +1010,7 @@ class Bagel(PreTrainedModel):
         unpacked_latent = x_t.split((packed_seqlens - 2).tolist())
         return unpacked_latent
 
+    
     def generate_image_reca(
         self,
         packed_text_ids: torch.LongTensor,
@@ -2025,14 +2026,29 @@ class Bagel(PreTrainedModel):
         packed_sequence = packed_text_embedding.new_zeros((sequence_length, self.hidden_size))
         packed_sequence[packed_text_indexes] = packed_text_embedding.detach()
 
-        sparse_mask = create_sparse_mask(sample_lens, split_lens, attn_modes, packed_text_embedding.device)
+        # Pad seqlen to a multiple of BLOCK_SIZE (required by create_block_mask)
+        BLOCK_SIZE = 128
         seqlen = sum(sample_lens)
+        pad_len = (BLOCK_SIZE - seqlen % BLOCK_SIZE) % BLOCK_SIZE
+        if pad_len > 0:
+            padded_seqlen = seqlen + pad_len
+            padded_split_lens = split_lens + [pad_len]
+            padded_attn_modes = attn_modes + ["full"]
+            padded_sample_lens = [padded_seqlen]
+            packed_sequence = F.pad(packed_sequence, (0, 0, 0, pad_len))
+        else:
+            padded_seqlen = seqlen
+            padded_split_lens = split_lens
+            padded_attn_modes = attn_modes
+            padded_sample_lens = sample_lens
+
+        sparse_mask = create_sparse_mask(padded_sample_lens, padded_split_lens, padded_attn_modes, packed_text_embedding.device)
         block_mask = create_block_mask(
             sparse_mask,
             B=1,
             H=self.num_heads,
-            Q_LEN=seqlen,
-            KV_LEN=seqlen,
+            Q_LEN=padded_seqlen,
+            KV_LEN=padded_seqlen,
             device=packed_text_embedding.device,
             BLOCK_SIZE=128,
             _compile=False,
@@ -2063,6 +2079,10 @@ class Bagel(PreTrainedModel):
         if needs_grad:
             packed_sequence.requires_grad_(True)
 
+        # Pad packed_position_ids to match padded_seqlen
+        if pad_len > 0:
+            packed_position_ids = F.pad(packed_position_ids, (0, pad_len), value=0)
+
         cos, sin = model_module.rotary_emb(packed_sequence, packed_position_ids.unsqueeze(0))
         packed_position_embeddings = (cos.squeeze(0).detach(), sin.squeeze(0).detach())
 
@@ -2079,7 +2099,7 @@ class Bagel(PreTrainedModel):
         def apply_layer(layer, seq):
             layer_kwargs = dict(
                 packed_sequence=seq,
-                sample_lens=sample_lens,
+                sample_lens=padded_sample_lens,
                 attention_mask=attention_mask,
                 packed_position_embeddings=packed_position_embeddings,
                 **extra_inputs,
@@ -2116,7 +2136,8 @@ class Bagel(PreTrainedModel):
         else:
             packed_sequence = model_module.norm(packed_sequence)
 
-        return packed_sequence
+        # Trim padding back to original sequence length
+        return packed_sequence[:seqlen]
 
     def _build_ce_forward_inputs(self, vit_tensor, question_text, answer_text, tokenizer, new_token_ids, device):
         start_of_image = self._get_token_id(new_token_ids, 'start_of_image')
