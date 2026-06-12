@@ -44,12 +44,31 @@ instead of blue, and the background should be a forest not a city."
 Please be specific about what needs to be changed:
 
 
-if model_feedback_clean.startswith("MATCH:"):
-        print("🎉 完美匹配！图像已符合预期，无需修改。")
-        # 结束流程或保存图像
+import re
+
+def parse_model_feedback(feedback_text):
+    """
+    鲁棒地解析模型的审查反馈，无视 Markdown 符号和前置废话。
+    返回一个 tuple: (status, instruction)
+    status 可以是 "MATCH", "EDIT_NEEDED", 或 "UNKNOWN"
+    """
+    # 1. 过滤掉可能干扰的 Markdown 加粗/斜体符号
+    clean_text = feedback_text.replace('*', '').strip()
+    
+    # 2. 优先匹配 EDIT_NEEDED 并提取后面的指令
+    # re.IGNORECASE: 忽略大小写
+    # re.DOTALL: 允许提取跨越多行的指令
+    edit_match = re.search(r'EDIT_NEEDED:\s*(.*)', clean_text, re.IGNORECASE | re.DOTALL)
+    if edit_match:
+        # 提取出具体的修改建议
+        instruction = edit_match.group(1).strip()
+        return "EDIT_NEEDED", instruction
         
-    elif model_feedback_clean.startswith("EDIT_NEEDED:"):
-        # 提取具体的修改指令
-        # 移除 "EDIT_NEEDED:" 前缀和前后的空格
-        edit_instruction = model_feedback_clean.replace("EDIT_NEEDED:", "").strip()
-        print(f"⚠️ 检测到不匹配。提取出的修改指令为: \n👉 \"{edit_instruction}\"")
+    # 3. 匹配 MATCH 关键字
+    # 只要文本中独立出现了 MATCH（忽略大小写），就认为通过
+    match_found = re.search(r'\bMATCH\b', clean_text, re.IGNORECASE)
+    if match_found:
+        return "MATCH", None
+        
+    # 4. 如果模型完全胡言乱语，没有按指令输出
+    return "UNKNOWN", clean_text
