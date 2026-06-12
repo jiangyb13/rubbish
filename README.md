@@ -72,3 +72,51 @@ def parse_model_feedback(feedback_text):
         
     # 4. 如果模型完全胡言乱语，没有按指令输出
     return "UNKNOWN", clean_text
+
+
+C:\Users\lwx1468560\.ssh>ssh root@7.221.78.88 -p 31248 -i C:\Users\lwx1468560\.ssh\ziyi -v
+OpenSSH_for_Windows_9.5p1, LibreSSL 3.8.2
+debug1: Connecting to 7.221.78.88 [7.221.78.88] port 31248.
+debug1: Connection established.
+debug1: identity file C:\\Users\\lwx1468560\\.ssh\\ziyi type 3
+debug1: identity file C:\\Users\\lwx1468560\\.ssh\\ziyi-cert type -1
+debug1: Local version string SSH-2.0-OpenSSH_for_Windows_9.5
+debug1: Remote protocol version 2.0, remote software version OpenSSH_8.9p1 Ubuntu-3ubuntu0.13
+debug1: compat_banner: match: OpenSSH_8.9p1 Ubuntu-3ubuntu0.13 pat OpenSSH* compat 0x04000000
+debug1: Authenticating to 7.221.78.88:31248 as 'root'
+debug1: load_hostkeys: fopen C:\\Users\\lwx1468560/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen __PROGRAMDATA__\\ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen __PROGRAMDATA__\\ssh/ssh_known_hosts2: No such file or directory
+debug1: SSH2_MSG_KEXINIT sent
+debug1: SSH2_MSG_KEXINIT received
+debug1: kex: algorithm: curve25519-sha256
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+debug1: SSH2_MSG_KEX_ECDH_REPLY received
+debug1: Server host key: ssh-ed25519 SHA256:VOxphQ64sR6mz2dlF28PMcfEysAzN8/oVT3Lfy86XiM
+debug1: load_hostkeys: fopen C:\\Users\\lwx1468560/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen __PROGRAMDATA__\\ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen __PROGRAMDATA__\\ssh/ssh_known_hosts2: No such file or directory
+debug1: Host '[7.221.78.88]:31248' is known and matches the ED25519 host key.
+debug1: Found key in C:\\Users\\lwx1468560/.ssh/known_hosts:4
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 3
+debug1: rekey out after 134217728 blocks
+debug1: SSH2_MSG_NEWKEYS sent
+debug1: expecting SSH2_MSG_NEWKEYS
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS received
+debug1: rekey in after 134217728 blocks
+debug1: get_agent_identities: ssh_get_authentication_socket: No such file or directory
+debug1: Will attempt key: C:\\Users\\lwx1468560\\.ssh\\ziyi ED25519 SHA256:m5b97publFWuCnCa4hSVnii5hu0JTKCYtUJ93hXSrVU explicit
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_input_ext_info: server-sig-algs=<ssh-ed25519,sk-ssh-ed25519@openssh.com,ssh-rsa,rsa-sha2-256,rsa-sha2-512,ssh-dss,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey,password
+debug1: Next authentication method: publickey
+debug1: Offering public key: C:\\Users\\lwx1468560\\.ssh\\ziyi ED25519 SHA256:m5b97publFWuCnCa4hSVnii5hu0JTKCYtUJ93hXSrVU explicit
+debug1: Authentications that can continue: publickey,password
+debug1: Next authentication method: password
+root@7.221.78.88's password:
