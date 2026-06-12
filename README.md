@@ -42,3 +42,14 @@ instructions]"
 For example: "EDIT_NEEDED: The character should be wearing a red dress
 instead of blue, and the background should be a forest not a city."
 Please be specific about what needs to be changed:
+
+
+if model_feedback_clean.startswith("MATCH:"):
+        print("🎉 完美匹配！图像已符合预期，无需修改。")
+        # 结束流程或保存图像
+        
+    elif model_feedback_clean.startswith("EDIT_NEEDED:"):
+        # 提取具体的修改指令
+        # 移除 "EDIT_NEEDED:" 前缀和前后的空格
+        edit_instruction = model_feedback_clean.replace("EDIT_NEEDED:", "").strip()
+        print(f"⚠️ 检测到不匹配。提取出的修改指令为: \n👉 \"{edit_instruction}\"")
