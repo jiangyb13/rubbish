@@ -2035,7 +2035,7 @@ class Bagel(PreTrainedModel):
             KV_LEN=seqlen,
             device=packed_text_embedding.device,
             BLOCK_SIZE=128,
-            _compile=True,
+            _compile=False,
         )
         attention_mask = block_mask
 
