@@ -1,286 +1,195 @@
-const state = {
-  offset: 0,
-  limit: 20,
-  total: 0,
-  view: "pairs",
-};
+import argparse
+import json
+import os
+from pathlib import Path
 
-function mediaUrl(path) {
-  if (!path) return "";
-  return `/media?path=${encodeURIComponent(path)}`;
-}
+from flask import Flask, jsonify, render_template, request, send_file
 
-function esc(value) {
-  return String(value ?? "").replace(/[&<>"']/g, ch => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  }[ch]));
-}
 
-function pill(ok, label) {
-  return `<span class="pill ${ok ? "ok" : "bad"}">${esc(label)}=${ok ? "true" : "false"}</span>`;
-}
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_JSONL = PROJECT_ROOT / "outputs_demo" / "training_pairs" / "pairs.jsonl"
+DEFAULT_PERSON_CLUSTERS = PROJECT_ROOT / "outputs_demo" / "identity_matching" / "person_clusters"
+DEFAULT_FILTED_POOL = PROJECT_ROOT / "filted_pool"
 
-function metricList(meta) {
-  if (!meta) return "";
-  const keys = ["bucket", "emotion", "shot_key", "shot_no", "frame_idx", "yaw", "pitch", "roll", "emotion_score"];
-  const bodyPose = meta.body_pose || {};
-  const base = keys
-    .filter(key => meta[key] !== undefined && meta[key] !== null && meta[key] !== "")
-    .map(key => `<span>${esc(key)}=${esc(meta[key])}</span>`);
-  if (bodyPose.label) base.push(`<span>body_label=${esc(bodyPose.label)}</span>`);
-  if (bodyPose.body_part) base.push(`<span>body_part=${esc(bodyPose.body_part)}</span>`);
-  return base.join("");
-}
 
-function imageTile(path, label, meta = {}, whitePath = null) {
-  if (!path && !whitePath) {
-    return `<div class="tile missing"><div class="thumb empty">missing</div><b>${esc(label)}</b></div>`;
-  }
-  const thumb = (p, tag) => p
-    ? `<figure class="thumbWrap">
-         <img class="thumb" src="${mediaUrl(p)}" loading="lazy" alt="${esc(label)} ${tag}" onclick="openLightbox('${mediaUrl(p)}')">
-         ${tag ? `<figcaption>${esc(tag)}</figcaption>` : ""}
-       </figure>`
-    : `<figure class="thumbWrap"><div class="thumb empty">missing</div>${tag ? `<figcaption>${esc(tag)}</figcaption>` : ""}</figure>`;
-  const imgs = whitePath
-    ? `<div class="thumbPair">${thumb(path, "orig")}${thumb(whitePath, "white")}</div>`
-    : thumb(path, "");
-  return `
-    <div class="tile">
-      ${imgs}
-      <b>${esc(label)}</b>
-      <div class="meta">${metricList(meta)}</div>
-      ${path ? `<div class="path">${esc(path)}</div>` : ""}
-      ${whitePath ? `<div class="path">${esc(whitePath)}</div>` : ""}
-    </div>
-  `;
-}
+def resolve_repo_path(path):
+    if not path:
+        return None
+    path = os.path.expanduser(str(path))
+    if os.path.isabs(path):
+        return Path(path).resolve()
+    return (PROJECT_ROOT / path).resolve()
 
-function openLightbox(src) {
-  const overlay = document.getElementById("lightbox");
-  const img = document.getElementById("lightboxImg");
-  img.src = src;
-  overlay.classList.add("active");
-}
 
-function closeLightbox() {
-  const overlay = document.getElementById("lightbox");
-  const img = document.getElementById("lightboxImg");
-  overlay.classList.remove("active");
-  img.src = "";
-}
+def repo_relative(path):
+    if not path:
+        return None
+    resolved = resolve_repo_path(path)
+    try:
+        return str(resolved.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
 
-document.addEventListener("keydown", event => {
-  if (event.key === "Escape") closeLightbox();
-});
 
-function targetVideoTile(path) {
-  const url = mediaUrl(path);
-  return `
-    <div class="videoTile">
-      <b>target_video</b>
-      <div class="videoPlaceholder">
-        <span>video not preloaded</span>
-        ${path ? `<a href="${url}" target="_blank" rel="noopener">open video</a>` : ""}
-      </div>
-      <div class="path">${esc(path)}</div>
-    </div>
-  `;
-}
+def read_jsonl(path):
+    rows = []
+    if not path or not path.exists():
+        return rows
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return rows
 
-function gallery(title, paths, metas, whitePaths) {
-  const tiles = (paths || []).map((path, index) => {
-    const meta = (metas || [])[index] || {};
-    const white = (whitePaths || [])[index] || null;
-    const label = meta.bucket || meta.emotion || `${title}_${index + 1}`;
-    return imageTile(path, label, meta, white);
-  }).join("") || `<div class="empty">No refs selected</div>`;
-  return `
-    <section class="block">
-      <div class="blockHead">
-        <h3>${esc(title)}</h3>
-        <span class="reason">${(paths || []).length} refs</span>
-      </div>
-      <div class="gallery">${tiles}</div>
-    </section>
-  `;
-}
 
-function rowCard(row, index) {
-  const stats = row.selection_stats || {};
-  const statHtml = Object.entries(stats)
-    .map(([key, value]) => `<span>${esc(key)}=${esc(value)}</span>`)
-    .join("");
+def person_dirs(root):
+    if not root or not root.exists():
+        return []
+    return [
+        path
+        for path in sorted(root.iterdir())
+        if path.is_dir() and path.name.startswith("person_")
+    ]
 
-  return `
-    <article class="card">
-      <header class="cardHead">
-        <div>
-          <h2>#${state.offset + index + 1} ${esc(row.person_id)}</h2>
-          <p>${esc(row.source_shot_key)} | uid=${esc(row.source_uid)}</p>
-        </div>
-      </header>
-      <section class="target">
-        ${imageTile(row.first_frame, "first_frame")}
-        ${targetVideoTile(row.target_video)}
-      </section>
-      ${gallery("angle_ref", row.angle_ref, row.angle_ref_meta, row.angle_ref_white)}
-      ${gallery("emo_ref", row.emo_ref, row.emo_ref_meta, row.emo_ref_white)}
-      ${gallery("body_pose_ref", row.body_pose_ref, row.body_pose_ref_meta, row.body_pose_ref_white)}
-      <div class="stats">${statHtml}</div>
-    </article>
-  `;
-}
 
-function formatDeg(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? `${number.toFixed(1)} deg` : "-";
-}
+def pass_filter(row, flag_filter, person_id):
+    if person_id and row.get("person_id") != person_id:
+        return False
+    if flag_filter == "has_angle":
+        return bool(row.get("angle_ref"))
+    if flag_filter == "has_emo":
+        return bool(row.get("emo_ref"))
+    if flag_filter == "has_body_pose":
+        return bool(row.get("body_pose_ref"))
+    return True
 
-function poolImagePath(row) {
-  const imageType = document.getElementById("poolImageTypeSelect").value || "face_orig";
-  const related = row.related_images || {};
-  return related[imageType] || row.pool_image_path || row.image_path || related.face_orig;
-}
 
-function poolTile(row) {
-  const expression = row.expression || {};
-  const pose = row.pose || {};
-  const path = poolImagePath(row);
-  const src = mediaUrl(path);
-  const emo = expression.dominant ? `<div class="emotionBadge">${esc(expression.dominant)}</div>` : "";
-  const flag = typeof expression.emo_flag === "boolean"
-    ? `<div class="emoFlag ${expression.emo_flag ? "true" : "false"}">VLM ${expression.emo_flag ? "true" : "false"}</div>`
-    : "";
-  return `
-    <div class="poolPhoto" title="${esc(path)}">
-      <div class="poolImgWrap">
-        <img src="${src}" loading="lazy" onclick="openLightbox('${src}')">
-        ${flag}
-        ${emo}
-      </div>
-      <div class="poolPose">
-        <span>P ${esc(formatDeg(pose.pitch))}</span>
-        <span>Y ${esc(formatDeg(pose.yaw))}</span>
-        <span>R ${esc(formatDeg(pose.roll))}</span>
-      </div>
-      <div class="poolCaption">${esc(row.shot_key)} / f${esc(row.frame_idx)}</div>
-    </div>
-  `;
-}
+def make_app(pairs_jsonl):
+    app = Flask(__name__)
+    app.config["PAIRS_JSONL"] = resolve_repo_path(pairs_jsonl)
+    app.config["PERSON_CLUSTERS_DIR"] = DEFAULT_PERSON_CLUSTERS
+    app.config["FILTED_POOL_DIR"] = DEFAULT_FILTED_POOL
 
-async function loadSummary() {
-  if (state.view === "pool") {
-    return loadPoolSummary();
-  }
-  const res = await fetch("/api/summary");
-  const summary = await res.json();
-  document.getElementById("summary").innerHTML = `
-    <div><b>Total</b><span>${summary.total}</span></div>
-    <div><b>Persons</b><span>${summary.person_count}</span></div>
-    <div><b>Angle refs</b><span>${summary.angle_refs}</span></div>
-    <div><b>Emo refs</b><span>${summary.emo_refs}</span></div>
-    <div><b>Body refs</b><span>${summary.body_pose_refs}</span></div>
-  `;
+    @app.route("/")
+    def index():
+        return render_template("index.html", pairs_jsonl=repo_relative(app.config["PAIRS_JSONL"]))
 
-  const select = document.getElementById("personSelect");
-  select.innerHTML = `<option value="">All persons</option>` + summary.persons
-    .map(person => `<option value="${esc(person)}">${esc(person)}</option>`)
-    .join("");
-}
+    @app.route("/api/summary")
+    def api_summary():
+        rows = read_jsonl(app.config["PAIRS_JSONL"])
+        persons = sorted({row.get("person_id") for row in rows if row.get("person_id")})
+        return jsonify(
+            {
+                "pairs_jsonl": repo_relative(app.config["PAIRS_JSONL"]),
+                "total": len(rows),
+                "persons": persons,
+                "person_count": len(persons),
+                "angle_refs": sum(len(row.get("angle_ref") or []) for row in rows),
+                "emo_refs": sum(len(row.get("emo_ref") or []) for row in rows),
+                "body_pose_refs": sum(len(row.get("body_pose_ref") or []) for row in rows),
+            }
+        )
 
-async function loadPoolSummary() {
-  const res = await fetch("/api/pool/summary");
-  const summary = await res.json();
-  document.getElementById("summary").innerHTML = `
-    <div><b>Pool persons</b><span>${summary.person_count}</span></div>
-    <div><b>Pool frames</b><span>${summary.total_frames}</span></div>
-  `;
+    @app.route("/api/pairs")
+    def api_pairs():
+        rows = read_jsonl(app.config["PAIRS_JSONL"])
+        flag_filter = request.args.get("flag", "all")
+        person_id = request.args.get("person_id", "")
+        offset = max(0, int(request.args.get("offset", 0)))
+        limit = max(1, min(200, int(request.args.get("limit", 30))))
 
-  const select = document.getElementById("personSelect");
-  select.innerHTML = `<option value="">Select person</option>` + summary.persons
-    .map(person => `<option value="${esc(person.person_id)}">${esc(person.person_id)} (${person.count})</option>`)
-    .join("");
-  if (!select.value && summary.persons.length > 0) {
-    select.value = summary.persons[0].person_id;
-  }
-}
+        filtered = [row for row in rows if pass_filter(row, flag_filter, person_id)]
+        page = filtered[offset : offset + limit]
+        return jsonify(
+            {
+                "total": len(filtered),
+                "offset": offset,
+                "limit": limit,
+                "rows": page,
+            }
+        )
 
-async function loadRows() {
-  if (state.view === "pool") {
-    return loadPoolRows();
-  }
-  const person = document.getElementById("personSelect").value;
-  const params = new URLSearchParams({
-    offset: state.offset,
-    limit: state.limit,
-    person_id: person,
-    flag: "all",
-  });
-  const res = await fetch(`/api/pairs?${params.toString()}`);
-  const data = await res.json();
-  state.total = data.total;
-  document.getElementById("content").innerHTML = data.rows
-    .map((row, index) => rowCard(row, index))
-    .join("") || `<div class="emptyPage">No rows match the current filter.</div>`;
-  document.getElementById("prevBtn").disabled = state.offset <= 0;
-  document.getElementById("nextBtn").disabled = state.offset + state.limit >= state.total;
-}
+    @app.route("/api/pool/summary")
+    def api_pool_summary():
+        people = []
+        total_frames = 0
+        for person_dir in person_dirs(app.config["FILTED_POOL_DIR"]):
+            meta_path = person_dir / "filtered_pool_meta.json"
+            jsonl_path = person_dir / "filtered_pool.jsonl"
+            if not jsonl_path.exists():
+                continue
+            meta = {}
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    meta = {}
+            count = int(meta.get("output_frame_count") or len(read_jsonl(jsonl_path)))
+            total_frames += count
+            people.append(
+                {
+                    "person_id": person_dir.name,
+                    "count": count,
+                    "jsonl_path": repo_relative(jsonl_path),
+                    "meta_path": repo_relative(meta_path) if meta_path.exists() else None,
+                    "distance": meta.get("distance"),
+                    "max_per_shot": meta.get("max_per_shot"),
+                }
+            )
+        return jsonify(
+            {
+                "person_count": len(people),
+                "total_frames": total_frames,
+                "persons": people,
+            }
+        )
 
-async function loadPoolRows() {
-  const person = document.getElementById("personSelect").value;
-  const params = new URLSearchParams({
-    offset: state.offset,
-    limit: 60,
-    person_id: person,
-  });
-  const res = await fetch(`/api/pool?${params.toString()}`);
-  const data = await res.json();
-  state.total = data.total;
-  document.getElementById("content").innerHTML = data.rows.length
-    ? `<section class="poolPanel">
-        <div class="poolPanelHead">
-          <h2>${esc(person)}</h2>
-          <span>${state.offset + 1}-${Math.min(state.offset + 60, state.total)} / ${state.total}</span>
-        </div>
-        <div class="poolGrid">${data.rows.map(row => poolTile(row)).join("")}</div>
-      </section>`
-    : `<div class="emptyPage">No filtered pool rows. Run TASK_NAME=pool_filted first.</div>`;
-  document.getElementById("prevBtn").disabled = state.offset <= 0;
-  document.getElementById("nextBtn").disabled = state.offset + 60 >= state.total;
-}
+    @app.route("/api/pool")
+    def api_pool():
+        person_id = request.args.get("person_id", "")
+        offset = max(0, int(request.args.get("offset", 0)))
+        limit = max(1, min(300, int(request.args.get("limit", 60))))
+        if not person_id:
+            return jsonify({"total": 0, "offset": offset, "limit": limit, "rows": []})
+        jsonl_path = app.config["FILTED_POOL_DIR"] / person_id / "filtered_pool.jsonl"
+        rows = read_jsonl(jsonl_path)
+        page = rows[offset : offset + limit]
+        return jsonify({"total": len(rows), "offset": offset, "limit": limit, "rows": page})
 
-function resetAndLoad() {
-  state.offset = 0;
-  loadRows();
-}
+    @app.route("/media")
+    def media():
+        raw_path = request.args.get("path", "")
+        resolved = resolve_repo_path(raw_path)
+        if not resolved or not resolved.exists() or not resolved.is_file():
+            return "not found", 404
+        try:
+            resolved.relative_to(PROJECT_ROOT)
+        except ValueError:
+            return "outside project root", 403
+        return send_file(str(resolved))
 
-document.getElementById("viewSelect").addEventListener("change", async event => {
-  state.view = event.target.value;
-  state.offset = 0;
-  document.getElementById("flagSelect").style.display = "none";
-  document.getElementById("poolImageTypeSelect").style.display = state.view === "pool" ? "" : "none";
-  await loadSummary();
-  await loadRows();
-});
-document.getElementById("personSelect").addEventListener("change", resetAndLoad);
-document.getElementById("flagSelect").addEventListener("change", resetAndLoad);
-document.getElementById("poolImageTypeSelect").addEventListener("change", resetAndLoad);
-document.getElementById("prevBtn").addEventListener("click", () => {
-  const step = state.view === "pool" ? 60 : state.limit;
-  state.offset = Math.max(0, state.offset - step);
-  loadRows();
-});
-document.getElementById("nextBtn").addEventListener("click", () => {
-  const step = state.view === "pool" ? 60 : state.limit;
-  if (state.offset + step < state.total) {
-    state.offset += step;
-    loadRows();
-  }
-});
+    return app
 
-loadSummary().then(loadRows);
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Visualize generated training pairs.")
+    parser.add_argument("--pairs-jsonl", default=os.environ.get("PAIRS_JSONL", str(DEFAULT_JSONL)))
+    parser.add_argument("--person-clusters-dir", default=os.environ.get("PERSON_CLUSTERS_DIR", str(DEFAULT_PERSON_CLUSTERS)))
+    parser.add_argument("--filted-pool-dir", default=os.environ.get("FILTED_POOL_DIR", str(DEFAULT_FILTED_POOL)))
+    parser.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "7893")))
+    parser.add_argument("--debug", action="store_true")
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    app = make_app(args.pairs_jsonl)
+    app.config["PERSON_CLUSTERS_DIR"] = resolve_repo_path(args.person_clusters_dir)
+    app.config["FILTED_POOL_DIR"] = resolve_repo_path(args.filted_pool_dir)
+    app.run(host=args.host, port=args.port, debug=args.debug)
