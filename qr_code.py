@@ -8,6 +8,7 @@ CUDA_VISIBLE_DEVICES=0 TASK_NAME=index_add python main.py \
   --enable_face_bbox_boundary_quality_check True \
   --enable_face_mask_coverage_quality_check True \
   --face_mask_min_foreground_ratio 0.98 \
+  --face_mask_coverage_max_abs_yaw 30.0 \
   --face_quality_model_name buffalo_l \
   --face_quality_model_root /mnt/nfs/data/pretrained_models/insightface \
   --face_quality_device cuda:0 \
@@ -24,6 +25,7 @@ CUDA_VISIBLE_DEVICES=0 TASK_NAME=index_add python main.py \
 #   --enable_face_bbox_boundary_quality_check True \
 #   --enable_face_mask_coverage_quality_check True \
 #   --face_mask_min_foreground_ratio 0.98 \
+#   --face_mask_coverage_max_abs_yaw 30.0 \
 #   --face_quality_model_name buffalo_l \
 #   --face_quality_model_root /mnt/nfs/data/pretrained_models/insightface \
 #   --face_quality_device cuda:0 \
@@ -40,6 +42,7 @@ CUDA_VISIBLE_DEVICES=0 TASK_NAME=index_add python main.py \
 #   --enable_face_bbox_boundary_quality_check True \
 #   --enable_face_mask_coverage_quality_check True \
 #   --face_mask_min_foreground_ratio 0.98 \
+#   --face_mask_coverage_max_abs_yaw 30.0 \
 #   --face_quality_model_name buffalo_l \
 #   --face_quality_model_root /mnt/nfs/data/pretrained_models/insightface \
 #   --face_quality_device cuda:0 \
