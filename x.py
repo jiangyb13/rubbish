@@ -321,6 +321,220 @@ def mask_hole_quality(
         return result
 
 
+def _quality_passed(entry: dict) -> bool:
+    quality = entry.get("quality")
+    if isinstance(quality, dict):
+        for item in quality.values():
+            if isinstance(item, dict) and item.get("passed") is False:
+                return False
+    return bool(entry.get("quality_label", True))
+
+
+def _set_quality_item(entry: dict, name: str, value: dict) -> None:
+    quality = entry.get("quality")
+    if not isinstance(quality, dict):
+        quality = {}
+    quality[name] = dict(value)
+    entry["quality"] = quality
+    entry["quality_label"] = _quality_passed(entry)
+
+
+def _load_binary_mask(mask_path: Optional[str]):
+    if not mask_path:
+        return None
+    resolved = resolve_repo_path(mask_path)
+    if not os.path.isfile(resolved):
+        return None
+    import cv2
+    import numpy as np
+
+    if resolved.lower().endswith(".npy"):
+        return np.load(resolved) > 0
+    mask = cv2.imread(resolved, cv2.IMREAD_GRAYSCALE)
+    return None if mask is None else mask > 0
+
+
+def _expanded_bbox(bbox, ratio: float):
+    x1, y1, x2, y2 = map(float, bbox)
+    cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+    w, h = max(0.0, x2 - x1), max(0.0, y2 - y1)
+    nw, nh = w * float(ratio), h * float(ratio)
+    return (cx - nw / 2.0, cy - nh / 2.0, cx + nw / 2.0, cy + nh / 2.0)
+
+
+def _bbox_touches_image_boundary(bbox, image_shape) -> bool:
+    if bbox is None or image_shape is None:
+        return False
+    h, w = image_shape[:2]
+    x1, y1, x2, y2 = map(float, bbox)
+    return x1 <= 0 or y1 <= 0 or x2 >= w or y2 >= h
+
+
+class FaceBoundaryQualityChecker:
+    """Stage4 face quality: expanded bbox boundary + original bbox SAM coverage."""
+
+    def __init__(
+        self,
+        model_name: str = "buffalo_l",
+        model_root: str = "./pretrained_models/insightface",
+        device: str = "cuda:0",
+        det_size: int = 640,
+        expand_ratio: float = 1.1,
+        min_foreground_ratio: float = 1.0,
+        check_boundary: bool = True,
+        check_mask_coverage: bool = True,
+    ):
+        self._model_name = model_name
+        self._model_root = model_root
+        self._device = device
+        self._det_size = int(det_size)
+        self._expand_ratio = float(expand_ratio)
+        self._min_foreground_ratio = float(min_foreground_ratio)
+        self._check_boundary = bool(check_boundary)
+        self._check_mask_coverage = bool(check_mask_coverage)
+        self._app = None
+        self._cv2 = None
+        self._np = None
+
+    def _load_backend(self) -> None:
+        if self._app is not None:
+            return
+        import cv2
+        import numpy as np
+        from insightface.app import FaceAnalysis
+
+        providers = ["CPUExecutionProvider"] if str(self._device).lower() == "cpu" else ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        ctx_id = -1
+        if str(self._device).startswith("cuda"):
+            try:
+                ctx_id = int(str(self._device).split(":", 1)[1])
+            except (IndexError, ValueError):
+                ctx_id = 0
+        self._cv2 = cv2
+        self._np = np
+        self._app = FaceAnalysis(
+            name=self._model_name,
+            root=resolve_repo_path(self._model_root),
+            providers=providers,
+        )
+        self._app.prepare(ctx_id=ctx_id, det_size=(self._det_size, self._det_size))
+
+    def check(self, image_path: Optional[str], mask_path: Optional[str]) -> dict:
+        common = {
+            "image_path": image_path,
+            "mask_path": mask_path,
+            "face_bbox": None,
+            "det_score": None,
+            "image_size": None,
+        }
+        boundary = {
+            **common,
+            "checked": False,
+            "expanded_face_bbox": None,
+            "expand_ratio": self._expand_ratio,
+            "touches_boundary": False,
+            "passed": True,
+            "status": "disabled" if not self._check_boundary else "missing_face_orig",
+        }
+        mask_coverage = {
+            **common,
+            "checked": False,
+            "mask_face_bbox": None,
+            "mask_foreground_ratio": None,
+            "mask_background_pixel_count": None,
+            "min_foreground_ratio": self._min_foreground_ratio,
+            "passed": True,
+            "status": "disabled" if not self._check_mask_coverage else "missing_face_orig",
+        }
+        result = {}
+        if self._check_boundary:
+            result["face_bbox_boundary"] = boundary
+        if self._check_mask_coverage:
+            result["face_mask_coverage"] = mask_coverage
+        if not image_path:
+            return result
+
+        try:
+            self._load_backend()
+            image = self._cv2.imread(resolve_repo_path(image_path))
+            if image is None:
+                for item in result.values():
+                    item["status"] = "cannot_read_image"
+                return result
+            faces = self._app.get(image)
+            if faces is None or len(faces) == 0:
+                for item in result.values():
+                    item.update({"checked": True, "status": "no_face_detected", "passed": False})
+                return result
+
+            face = max(faces, key=lambda item: item.det_score)
+            bbox = face.bbox.astype(float)
+            common_update = {
+                "checked": True,
+                "face_bbox": [float(v) for v in bbox],
+                "det_score": float(face.det_score),
+                "image_size": [int(image.shape[1]), int(image.shape[0])],
+                "status": "ok",
+            }
+            for item in result.values():
+                item.update(common_update)
+
+            if self._check_boundary:
+                expanded = _expanded_bbox(bbox, self._expand_ratio)
+                touches_boundary = _bbox_touches_image_boundary(expanded, image.shape)
+                boundary.update({
+                    "expanded_face_bbox": [float(v) for v in expanded],
+                    "touches_boundary": bool(touches_boundary),
+                    "passed": not touches_boundary,
+                    "status": "face_bbox_touches_boundary" if touches_boundary else "ok",
+                })
+
+            if not self._check_mask_coverage:
+                return result
+
+            mask = _load_binary_mask(mask_path)
+            if mask is None:
+                mask_coverage["status"] = "missing_mask"
+                return result
+            if mask.shape[:2] != image.shape[:2]:
+                mask = self._cv2.resize(
+                    mask.astype("uint8"),
+                    (image.shape[1], image.shape[0]),
+                    interpolation=self._cv2.INTER_NEAREST,
+                ) > 0
+
+            h, w = mask.shape[:2]
+            x1, y1, x2, y2 = map(int, [
+                self._np.floor(bbox[0]),
+                self._np.floor(bbox[1]),
+                self._np.ceil(bbox[2]),
+                self._np.ceil(bbox[3]),
+            ])
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            if x2 <= x1 or y2 <= y1:
+                mask_coverage.update({"status": "empty_face_bbox", "passed": False})
+                return result
+            roi = mask[y1:y2, x1:x2]
+            fg_count = int(self._np.count_nonzero(roi))
+            total = int(roi.size)
+            bg_count = total - fg_count
+            fg_ratio = float(fg_count / total) if total else 0.0
+            mask_passed = fg_ratio >= self._min_foreground_ratio
+            mask_coverage.update({
+                "mask_face_bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "mask_foreground_ratio": fg_ratio,
+                "mask_background_pixel_count": bg_count,
+                "passed": bool(mask_passed),
+                "status": "ok" if mask_passed else "face_bbox_contains_mask_background",
+            })
+            return result
+        except Exception as exc:
+            for item in result.values():
+                item.update({"status": "error", "error_msg": str(exc)})
+            return result
+
+
 def load_cluster_meta(cluster_dir: str) -> dict:
     meta_path = os.path.join(cluster_dir, "cluster_meta.json")
     if not os.path.isfile(meta_path):
@@ -991,6 +1205,25 @@ class BodyPoseExtractor:
             }
 
 
+def build_face_boundary_quality_checker(config, force: bool = False) -> Optional[FaceBoundaryQualityChecker]:
+    del force
+    enable_all = bool(getattr(config, "enable_face_boundary_quality_check", False))
+    check_boundary = enable_all or bool(getattr(config, "enable_face_bbox_boundary_quality_check", False))
+    check_mask_coverage = enable_all or bool(getattr(config, "enable_face_mask_coverage_quality_check", False))
+    if not check_boundary and not check_mask_coverage:
+        return None
+    return FaceBoundaryQualityChecker(
+        model_name=getattr(config, "face_quality_model_name", "buffalo_l"),
+        model_root=getattr(config, "face_quality_model_root", "./pretrained_models/insightface"),
+        device=getattr(config, "face_quality_device", "cuda:0"),
+        det_size=getattr(config, "face_quality_det_size", 640),
+        expand_ratio=getattr(config, "face_boundary_expand_ratio", 1.1),
+        min_foreground_ratio=getattr(config, "face_mask_min_foreground_ratio", 1.0),
+        check_boundary=check_boundary,
+        check_mask_coverage=check_mask_coverage,
+    )
+
+
 def build_feature_extractors(config) -> Dict[str, Callable[[dict], dict]]:
     extractors = {}
     if config.enable_emotion:
@@ -1019,12 +1252,15 @@ def build_person_index(
     progress_position: int = 1,
     enable_mask_hole_quality_check: bool = True,
     mask_hole_threshold: int = 0,
+    face_boundary_quality_checker: Optional[FaceBoundaryQualityChecker] = None,
 ) -> dict:
     enabled_features = []
     if include_pose:
         enabled_features.append("pose")
     if enable_mask_hole_quality_check:
         enabled_features.append("mask_hole_quality")
+    if face_boundary_quality_checker is not None:
+        enabled_features.append("face_boundary_quality")
     enabled_features.extend(feature_extractors.keys())
 
     output = empty_output(person_id, cluster_dir, enabled_features)
@@ -1055,6 +1291,12 @@ def build_person_index(
                 image_type: identity_paths.get(image_type) or one_shot_paths.get(image_type)
                 for image_type in CORE_IMAGE_TYPES
             }
+            face_boundary_quality = None
+            if face_boundary_quality_checker is not None:
+                face_boundary_quality = face_boundary_quality_checker.check(
+                    image_path=related_images.get("face_orig"),
+                    mask_path=white_image_mask_path(record, "face_white", frame_idx),
+                )
             context = {
                 "person_id": person_id,
                 "uid": uid,
@@ -1094,6 +1336,7 @@ def build_person_index(
                 derived_metadata = cluster_image_metadata.get(image_type, {}).get(key)
                 if derived_metadata:
                     attrs.update(derived_metadata)
+                attrs["quality_label"] = True
                 if enable_mask_hole_quality_check:
                     quality = mask_hole_quality(
                         image_path=image_path,
@@ -1101,10 +1344,10 @@ def build_person_index(
                         image_type=image_type,
                         threshold=mask_hole_threshold,
                     )
-                    attrs["quality"] = {"mask_hole": quality}
-                    attrs["quality_label"] = bool(quality.get("passed", True))
-                else:
-                    attrs["quality_label"] = True
+                    _set_quality_item(attrs, "mask_hole", quality)
+                if face_boundary_quality is not None and image_type in ("face_orig", "face_white"):
+                    for quality_name, quality_value in face_boundary_quality.items():
+                        _set_quality_item(attrs, quality_name, quality_value)
                 if include_pose:
                     pose_attrs = {
                         "pitch": float(pose.get("pitch", 0.0)),
@@ -1267,7 +1510,11 @@ def _mask_path_from_white_image_path(image_path: Optional[str], image_type: str)
     return None
 
 
-def update_group_mask_hole_quality(entries: List[dict], threshold: int) -> int:
+def update_group_mask_hole_quality(
+    entries: List[dict],
+    threshold: int,
+    recovery_record: Optional[dict] = None,
+) -> int:
     entries_by_type = {entry.get("image_type"): entry for entry in entries if entry.get("image_type")}
     updated = 0
     for mask_image_type, affected_types in (
@@ -1278,9 +1525,19 @@ def update_group_mask_hole_quality(entries: List[dict], threshold: int) -> int:
         if not source_entry:
             continue
         image_path = _entry_image_path(source_entry)
+        frame_idx = source_entry.get("frame_idx")
+        try:
+            frame_idx = int(frame_idx)
+        except (TypeError, ValueError):
+            frame_idx = None
+        recovery_mask_path = (
+            white_image_mask_path(recovery_record, mask_image_type, frame_idx)
+            if recovery_record and frame_idx is not None
+            else None
+        )
         quality = mask_hole_quality(
             image_path=image_path,
-            mask_path=_mask_path_from_white_image_path(image_path, mask_image_type),
+            mask_path=recovery_mask_path or _mask_path_from_white_image_path(image_path, mask_image_type),
             image_type=mask_image_type,
             threshold=threshold,
         )
@@ -1288,9 +1545,44 @@ def update_group_mask_hole_quality(entries: List[dict], threshold: int) -> int:
             entry = entries_by_type.get(image_type)
             if not entry:
                 continue
-            entry["quality"] = {"mask_hole": dict(quality)}
-            entry["quality_label"] = bool(quality.get("passed", True))
+            _set_quality_item(entry, "mask_hole", quality)
             updated += 1
+    return updated
+
+
+def update_group_face_boundary_quality(
+    entries: List[dict],
+    checker: FaceBoundaryQualityChecker,
+    recovery_record: Optional[dict] = None,
+) -> int:
+    entries_by_type = {entry.get("image_type"): entry for entry in entries if entry.get("image_type")}
+    face_orig_entry = entries_by_type.get("face_orig")
+    if not face_orig_entry:
+        return 0
+    image_path = _entry_image_path(face_orig_entry)
+    frame_idx = face_orig_entry.get("frame_idx")
+    try:
+        frame_idx = int(frame_idx)
+    except (TypeError, ValueError):
+        frame_idx = None
+    recovery_mask_path = (
+        white_image_mask_path(recovery_record, "face_white", frame_idx)
+        if recovery_record and frame_idx is not None
+        else None
+    )
+    mask_path = recovery_mask_path
+    if not mask_path:
+        source_entry = entries_by_type.get("face_white")
+        mask_path = _mask_path_from_white_image_path(_entry_image_path(source_entry), "face_white") if source_entry else None
+    quality = checker.check(image_path=image_path, mask_path=mask_path)
+    updated = 0
+    for image_type in ("face_orig", "face_white"):
+        entry = entries_by_type.get(image_type)
+        if not entry:
+            continue
+        for quality_name, quality_value in quality.items():
+            _set_quality_item(entry, quality_name, quality_value)
+        updated += 1
     return updated
 
 
@@ -1311,6 +1603,10 @@ def build_update_feature_extractors(feature_names: List[str], config: Any) -> Di
             detector_name=config.body_pose_detector,
             device=config.body_pose_device,
         )
+    if "face_boundary_quality" in feature_names:
+        checker = build_face_boundary_quality_checker(config, force=True)
+        if checker is not None:
+            extractors["face_boundary_quality"] = checker
     return extractors
 
 
@@ -1320,9 +1616,10 @@ def update_existing_index_features(
     config: Any,
     update_extractors: Optional[Dict[str, Any]] = None,
     progress_position: int = 1,
+    recovery_lookup: Optional[Dict[Tuple[str, str], dict]] = None,
 ) -> Tuple[int, int, int]:
     feature_names = [str(name).strip().lower() for name in feature_names if str(name).strip()]
-    valid_features = {"emotion", "emotion_vlm", "body_pose", "mask_hole_quality"}
+    valid_features = {"emotion", "emotion_vlm", "body_pose", "mask_hole_quality", "face_boundary_quality"}
     unknown_features = sorted(set(feature_names) - valid_features)
     if unknown_features:
         raise ValueError(f"Unknown update_features: {', '.join(unknown_features)}")
@@ -1345,6 +1642,7 @@ def update_existing_index_features(
     update_extractors = update_extractors or build_update_feature_extractors(feature_names, config)
     emotion_extractor = update_extractors.get("emotion")
     body_pose_extractor = update_extractors.get("body_pose")
+    face_boundary_checker = update_extractors.get("face_boundary_quality")
 
     updated_frames = skipped_frames = updated_entries = 0
     progress = tqdm(
@@ -1393,11 +1691,27 @@ def update_existing_index_features(
             frame_attrs.update(body_pose_extractor.extract(context))
 
         quality_updated_entries = 0
+        recovery_record = None
+        if recovery_lookup:
+            recovery_record = recovery_lookup.get((
+                str(context.get("shot_key")),
+                str(context.get("obj_id")),
+            ))
         if "mask_hole_quality" in feature_names:
-            quality_updated_entries = update_group_mask_hole_quality(
+            quality_updated_entries += update_group_mask_hole_quality(
                 group["entries"],
                 threshold=config.mask_hole_threshold,
+                recovery_record=recovery_record,
             )
+        if "face_boundary_quality" in feature_names:
+            if face_boundary_checker is None:
+                face_boundary_checker = build_face_boundary_quality_checker(config, force=True)
+            if face_boundary_checker is not None:
+                quality_updated_entries += update_group_face_boundary_quality(
+                    group["entries"],
+                    checker=face_boundary_checker,
+                    recovery_record=recovery_record,
+                )
 
         if not frame_attrs and not quality_updated_entries:
             skipped_frames += 1
@@ -1653,6 +1967,7 @@ class IndexAddPipeline:
         )
         if config.member_recovery_jsonl and not recovery_records:
             tqdm.write(f"[AfterPipelineV3] WARNING: member_recovery_jsonl not found or empty: {recovery_jsonl}")
+        recovery_lookup = {member_key(record): record for record in recovery_records}
 
         update_features = list(config.update_features or [])
         if config.update_emotion_vlm_only and "emotion_vlm" not in update_features:
@@ -1661,6 +1976,7 @@ class IndexAddPipeline:
         is_update = bool(update_features)
         include_pose = not config.disable_pose
         feature_extractors = {} if is_update else build_feature_extractors(config)
+        face_boundary_quality_checker = None if is_update else build_face_boundary_quality_checker(config)
         update_extractors = build_update_feature_extractors(update_features, config) if is_update else {}
 
         src_units = self._read_unit_list(unit_list_file)
@@ -1722,6 +2038,7 @@ class IndexAddPipeline:
                         config,
                         update_extractors=update_extractors,
                         progress_position=1,
+                        recovery_lookup=recovery_lookup,
                     )
                     total_frames += updated_frames
                     total_images += updated_entries
@@ -1748,6 +2065,7 @@ class IndexAddPipeline:
                     progress_position=1,
                     enable_mask_hole_quality_check=config.enable_mask_hole_quality_check,
                     mask_hole_threshold=config.mask_hole_threshold,
+                    face_boundary_quality_checker=face_boundary_quality_checker,
                 )
                 with open(output_path, "w", encoding="utf-8") as file:
                     json.dump(
@@ -1782,6 +2100,7 @@ class IndexAddPipeline:
         """构建模式：按 video 各读自己的 jsonl，扫聚类图片、抽特征，写回新索引。"""
         include_pose = not config.disable_pose
         feature_extractors = build_feature_extractors(config)
+        face_boundary_quality_checker = build_face_boundary_quality_checker(config)
 
         # recovery 为单一全局文件，只读一次，供所有 video 共用（用于补回 cluster_meta 里
         # 但不在 identity jsonl 中的成员）
@@ -1836,6 +2155,7 @@ class IndexAddPipeline:
                     progress_position=1,
                     enable_mask_hole_quality_check=config.enable_mask_hole_quality_check,
                     mask_hole_threshold=config.mask_hole_threshold,
+                    face_boundary_quality_checker=face_boundary_quality_checker,
                 )
                 with open(output_path, "w", encoding="utf-8") as file:
                     json.dump(
@@ -1866,6 +2186,15 @@ class IndexAddPipeline:
     ) -> Tuple[int, int, int, int, int]:
         """增量模式：对已建好的索引补加 emotion / emotion_vlm / body_pose，原地写回。"""
         update_extractors = build_update_feature_extractors(update_features, config)
+        recovery_jsonl = resolve_repo_path(config.member_recovery_jsonl) if config.member_recovery_jsonl else None
+        recovery_records = (
+            [resolve_path_fields(record) for record in read_jsonl(recovery_jsonl)]
+            if recovery_jsonl and os.path.isfile(recovery_jsonl)
+            else []
+        )
+        recovery_lookup = {member_key(record): record for record in recovery_records}
+        if config.member_recovery_jsonl and not recovery_lookup:
+            tqdm.write(f"[AfterPipelineV3] WARNING: member_recovery_jsonl not found or empty: {recovery_jsonl}")
 
         written = 0
         total_frames = total_images = 0
@@ -1881,6 +2210,7 @@ class IndexAddPipeline:
                 config,
                 update_extractors=update_extractors,
                 progress_position=1,
+                recovery_lookup=recovery_lookup,
             )
             total_frames += updated_frames
             total_images += updated_entries
