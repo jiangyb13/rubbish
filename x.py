@@ -381,6 +381,7 @@ class FaceBoundaryQualityChecker:
         det_size: int = 640,
         expand_ratio: float = 1.1,
         min_foreground_ratio: float = 1.0,
+        max_abs_yaw_for_mask_coverage: float = 30.0,
         check_boundary: bool = True,
         check_mask_coverage: bool = True,
     ):
@@ -390,6 +391,7 @@ class FaceBoundaryQualityChecker:
         self._det_size = int(det_size)
         self._expand_ratio = float(expand_ratio)
         self._min_foreground_ratio = float(min_foreground_ratio)
+        self._max_abs_yaw_for_mask_coverage = float(max_abs_yaw_for_mask_coverage)
         self._check_boundary = bool(check_boundary)
         self._check_mask_coverage = bool(check_mask_coverage)
         self._app = None
@@ -419,7 +421,7 @@ class FaceBoundaryQualityChecker:
         )
         self._app.prepare(ctx_id=ctx_id, det_size=(self._det_size, self._det_size))
 
-    def check(self, image_path: Optional[str], mask_path: Optional[str]) -> dict:
+    def check(self, image_path: Optional[str], mask_path: Optional[str], pose: Optional[dict] = None) -> dict:
         common = {
             "image_path": image_path,
             "mask_path": mask_path,
@@ -443,6 +445,9 @@ class FaceBoundaryQualityChecker:
             "mask_foreground_ratio": None,
             "mask_background_pixel_count": None,
             "min_foreground_ratio": self._min_foreground_ratio,
+            "max_abs_yaw": self._max_abs_yaw_for_mask_coverage,
+            "yaw": None,
+            "is_frontal": None,
             "passed": True,
             "status": "disabled" if not self._check_mask_coverage else "missing_face_orig",
         }
@@ -490,6 +495,25 @@ class FaceBoundaryQualityChecker:
                 })
 
             if not self._check_mask_coverage:
+                return result
+
+            yaw = None
+            if isinstance(pose, dict):
+                try:
+                    yaw = float(pose.get("yaw"))
+                except (TypeError, ValueError):
+                    yaw = None
+            is_frontal = yaw is not None and abs(yaw) <= self._max_abs_yaw_for_mask_coverage
+            mask_coverage.update({
+                "yaw": yaw,
+                "is_frontal": bool(is_frontal),
+            })
+            if not is_frontal:
+                mask_coverage.update({
+                    "checked": False,
+                    "passed": True,
+                    "status": "skipped_non_frontal_face",
+                })
                 return result
 
             mask = _load_binary_mask(mask_path)
@@ -1219,6 +1243,7 @@ def build_face_boundary_quality_checker(config, force: bool = False) -> Optional
         det_size=getattr(config, "face_quality_det_size", 640),
         expand_ratio=getattr(config, "face_boundary_expand_ratio", 1.1),
         min_foreground_ratio=getattr(config, "face_mask_min_foreground_ratio", 1.0),
+        max_abs_yaw_for_mask_coverage=getattr(config, "face_mask_coverage_max_abs_yaw", 30.0),
         check_boundary=check_boundary,
         check_mask_coverage=check_mask_coverage,
     )
@@ -1296,6 +1321,7 @@ def build_person_index(
                 face_boundary_quality = face_boundary_quality_checker.check(
                     image_path=related_images.get("face_orig"),
                     mask_path=white_image_mask_path(record, "face_white", frame_idx),
+                    pose=pose,
                 )
             context = {
                 "person_id": person_id,
@@ -1574,7 +1600,7 @@ def update_group_face_boundary_quality(
     if not mask_path:
         source_entry = entries_by_type.get("face_white")
         mask_path = _mask_path_from_white_image_path(_entry_image_path(source_entry), "face_white") if source_entry else None
-    quality = checker.check(image_path=image_path, mask_path=mask_path)
+    quality = checker.check(image_path=image_path, mask_path=mask_path, pose=face_orig_entry.get("pose") or {})
     updated = 0
     for image_type in ("face_orig", "face_white"):
         entry = entries_by_type.get(image_type)
