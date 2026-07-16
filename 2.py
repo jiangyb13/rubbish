@@ -609,6 +609,10 @@ class IndexAddConfig:
         default=0.98,
         metadata={"help": "Minimum foreground ratio inside the original face bbox on the SAM face mask. Default 0.98 tolerates small boundary/background noise."}
     )
+    face_mask_coverage_max_abs_yaw: float = field(
+        default=30.0,
+        metadata={"help": "Run face mask coverage quality check only when abs(face yaw) is within this threshold in degrees."}
+    )
     face_quality_device: str = field(
         default="cuda:0",
         metadata={"help": "Device for Stage4 face-boundary quality InsightFace detector, e.g. cuda:0 or cpu."}
