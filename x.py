@@ -1,535 +1,166 @@
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  color: #1f2933;
-  background: #f5f7fa;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 22px;
-  background: #ffffff;
-  border-bottom: 1px solid #dce3eb;
-}
-
-.topbar h1 {
-  margin: 0;
-  font-size: 22px;
-}
-
-.topbar p {
-  margin: 5px 0 0;
-  font-size: 12px;
-  color: #697586;
-  word-break: break-all;
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-select,
-button,
-input[type="number"] {
-  height: 34px;
-  border: 1px solid #cbd5df;
-  background: #ffffff;
-  border-radius: 6px;
-  padding: 0 10px;
-  font-size: 13px;
-}
-
-button:disabled {
-  opacity: 0.45;
-}
-
-.thresholdControl {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  color: #4b5563;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.thresholdControl input {
-  width: 84px;
-}
-
-.pageInfo {
-  min-width: 80px;
-  color: #697586;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
-  padding: 16px 22px;
-}
-
-.summary div {
-  background: #ffffff;
-  border: 1px solid #dfe6ee;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.summary b {
-  display: block;
-  font-size: 12px;
-  color: #697586;
-}
-
-.summary span {
-  display: block;
-  margin-top: 4px;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.content {
-  padding: 0 22px 22px;
-}
-
-.card {
-  margin-bottom: 18px;
-  padding: 16px;
-  background: #ffffff;
-  border: 1px solid #dfe6ee;
-  border-radius: 8px;
-}
-
-.cardHead,
-.blockHead {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.cardHead {
-  padding-bottom: 12px;
-  border-bottom: 1px solid #edf1f5;
-}
-
-.cardHead h2,
-.blockHead h3 {
-  margin: 0;
-}
-
-.cardHead h2 {
-  font-size: 18px;
-}
-
-.cardHead p {
-  margin: 5px 0 0;
-  color: #697586;
-  font-size: 13px;
-}
-
-.flagBox,
-.blockHead {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  border-radius: 999px;
-  padding: 0 9px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.pill.ok {
-  color: #116b3a;
-  background: #e4f6ed;
-}
-
-.pill.bad {
-  color: #9f2f2f;
-  background: #fdeaea;
-}
-
-.target {
-  display: grid;
-  grid-template-columns: 220px minmax(280px, 1fr);
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.poolLayout {
-  display: grid;
-  grid-template-columns: 180px 220px minmax(260px, 1fr);
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.block {
-  margin-top: 16px;
-}
-
-.blockHead {
-  justify-content: flex-start;
-  margin-bottom: 8px;
-}
-
-.blockHead h3 {
-  font-size: 15px;
-}
-
-.reason {
-  font-size: 12px;
-  color: #697586;
-}
-
-.gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.thumbPair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.thumbWrap {
-  margin: 0;
-}
-
-.thumbWrap img {
-  cursor: zoom-in;
-}
-
-.thumbWrap figcaption {
-  margin-top: 3px;
-  text-align: center;
-  font-size: 10px;
-  color: #697586;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.tile,
-.videoTile {
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: #fbfcfe;
-}
-
-.thumb {
-  width: 100%;
-  height: 150px;
-  object-fit: contain;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #7b8794;
-  background: #edf2f7;
-  border-radius: 4px;
-}
-
-.tile b,
-.videoTile b {
-  display: block;
-  margin-top: 7px;
-  font-size: 12px;
-}
-
-.videoPlaceholder {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 150px;
-  margin-top: 8px;
-  padding: 14px;
-  color: #697586;
-  background: #edf2f7;
-  border-radius: 4px;
-}
-
-.videoPlaceholder a {
-  color: #1d4ed8;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.meta,
-.stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 7px;
-}
-
-.meta span,
-.stats span {
-  padding: 3px 5px;
-  border-radius: 4px;
-  background: #edf2f7;
-  color: #4b5563;
-  font-size: 11px;
-}
-
-.path {
-  margin-top: 6px;
-  color: #697586;
-  font-size: 11px;
-  word-break: break-all;
-}
-
-.empty,
-.emptyPage {
-  padding: 16px;
-  border: 1px dashed #cbd5df;
-  border-radius: 6px;
-  color: #697586;
-  background: #fbfcfe;
-}
-
-.poolPanel {
-  padding: 16px;
-  background: #ffffff;
-  border: 1px solid #dfe6ee;
-  border-radius: 8px;
-}
-
-.poolPanelHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.poolPanelHead h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.poolPanelHead span {
-  color: #697586;
-  font-size: 13px;
-}
-
-.poolGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.poolPhoto {
-  width: 112px;
-  padding: 6px;
-  border: 1px solid #e2e8f0;
-  border-radius: 5px;
-  background: #ffffff;
-}
-
-.poolImgWrap {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #edf2f7;
-}
-
-.poolImgWrap img {
-  display: block;
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.poolImgWrap img:hover {
-  transform: scale(1.05);
-}
-
-.poolPose {
-  display: flex;
-  justify-content: space-between;
-  gap: 2px;
-  margin-top: 5px;
-  color: #303133;
-  font-size: 9px;
-}
-
-.poolCaption {
-  margin-top: 4px;
-  color: #697586;
-  font-size: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.emotionBadge {
-  position: absolute;
-  left: 4px;
-  bottom: 4px;
-  padding: 2px 5px;
-  border-radius: 999px;
-  color: #ffffff;
-  background: rgba(37, 99, 235, 0.9);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.emoFlag {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  padding: 2px 5px;
-  border-radius: 999px;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.emoFlag.true {
-  background: rgba(22, 163, 74, 0.9);
-}
-
-.emoFlag.false {
-  background: rgba(220, 38, 38, 0.9);
-}
-
-.lightbox {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.86);
-  cursor: pointer;
-}
-
-.lightbox.active {
-  display: flex;
-}
-
-.lightbox img {
-  max-width: 90vw;
-  max-height: 90vh;
-  border-radius: 4px;
-}
-
-@media (max-width: 760px) {
-  .topbar,
-  .toolbar,
-  .cardHead {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .target {
-    grid-template-columns: 1fr;
-  }
-
-  .poolLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .content,
-  .summary {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-}
-
-.qualityBar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.qualityBar.detail {
-  align-items: flex-start;
-}
-
-.qualityPill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  padding: 2px 5px;
-  border-radius: 999px;
-  font-size: 10px;
-  line-height: 1.2;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #334155;
-  overflow-wrap: anywhere;
-}
-
-.qualityPill.ok {
-  border-color: #86efac;
-  background: #ecfdf3;
-  color: #166534;
-}
-
-.qualityPill.bad {
-  border-color: #fca5a5;
-  background: #fef2f2;
-  color: #991b1b;
-}
-
-.qualityPill.neutral {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #64748b;
-}
-
-.qualityImages {
-  display: grid;
-  gap: 6px;
-  margin-top: 7px;
-}
-
-.qualityImageBlock {
-  border: 1px solid #e2e8f0;
-  border-radius: 5px;
-  padding: 6px;
-  background: #fbfdff;
-}
-
-.qualityImageTitle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #334155;
-}
+#!/bin/bash
+# ================================================================
+# Stage 5: Generate Training Pairs（独立脚本）
+# ================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+PYTHON_BIN="${PYTHON_BIN:-python}"
+
+OUTPUT_ROOT="${OUTPUT_ROOT:-/data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v2/outputs/outputs_multiperson}"
+LOG_DIR="${LOG_DIR:-/data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v2/outputs/outputs_multiperson/stage5_logs}"
+
+IDENTITY_OUTPUT_DIR="${IDENTITY_OUTPUT_DIR:-/data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v2/outputs_multiperson}"
+PERSON_CLUSTER_DIR="${PERSON_CLUSTER_DIR:-$IDENTITY_OUTPUT_DIR}"
+STAGE3_MODE="${STAGE3_MODE:-per_video}"
+INDEX_FILENAME="${INDEX_FILENAME:-after_pipeline_index.json}"
+
+TRAINING_PAIRS_DIR="${TRAINING_PAIRS_DIR:-$OUTPUT_ROOT/training_pairs}"
+TRAINING_PAIRS_JSONL="${TRAINING_PAIRS_JSONL:-$TRAINING_PAIRS_DIR/pairs.jsonl}"
+TRAINING_PAIRS_STATS="${TRAINING_PAIRS_STATS:-$TRAINING_PAIRS_DIR/stats.json}"
+TRAINING_FIRST_FRAME_DIR="${TRAINING_FIRST_FRAME_DIR:-$TRAINING_PAIRS_DIR/first_frames}"
+TRAINING_PAIRS_UNIT_LIST="${TRAINING_PAIRS_UNIT_LIST:-$TRAINING_PAIRS_DIR/person_clusters_list.txt}"
+ANGLE_REF_COUNT="${ANGLE_REF_COUNT:-5}"
+EMO_REF_COUNT="${EMO_REF_COUNT:-5}"
+BODY_POSE_REF_COUNT="${BODY_POSE_REF_COUNT:-5}"
+BUCKET_CANDIDATE_TOPK="${BUCKET_CANDIDATE_TOPK:-8}"
+MIN_SAME_PREFIX_SHOT_GAP="${MIN_SAME_PREFIX_SHOT_GAP:-0}"
+OVERWRITE_SIMILARITY_MATRIX="${OVERWRITE_SIMILARITY_MATRIX:-False}"
+OVERWRITE_FIRST_FRAMES="${OVERWRITE_FIRST_FRAMES:-False}"
+
+mkdir -p "$LOG_DIR" "$TRAINING_PAIRS_DIR"
+
+count_lines() {
+    local path=$1
+    if [ -f "$path" ]; then wc -l < "$path"; else echo 0; fi
+}
+
+count_jsonl_tree_by_name() {
+    local root=$1
+    local filename=$2
+    local exclude_path=${3:-}
+    "$PYTHON_BIN" -c '
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+filename = sys.argv[2]
+exclude = Path(sys.argv[3]).resolve() if len(sys.argv) > 3 and sys.argv[3] else None
+total = 0
+if root.exists():
+    for path in root.rglob(filename):
+        if not path.is_file():
+            continue
+        if exclude and path.resolve() == exclude:
+            continue
+        with path.open("r", encoding="utf-8", errors="ignore") as file:
+            total += sum(1 for line in file if line.strip())
+print(total)
+' "$root" "$filename" "$exclude_path"
+}
+
+build_person_clusters_unit_list() {
+    local identity_root=$1
+    local output_list=$2
+    mkdir -p "$(dirname "$output_list")"
+    "$PYTHON_BIN" -c '
+import sys
+from pathlib import Path
+from tqdm import tqdm
+
+identity_root = Path(sys.argv[1]).resolve()
+output_list = Path(sys.argv[2])
+rows = []
+
+# 直接获取第一层目录 (UUID 文件夹)
+uuid_dirs = [d for d in identity_root.iterdir() if d.is_dir()]
+
+# 使用 tqdm 遍历，速度极快
+for uuid_dir in tqdm(uuid_dirs, desc="Processing clusters", unit="dir"):
+    # 构造目标路径: identity_root / UUID / identity_matching / person_clusters
+    path = uuid_dir / "identity_matching" / "person_clusters"
+    
+    # 校验目录是否存在及有效性 (保持原过滤逻辑)
+    if not path.is_dir():
+        continue
+    if not any(child.is_dir() and child.name.startswith("person_") for child in path.iterdir()):
+        continue
+        
+    # --- 核心：保持和原代码一致的 parts 逻辑 ---
+    # 原代码中 parts = path.parent.relative_to(identity_root).parts
+    # 在你的结构下，path.parent 就是 identity_root / UUID / identity_matching
+    # 相对路径就是 UUID / identity_matching
+    rel_parent = path.parent.resolve().relative_to(identity_root)
+    parts = rel_parent.parts
+    
+    # 严格保持原赋值逻辑
+    video = parts[0] if len(parts) > 0 else ""
+    part = parts[1] if len(parts) > 1 else ""
+    uuid = parts[2] if len(parts) > 2 else ""
+    
+    rows.append(f"{path.resolve()}|{video}|{part}|{uuid}")
+
+output_list.parent.mkdir(parents=True, exist_ok=True)
+output_list.write_text("\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
+print(f"[unit_list] {output_list}: {len(rows)} person_clusters roots")
+' "$identity_root" "$output_list"
+}
+
+echo "========================================"
+echo "  Stage 5: Generate Training Pairs"
+echo "  identity: $IDENTITY_OUTPUT_DIR"
+echo "  输出:     $TRAINING_PAIRS_DIR"
+echo "  索引文件: $INDEX_FILENAME"
+echo "  日志:     $LOG_DIR"
+echo "========================================"
+
+if [ "$STAGE3_MODE" = "per_video" ]; then
+    echo "[Stage 5] per_video 模式：生成 person_clusters 列表并按视频镜像输出"
+    build_person_clusters_unit_list "$IDENTITY_OUTPUT_DIR" "$TRAINING_PAIRS_UNIT_LIST"
+    UNIT_COUNT=$(count_lines "$TRAINING_PAIRS_UNIT_LIST")
+    if [ "$UNIT_COUNT" -eq 0 ]; then
+        echo "[ERROR] Stage 5 未找到任何 person_clusters: $IDENTITY_OUTPUT_DIR"
+        exit 1
+    fi
+
+    env TASK_NAME=generate_training_pairs "$PYTHON_BIN" main.py \
+        --person_clusters_dir "$PERSON_CLUSTER_DIR" \
+        --unit_list_file "$TRAINING_PAIRS_UNIT_LIST" \
+        --unit_list_input_base_dir "$IDENTITY_OUTPUT_DIR" \
+        --output_jsonl "$TRAINING_PAIRS_JSONL" \
+        --stats_json "$TRAINING_PAIRS_STATS" \
+        --first_frame_dir "$TRAINING_FIRST_FRAME_DIR" \
+        --index_filename "$INDEX_FILENAME" \
+        --angle_ref_count "$ANGLE_REF_COUNT" \
+        --emo_ref_count "$EMO_REF_COUNT" \
+        --body_pose_ref_count "$BODY_POSE_REF_COUNT" \
+        --bucket_candidate_topk "$BUCKET_CANDIDATE_TOPK" \
+        --min_same_prefix_shot_gap "$MIN_SAME_PREFIX_SHOT_GAP" \
+        --overwrite_similarity_matrix "$OVERWRITE_SIMILARITY_MATRIX" \
+        --overwrite_first_frames "$OVERWRITE_FIRST_FRAMES" \
+        > "$LOG_DIR/stage5_generate_training_pairs.log" 2>&1
+
+    PAIRS_BASENAME="$(basename "$TRAINING_PAIRS_JSONL")"
+    PAIRS_TOTAL=$(count_jsonl_tree_by_name "$TRAINING_PAIRS_DIR" "$PAIRS_BASENAME" "$TRAINING_PAIRS_JSONL")
+    echo "[Stage 5] 完成: $TRAINING_PAIRS_DIR/<video>/$PAIRS_BASENAME (${PAIRS_TOTAL} 条 pairs, ${UNIT_COUNT} 个 person_clusters)"
+else
+    env TASK_NAME=generate_training_pairs "$PYTHON_BIN" main.py \
+        --person_clusters_dir "$PERSON_CLUSTER_DIR" \
+        --output_jsonl "$TRAINING_PAIRS_JSONL" \
+        --stats_json "$TRAINING_PAIRS_STATS" \
+        --first_frame_dir "$TRAINING_FIRST_FRAME_DIR" \
+        --index_filename "$INDEX_FILENAME" \
+        --angle_ref_count "$ANGLE_REF_COUNT" \
+        --emo_ref_count "$EMO_REF_COUNT" \
+        --body_pose_ref_count "$BODY_POSE_REF_COUNT" \
+        --bucket_candidate_topk "$BUCKET_CANDIDATE_TOPK" \
+        --min_same_prefix_shot_gap "$MIN_SAME_PREFIX_SHOT_GAP" \
+        --overwrite_similarity_matrix "$OVERWRITE_SIMILARITY_MATRIX" \
+        --overwrite_first_frames "$OVERWRITE_FIRST_FRAMES" \
+        > "$LOG_DIR/stage5_generate_training_pairs.log" 2>&1
+
+    echo "[Stage 5] 完成: $TRAINING_PAIRS_JSONL ($(count_lines "$TRAINING_PAIRS_JSONL") 条 pairs)"
+fi
