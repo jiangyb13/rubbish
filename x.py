@@ -1,142 +1,142 @@
-#!/bin/bash
-
-
-
-# ==============================================================================
-
-# 批量运行 Stage 4 脚本的包装器（防重运行安全改良版）
-
-# ==============================================================================
-
-
-
-set -euo pipefail
-
-
-
-# 1. 定义你要遍历的父目录
-
-BASE_DIR="/data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v2/outputs_singleperson_v2/identity_matching/video_720p_15min_0"
-
-# Stage 4 脚本的路径
-
-STAGE4_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stage4_index_add_update_quality.sh"
-
-
-
-if [ ! -f "$STAGE4_SCRIPT" ]; then
-
-    echo "[ERROR] 找不到 Stage 4 脚本: $STAGE4_SCRIPT"
-
-    exit 1
-
-fi
-
-
-
-if [ ! -d "$BASE_DIR" ]; then
-
-    echo "[ERROR] 目标遍历目录不存在: $BASE_DIR"
-
-    exit 1
-
-fi
-
-
-
-echo "=============================================================================="
-
-echo " 开始遍历目录并运行 Stage 4"
-
-echo " 目标父目录: $BASE_DIR"
-
-echo "=============================================================================="
-
-
-
-# 2. 改用进程替换驱动循环，阻断 stdin 管道污染
-
-while read -r sub_dir; do
-
-    # 略过空行
-
-    [ -z "$sub_dir" ] && continue
-
-   
-
-    dir_name=$(basename "$sub_dir")
-
-    echo ""
-
-    echo "=============================================================================="
-
-    echo " 👉 正在处理子目录: $dir_name"
-
-    echo " 路径: $sub_dir"
-
-    echo "=============================================================================="
-
-
-
-    # # 【防重核心 1】在启动新任务前，确保前一个任务的 main.py 已经彻底退出
-
-    # # 防止因异常崩溃导致前一个任务的僵尸进程影响当前任务
-
-    # if pkill -0 -f main.py 2>/dev/null; then
-
-    #     echo "[INFO] 检测到后台有残留的 main.py 进程，正在进行环境清理..."
-
-    #     pkill -f main.py || true
-
-    #     sleep 2
-
-    # fi
-
-
-
-    # 3. 注入环境变量
-
-    export IDENTITY_OUTPUT_DIR="$sub_dir"
-
-    export LOG_DIR="/data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v2/outputs/logs/$dir_name"
-
-    export ONE_SHOT_OUTPUT_JSONL="/data/huanan-4931/data/AIGC_VIDEO/TRAIN_DATA_I2V/video_720p_preprocessed_cross_shot_pair/one_shot_process/video_720p_15min_0/$dir_name/output.jsonl"
-
-
-
-    ls "/data/huanan-4931/data/AIGC_VIDEO/TRAIN_DATA_I2V/video_720p_preprocessed_cross_shot_pair/one_shot_process/video_720p_15min_0/$dir_name/output.jsonl"
-
-
-
-    # 执行 Stage 4 脚本（使用 </dev/null 断开标准输入流，双重保险）
-
-    if bash "$STAGE4_SCRIPT" </dev/null; then
-
-        echo "✅ 子目录 $dir_name 处理成功！"
-
-    else
-
-        echo "❌ [ERROR] 子目录 $dir_name 处理失败，触发熔断退出。"
-
-        exit 1
-
-    fi
-
-
-
-# 通过 <<< 将 find 的结果安全喂给 while，不占用主进程的 stdin
-
-done <<< "$(find "$BASE_DIR" -maxdepth 1 -mindepth 1 -type d | sort)"
-
-
-
-
-
-echo ""
-
-echo "🎉 所有子目录从 part_0000 到 part_0406 全部处理完毕！"
-
-
-
-这个脚本好慢 
-
+#!/usr/bin/env python3
+"""Locate the SAM2 face image corresponding to an identity angle-library image."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+
+ANGLE_NAME_RE = re.compile(
+    r"^(?P<shot_key>.+)_id(?P<obj_id>\d+)_frame(?P<frame_idx>\d+)(?:_yaw[+-]\d+(?:\.\d+)?)?\.[^.]+$"
+)
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSONL at {path}:{line_number}: {exc}") from exc
+    return rows
+
+
+def _resolve_workspace_path(path_value: str | None, workspace: Path) -> Path | None:
+    if not path_value:
+        return None
+    path = Path(path_value)
+    return path if path.is_absolute() else workspace / path
+
+
+def _infer_workspace_from_output_jsonl(output_jsonl: Path) -> Path:
+    # .../<workspace>/outputs/<video>/identity_matching/output.jsonl
+    for parent in output_jsonl.resolve().parents:
+        if parent.name == "outputs":
+            return parent.parent
+    return output_jsonl.resolve().parents[2]
+
+
+def _parse_angle_filename(angle_image: Path) -> dict[str, Any]:
+    match = ANGLE_NAME_RE.match(angle_image.name)
+    if not match:
+        raise ValueError(
+            "Cannot parse angle-library filename. Expected something like "
+            "video15_shot_0004_id0_frame0002_yaw-000.0.png"
+        )
+    return {
+        "shot_key": match.group("shot_key"),
+        "obj_id": match.group("obj_id"),
+        "frame_idx": int(match.group("frame_idx")),
+    }
+
+
+def _find_manifest_entry(angle_image: Path, workspace: Path) -> dict[str, Any] | None:
+    parts = angle_image.resolve().parts
+    if "face_angle_library" not in parts:
+        return None
+    angle_root_index = parts.index("face_angle_library")
+    cluster_dir = Path(*parts[:angle_root_index])
+    manifest_path = cluster_dir / "frame_manifest.jsonl"
+    if not manifest_path.is_file():
+        return None
+
+    target = angle_image.resolve()
+    for row in _read_jsonl(manifest_path):
+        images = row.get("images") or {}
+        for key in ("face_angle_left", "face_angle_front", "face_angle_right"):
+            candidate = _resolve_workspace_path(images.get(key), workspace)
+            if candidate and candidate.resolve() == target:
+                return row
+    return None
+
+
+def _find_output_record(
+    rows: list[dict[str, Any]], shot_key: str, obj_id: str
+) -> dict[str, Any] | None:
+    suffix = f"{shot_key}/id_{obj_id}"
+    for row in rows:
+        id_dir_path = str(row.get("id_dir_path") or "")
+        if id_dir_path.endswith(suffix):
+            return row
+    return None
+
+
+def locate_sam2(angle_image: Path, output_jsonl: Path, workspace: Path | None = None) -> dict[str, Any]:
+    output_jsonl = output_jsonl.resolve()
+    workspace = workspace.resolve() if workspace else _infer_workspace_from_output_jsonl(output_jsonl)
+    angle_image = angle_image.resolve()
+
+    output_rows = _read_jsonl(output_jsonl)
+    manifest_entry = _find_manifest_entry(angle_image, workspace)
+    identity = manifest_entry or _parse_angle_filename(angle_image)
+
+    shot_key = str(identity["shot_key"])
+    obj_id = str(identity["obj_id"])
+    frame_idx = int(identity["frame_idx"])
+    record = _find_output_record(output_rows, shot_key, obj_id)
+    if record is None:
+        raise LookupError(f"No output.jsonl record found for shot_key={shot_key}, obj_id={obj_id}")
+
+    sam_face_white = _resolve_workspace_path(record.get("sam_id_face_white_dir_path"), workspace)
+    sam_face_orig = _resolve_workspace_path(record.get("sam_id_face_orig_dir_path"), workspace)
+    sam_full_mask = _resolve_workspace_path(record.get("sam_id_cropped_from_full_face_mask_dir_path"), workspace)
+    sam_orig_mask = _resolve_workspace_path(record.get("sam_id_orig_face_mask_dir_path"), workspace)
+
+    result = {
+        "angle_image": str(angle_image),
+        "person_id": identity.get("person_id") or record.get("identity_matching_person_id"),
+        "shot_key": shot_key,
+        "obj_id": obj_id,
+        "frame_idx": frame_idx,
+        "source_shot_frame_idx": identity.get("source_shot_frame_idx"),
+        "id_dir_path": str(_resolve_workspace_path(record.get("id_dir_path"), workspace)),
+        "identity_matching_images": (manifest_entry or {}).get("images"),
+        "one_shot_images": (manifest_entry or {}).get("derived"),
+        "sam2_face_white": str(sam_face_white / f"{frame_idx}.png") if sam_face_white else None,
+        "sam2_face_orig": str(sam_face_orig / f"{frame_idx}.jpg") if sam_face_orig else None,
+        "sam2_face_mask_for_full": str(sam_full_mask / f"{frame_idx}.npy") if sam_full_mask else None,
+        "sam2_face_mask_for_orig": str(sam_orig_mask / f"{frame_idx}.npy") if sam_orig_mask else None,
+    }
+    return result
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--angle-image", required=True, type=Path)
+    parser.add_argument("--output-jsonl", required=True, type=Path)
+    parser.add_argument("--workspace", type=Path, default=None)
+    args = parser.parse_args()
+
+    print(json.dumps(locate_sam2(args.angle_image, args.output_jsonl, args.workspace), indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
