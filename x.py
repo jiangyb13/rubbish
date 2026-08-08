@@ -2595,6 +2595,7 @@ class IndexAddPipeline:
         include_pose = not config.disable_pose
         feature_extractors = build_feature_extractors(config)
         face_boundary_quality_checker = build_face_boundary_quality_checker(config)
+        face_quality_vlm_checker = build_face_quality_vlm_checker(config)
 
         # recovery 为单一全局文件，只读一次，供所有 video 共用（用于补回 cluster_meta 里
         # 但不在 identity jsonl 中的成员）
