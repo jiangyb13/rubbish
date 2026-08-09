@@ -738,6 +738,30 @@ def cluster_frame_keys(
     return sorted(keys, key=lambda item: item[2])
 
 
+_VLM_BACKEND_CACHE: Dict[Tuple[str, str], Tuple[Any, Any, Any]] = {}
+
+
+def load_qwen3_vlm_backend(model_path: str, device: str) -> Tuple[Any, Any, Any]:
+    resolved_model_path = resolve_repo_path(model_path)
+    key = (resolved_model_path, str(device))
+    cached = _VLM_BACKEND_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    import torch
+    from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
+
+    model = Qwen3VLForConditionalGeneration.from_pretrained(
+        resolved_model_path,
+        torch_dtype="auto",
+        device_map=device,
+    )
+    processor = AutoProcessor.from_pretrained(resolved_model_path)
+    cached = (model, processor, torch)
+    _VLM_BACKEND_CACHE[key] = cached
+    return cached
+
+
 def empty_output(person_id: str, cluster_dir: str, enabled_features: List[str]) -> dict:
     return {
         "person_id": person_id,
@@ -794,17 +818,10 @@ class FaceQualityVLMChecker:
     def _load_vlm_backend(self) -> None:
         if self._vlm_model is not None and self._vlm_processor is not None:
             return
-        import torch
-        from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
-
-        model_path = resolve_repo_path(self._model_path)
-        self._vlm_model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_path,
-            torch_dtype="auto",
-            device_map=self._device,
+        self._vlm_model, self._vlm_processor, self._torch = load_qwen3_vlm_backend(
+            self._model_path,
+            self._device,
         )
-        self._vlm_processor = AutoProcessor.from_pretrained(model_path)
-        self._torch = torch
 
     @staticmethod
     def _parse_json_response(text: str) -> Tuple[dict, str]:
@@ -1059,17 +1076,10 @@ class EmotionExtractor:
     def _load_vlm_backend(self) -> None:
         if self._vlm_model is not None and self._vlm_processor is not None:
             return
-        import torch
-        from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
-
-        model_path = resolve_repo_path(self._vlm_model_path)
-        self._vlm_model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_path,
-            torch_dtype="auto",
-            device_map=self._vlm_device,
+        self._vlm_model, self._vlm_processor, self._torch = load_qwen3_vlm_backend(
+            self._vlm_model_path,
+            self._vlm_device,
         )
-        self._vlm_processor = AutoProcessor.from_pretrained(model_path)
-        self._torch = torch
 
     def _parse_vlm_response(self, text: str, expected_emotion: str = "") -> dict:
         raw = (text or "").strip()
