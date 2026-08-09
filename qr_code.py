@@ -2348,6 +2348,13 @@ def _workspace_path(video_dir: str, key: str) -> str:
     return os.path.join(video_dir, WORKSPACE_REL_PATHS[key])
 
 
+def _workspace_person_clusters_dir(video_dir: str) -> str:
+    flat_dir = os.path.join(video_dir, "person_clusters")
+    if os.path.isdir(flat_dir):
+        return flat_dir
+    return _workspace_path(video_dir, "person_clusters_dir")
+
+
 def _load_task_units(input_jsonl: str, output_root: str) -> List[Dict[str, str]]:
     units = []
     seen = set()
@@ -2442,7 +2449,7 @@ def _write_workspace_person_cluster_units(path: str, units: Iterable[Dict[str, s
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         for unit in units:
-            handle.write(f"{_workspace_path(unit['video_dir'], 'person_clusters_dir')}|{unit['video_id']}||{unit['video_id']}\n")
+            handle.write(f"{_workspace_person_clusters_dir(unit['video_dir'])}|{unit['video_id']}||{unit['video_id']}\n")
 
 
 def compute_shard_range(total: int, rank: int, total_rank: int) -> Tuple[int, int]:
@@ -2571,7 +2578,7 @@ class IndexAddPipeline:
                 setattr(config, key, value)
         for unit in units:
             _update_workspace_stage(unit, "index_add", "complete", {
-                "person_clusters_dir": os.path.relpath(_workspace_path(unit["video_dir"], "person_clusters_dir"), unit["video_dir"]),
+                "person_clusters_dir": os.path.relpath(_workspace_person_clusters_dir(unit["video_dir"]), unit["video_dir"]),
                 "index_filename": config.output_filename,
             })
         return result
