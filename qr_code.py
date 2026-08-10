@@ -1,93 +1,106 @@
-{
-  "quality_label": false,
-  "failed_quality_keys": [],
-  "quality": {
-    "face_occlusion": {
-      "checked": true,
-      "confidence": 0.95,
-      "face_occluded": false,
-      "image_path": "/cache/identity_matching/video_720p_15min_0/part_0079/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b/person_clusters/person_0000/face_orig/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b_shot_832_id0_frame0003.jpg",
-      "max_new_tokens": 512,
-      "model": "/data/huanan/misc/models/vlm/Qwen3-VL-8B-Instruct/",
-      "parse_status": "success",
-      "passed": true,
-      "raw_response": "{\"face_occluded\": false, \"confidence\": 0.95, \"reason\": \"Face fully visible, no obstructions or extreme cropping detected.\"}",
-      "reason": "Face fully visible, no obstructions or extreme cropping detected.",
-      "status": "ok"
-    },
-    "image_clarity_laplacian": {
-      "checked": true,
-      "image_path": "/cache/identity_matching/video_720p_15min_0/part_0079/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b/person_clusters/person_0000/face_orig/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b_shot_832_id0_frame0003.jpg",
-      "passed": true,
-      "sharpness": 14.597181081924457,
-      "status": "ok",
-      "threshold": 10
-    },
-    "image_clarity_vlm": {
-      "checked": true,
-      "confidence": 0.85,
-      "image_path": "/cache/identity_matching/video_720p_15min_0/part_0079/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b/person_clusters/person_0000/face_orig/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b_shot_832_id0_frame0003.jpg",
-      "is_clear": true,
-      "max_new_tokens": 512,
-      "model": "/data/huanan/misc/models/vlm/Qwen3-VL-8B-Instruct/",
-      "parse_status": "success",
-      "passed": true,
-      "raw_response": "{\"is_clear\": true, \"confidence\": 0.85, \"reason\": \"Face is in focus with visible features, no motion blur or compression artifacts.\"}",
-      "reason": "Face is in focus with visible features, no motion blur or compression artifacts.",
-      "status": "ok"
-    },
-    "mask_hole": {
-      "checked": true,
-      "entry_image_type": "face_orig",
-      "hole_count": 0,
-      "is_mask_source_white_image": true,
-      "is_white_image": false,
-      "mask_image_type": "face_white",
-      "mask_path": "/cache/one_shot_process/video_720p_15min_0/part_0079/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b_shot_832/id_0/face/cropped_face/face_mask_for_face/3.npy",
-      "passed": true,
-      "status": "ok",
-      "threshold": 0
-    }
-  },
-  "pose": {
-    "pitch": 37.06200269756981,
-    "roll": 7.129563264685443,
-    "yaw": -28.53006563823389
-  },
-  "expression": {
-    "backend": "emotiefflib",
-    "dominant": "neutral",
-    "model_name": "enet_b0_8_best_vgaf",
-    "scores": {
-      "angry": 17.03309565782547,
-      "contempt": 15.641628205776215,
-      "disgust": 0.9287634864449501,
-      "fear": 0.12926830677315593,
-      "happy": 16.53546541929245,
-      "neutral": 30.79792559146881,
-      "sad": 16.961726546287537,
-      "surprise": 1.9721340388059616
-    },
-    "status": "success"
-  },
-  "body_pose": {
-    "bbox": [
-      11.699872016906738,
-      11.207839965820312,
-      743.7472534179688,
-      887.67724609375
-    ],
-    "body_part": "half_body",
-    "detector": "yolo",
-    "heading": [
-      -0.08940402418375015,
-      0.06174793839454651,
-      -0.9940795302391052
-    ],
-    "label": "front",
-    "status": "success",
-    "yaw_deg": -5.139154434204102
-  },
-  "image_path": "/cache/identity_matching/video_720p_15min_0/part_0079/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b/person_clusters/person_0000/face_orig/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b_shot_832_id0_frame0003.jpg",
-  "index_path": "/data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v4/outputs/outputs_from_multi_person/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b/person_clusters/person_0000/post_process_index.json"
-}
+#!/usr/bin/env python3
+import argparse
+import json
+import os
+from pathlib import Path
+
+
+IMAGE_TYPES = ("face_orig", "face_white", "full_orig", "full_white")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Recompute quality_label in post_process_index.json files.")
+    parser.add_argument("--video_dir", required=True, help="Video workspace root.")
+    parser.add_argument("--index_name", default="post_process_index.json")
+    parser.add_argument("--dry_run", action="store_true", help="Only print changes; do not write JSON files.")
+    parser.add_argument("--backup", action="store_true", help="Write a .bak copy before modifying each changed JSON.")
+    return parser.parse_args()
+
+
+def person_clusters_dirs(video_dir: Path):
+    candidates = [
+        video_dir / "person_clusters",
+        video_dir / "identity_matching" / "person_clusters",
+    ]
+    return [path for path in candidates if path.is_dir()]
+
+
+def index_files(video_dir: Path, index_name: str):
+    found = []
+    for cluster_dir in person_clusters_dirs(video_dir):
+        for person_dir in sorted(path for path in cluster_dir.iterdir() if path.is_dir()):
+            index_path = person_dir / index_name
+            if index_path.is_file():
+                found.append(index_path)
+    return found
+
+
+def recompute_quality_label(entry: dict) -> bool:
+    quality = entry.get("quality")
+    if isinstance(quality, dict):
+        for item in quality.values():
+            if isinstance(item, dict) and item.get("passed") is False:
+                return False
+    return True
+
+
+def update_index(path: Path):
+    with path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    images = data.get("images") if isinstance(data, dict) else {}
+    if not isinstance(images, dict):
+        return 0, 0, data
+
+    checked = 0
+    changed = 0
+    for image_type in IMAGE_TYPES:
+        entries = images.get(image_type) or {}
+        if not isinstance(entries, dict):
+            continue
+        for entry in entries.values():
+            if not isinstance(entry, dict):
+                continue
+            old_value = bool(entry.get("quality_label", True))
+            new_value = recompute_quality_label(entry)
+            checked += 1
+            if old_value != new_value:
+                entry["quality_label"] = new_value
+                changed += 1
+    return checked, changed, data
+
+
+def main():
+    args = parse_args()
+    video_dir = Path(os.path.expanduser(args.video_dir)).resolve()
+    files = index_files(video_dir, args.index_name)
+    if not files:
+        raise SystemExit(f"No {args.index_name} found under {video_dir}/person_clusters or identity_matching/person_clusters")
+
+    total_checked = 0
+    total_changed = 0
+    changed_files = 0
+
+    for path in files:
+        checked, changed, data = update_index(path)
+        total_checked += checked
+        total_changed += changed
+        if changed:
+            changed_files += 1
+            print(f"[fix_quality_labels] {path}: changed={changed}, checked={checked}")
+            if not args.dry_run:
+                if args.backup:
+                    backup_path = path.with_suffix(path.suffix + ".bak")
+                    if not backup_path.exists():
+                        backup_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+                with path.open("w", encoding="utf-8") as handle:
+                    json.dump(data, handle, ensure_ascii=False, indent=2)
+
+    mode = "dry_run" if args.dry_run else "written"
+    print(
+        f"[fix_quality_labels] done mode={mode}, files={len(files)}, "
+        f"changed_files={changed_files}, checked_entries={total_checked}, changed_entries={total_changed}"
+    )
+
+
+if __name__ == "__main__":
+    main()
