@@ -2,313 +2,322 @@
 import argparse
 import json
 import os
+from collections import Counter
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, render_template_string, request, send_file
 
 
-APP_ROOT = Path(__file__).resolve().parent
+IMAGE_TYPES = ("face_orig", "face_white", "full_orig", "full_white")
+QUALITY_KEYS = (
+    "mask_hole",
+    "face_bbox_boundary",
+    "face_mask_coverage",
+    "face_occlusion",
+    "image_clarity_laplacian",
+    "image_clarity_vlm",
+)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Visualize kept and rejected training pairs.")
-    parser.add_argument("--video_dir", required=True, help="Workspace root that contains training_pairs/.")
-    parser.add_argument("--pairs_jsonl", default=None, help="Kept pairs JSONL. Defaults to video_dir/training_pairs/pairs.jsonl.")
-    parser.add_argument("--rejected_jsonl", default=None, help="Rejected pairs JSONL. Defaults to video_dir/training_pairs/rejected_pairs.jsonl.")
+    parser = argparse.ArgumentParser(description="Visualize Stage4 post_process_index quality results.")
+    parser.add_argument("--root", required=True, help="video_dir, person_clusters dir, or a single post_process_index.json.")
+    parser.add_argument("--index_name", default="post_process_index.json")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=7896)
-    parser.add_argument("--max_rows", type=int, default=0, help="Maximum rows loaded from each JSONL; 0 means no limit.")
+    parser.add_argument("--port", type=int, default=7897)
+    parser.add_argument("--max_rows", type=int, default=0, help="Load at most this many image rows; 0 means all.")
     parser.add_argument("--debug", action="store_true")
     return parser.parse_args()
 
 
-def read_jsonl(path, max_rows=0):
+def find_index_files(root, index_name):
+    root = Path(root).expanduser().resolve()
+    if root.is_file():
+        return [root]
+
+    def collect(cluster_dir):
+        if not cluster_dir.is_dir():
+            return []
+        return sorted(p / index_name for p in cluster_dir.iterdir() if p.is_dir() and (p / index_name).is_file())
+
+    matches = []
+    if root.name == "person_clusters":
+        matches.extend(collect(root))
+    matches.extend(collect(root / "person_clusters"))
+    matches.extend(collect(root / "identity_matching" / "person_clusters"))
+    return sorted(set(matches))
+
+
+def quality_state(item):
+    if not isinstance(item, dict):
+        return "missing"
+    if item.get("passed") is False:
+        return "fail"
+    if item.get("passed") is True:
+        return "pass"
+    status = str(item.get("status") or "")
+    if status.startswith("skipped"):
+        return "skip"
+    return "missing"
+
+
+def summarize_quality(item):
+    if not isinstance(item, dict):
+        return {"state": "missing"}
+    data = {
+        "state": quality_state(item),
+        "status": item.get("status"),
+        "passed": item.get("passed"),
+        "checked": item.get("checked"),
+    }
+    for key in (
+        "hole_count", "threshold", "sharpness", "face_occluded", "is_clear",
+        "confidence", "reason", "parse_status", "touches_boundary",
+        "mask_foreground_ratio", "yaw", "is_frontal", "mask_path",
+    ):
+        if key in item:
+            data[key] = item.get(key)
+    return data
+
+
+def load_rows(root, index_name, max_rows):
+    root_abs = str(Path(root).expanduser().resolve())
     rows = []
-    if not path or not os.path.isfile(path):
-        return rows
-    with open(path, "r", encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError as exc:
-                row = {"_load_error": f"line {line_number}: {exc}", "_raw": line}
-            row["_row_id"] = len(rows)
-            rows.append(row)
-            if max_rows and len(rows) >= max_rows:
-                break
-    return rows
-
-
-def compact_detail(value):
-    if value is None:
-        return None
-    text = json.dumps(value, ensure_ascii=False, indent=2)
-    return text if len(text) <= 4000 else text[:4000] + "\n..."
-
-
-def first_existing_path(candidates):
-    for value in candidates:
-        if not value:
+    index_files = find_index_files(root, index_name)
+    for index_path in index_files:
+        try:
+            data = json.loads(index_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"[quality-viewer] skip {index_path}: {exc}")
             continue
-        path = Path(os.path.expanduser(str(value)))
-        if path.is_file():
-            return str(path.resolve())
-    return None
+        person_id = data.get("person_id") or index_path.parent.name
+        images = data.get("images") if isinstance(data, dict) else {}
+        if not isinstance(images, dict):
+            continue
+        for image_type in IMAGE_TYPES:
+            entries = images.get(image_type) or {}
+            if not isinstance(entries, dict):
+                continue
+            for image_path, attrs in entries.items():
+                if not isinstance(attrs, dict):
+                    continue
+                quality = attrs.get("quality") if isinstance(attrs.get("quality"), dict) else {}
+                states = {key: summarize_quality(quality.get(key)) for key in QUALITY_KEYS}
+                failed = [key for key, value in states.items() if value.get("state") == "fail"]
+                row = {
+                    "id": len(rows),
+                    "index_path": str(index_path),
+                    "relative_index_path": os.path.relpath(index_path, root_abs) if os.path.isdir(root_abs) else str(index_path),
+                    "person_id": attrs.get("person_id") or person_id,
+                    "uid": attrs.get("uid"),
+                    "shot_key": attrs.get("shot_key"),
+                    "obj_id": attrs.get("obj_id"),
+                    "frame_idx": attrs.get("frame_idx"),
+                    "image_type": image_type,
+                    "image_path": attrs.get("image_path") or image_path,
+                    "one_shot_image_path": attrs.get("one_shot_image_path"),
+                    "quality_label": attrs.get("quality_label", True),
+                    "failed_quality_keys": failed,
+                    "quality_states": states,
+                    "quality": {key: quality.get(key) for key in QUALITY_KEYS if key in quality},
+                    "related_images": attrs.get("related_images") or {},
+                    "related_one_shot_images": attrs.get("related_one_shot_images") or {},
+                    "pose": attrs.get("pose") or {},
+                    "expression": attrs.get("expression") or {},
+                    "body_pose": attrs.get("body_pose") or {},
+                }
+                rows.append(row)
+                if max_rows and len(rows) >= max_rows:
+                    return rows, index_files
+    return rows, index_files
 
 
 def create_app(args):
-    video_dir = Path(args.video_dir).expanduser().resolve()
-    pairs_jsonl = Path(args.pairs_jsonl).expanduser().resolve() if args.pairs_jsonl else video_dir / "training_pairs" / "pairs.jsonl"
-    rejected_jsonl = Path(args.rejected_jsonl).expanduser().resolve() if args.rejected_jsonl else video_dir / "training_pairs" / "rejected_pairs.jsonl"
+    root = Path(args.root).expanduser().resolve()
+    rows, index_files = load_rows(str(root), args.index_name, args.max_rows)
+    allowed_roots = [root]
+    for row in rows:
+        for value in (row.get("image_path"), row.get("one_shot_image_path")):
+            if value:
+                try:
+                    allowed_roots.append(Path(value).expanduser().resolve().parents[3])
+                except Exception:
+                    pass
 
-    kept_rows = read_jsonl(str(pairs_jsonl), args.max_rows)
-    rejected_rows = read_jsonl(str(rejected_jsonl), args.max_rows)
-
-    allowed_roots = [video_dir, APP_ROOT, Path.cwd().resolve()]
-
-    def resolve_image_path(value):
-        if not value:
+    def resolve_image(path_value):
+        if not path_value:
             return None
-        raw = str(value)
-        candidates = []
-        path = Path(os.path.expanduser(raw))
-        if path.is_absolute():
-            candidates.append(path)
-        else:
-            candidates.extend([
-                video_dir / raw,
-                APP_ROOT / raw,
-                Path.cwd().resolve() / raw,
-            ])
-        found = first_existing_path(candidates)
-        if not found:
+        path = Path(str(path_value)).expanduser()
+        if not path.is_absolute():
+            path = root / path
+        try:
+            path = path.resolve()
+        except Exception:
             return None
-        resolved = Path(found).resolve()
-        if not any(str(resolved).startswith(str(root)) for root in allowed_roots):
+        if not path.is_file():
             return None
-        return str(resolved)
-
-    def image_url(value):
-        resolved = resolve_image_path(value)
-        if not resolved:
+        if not any(str(path).startswith(str(base)) for base in allowed_roots):
             return None
-        return f"/image?path={resolved}"
-
-    def ref_images(row, key, meta_key):
-        values = []
-        for value in row.get(key) or []:
-            values.append({"path": value, "url": image_url(value), "meta": {}})
-        metas = row.get(meta_key) or []
-        if metas and not values:
-            for meta in metas:
-                path = meta.get("path") or meta.get("white_path")
-                values.append({"path": path, "url": image_url(path), "meta": meta})
-        else:
-            for idx, meta in enumerate(metas):
-                if idx < len(values):
-                    values[idx]["meta"] = meta
-        return values
-
-    def normalize_row(row, status):
-        if status == "kept":
-            detail = row.get("selection_stats") or {}
-            reason = "kept"
-            target_path = row.get("first_frame")
-        else:
-            detail = row.get("detail") or {}
-            reason = row.get("reject_reason") or "rejected"
-            target_path = row.get("first_frame")
-        return {
-            "id": row.get("_row_id"),
-            "status": status,
-            "person_id": row.get("person_id"),
-            "source_uid": row.get("source_uid"),
-            "source_shot_key": row.get("source_shot_key"),
-            "source_frame_idx": row.get("source_frame_idx"),
-            "target_video": row.get("target_video"),
-            "target_url": image_url(target_path),
-            "target_path": target_path,
-            "reason": reason,
-            "detail": detail,
-            "detail_text": compact_detail(detail),
-            "selection_stats": row.get("selection_stats") or {},
-            "angle": ref_images(row, "angle_ref", "angle_ref_meta"),
-            "emotion": ref_images(row, "emo_ref", "emo_ref_meta"),
-            "body_pose": ref_images(row, "body_pose_ref", "body_pose_ref_meta"),
-            "raw_text": compact_detail({k: v for k, v in row.items() if not k.startswith("_")}),
-        }
-
-    kept = [normalize_row(row, "kept") for row in kept_rows]
-    rejected = [normalize_row(row, "rejected") for row in rejected_rows]
+        return str(path)
 
     app = Flask(__name__)
 
-    @app.route("/")
+    @app.get("/")
     def index():
-        status = request.args.get("status", "kept")
-        if status not in {"kept", "rejected"}:
-            status = "kept"
-        rows = kept if status == "kept" else rejected
-        reason = request.args.get("reason", "")
-        person = request.args.get("person", "")
-        if reason:
-            rows = [row for row in rows if row["reason"] == reason]
-        if person:
-            rows = [row for row in rows if str(row.get("person_id") or "") == person]
-        reasons = sorted({row["reason"] for row in rejected})
-        return render_template_string(TEMPLATE, rows=rows, status=status, reasons=reasons, reason=reason, person=person, kept_count=len(kept), rejected_count=len(rejected), video_dir=str(video_dir), pairs_jsonl=str(pairs_jsonl), rejected_jsonl=str(rejected_jsonl))
+        return render_template_string(HTML)
 
-    @app.route("/image")
+    @app.get("/data")
+    def data():
+        by_type = Counter(row["image_type"] for row in rows)
+        by_quality = Counter()
+        for row in rows:
+            for key in row["failed_quality_keys"]:
+                by_quality[key] += 1
+        return jsonify({
+            "root": str(root),
+            "index_name": args.index_name,
+            "index_file_count": len(index_files),
+            "rows": rows,
+            "total": len(rows),
+            "failed": sum(1 for row in rows if row.get("quality_label") is False),
+            "by_type": dict(by_type),
+            "by_failed_quality": dict(by_quality),
+        })
+
+    @app.get("/image")
     def image():
-        path = resolve_image_path(request.args.get("path"))
+        path = resolve_image(request.args.get("path"))
         if not path:
             abort(404)
         return send_file(path)
 
-    @app.route("/api/summary")
-    def summary():
-        counts = {}
-        for row in rejected:
-            counts[row["reason"]] = counts.get(row["reason"], 0) + 1
-        return jsonify({
-            "video_dir": str(video_dir),
-            "pairs_jsonl": str(pairs_jsonl),
-            "rejected_jsonl": str(rejected_jsonl),
-            "kept": len(kept),
-            "rejected": len(rejected),
-            "reject_reasons": counts,
-        })
-
     return app
 
 
-TEMPLATE = """
+HTML = r"""
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Training Pair Viewer</title>
+  <title>Stage4 Quality Viewer</title>
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #f6f7f9; color: #1f2933; }
-    header { position: sticky; top: 0; z-index: 10; background: #ffffff; border-bottom: 1px solid #d9dee7; padding: 14px 20px; }
-    .title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .title h1 { font-size: 20px; margin: 0; }
-    .pill { border: 1px solid #c8d0dc; border-radius: 999px; padding: 4px 10px; background: #fff; color: #4b5563; font-size: 13px; text-decoration: none; }
-    .pill.active { background: #1f2937; color: #fff; border-color: #1f2937; }
-    .meta { margin-top: 8px; font-size: 12px; color: #667085; line-height: 1.5; word-break: break-all; }
-    .filters { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-    input, select, button { height: 32px; border: 1px solid #c8d0dc; border-radius: 6px; padding: 0 9px; background: #fff; }
-    main { padding: 18px 20px 48px; }
-    .card { background: #fff; border: 1px solid #d9dee7; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
-    .row-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid #eef1f5; padding-bottom: 10px; margin-bottom: 12px; }
-    .reason { font-weight: 700; color: #9a3412; }
-    .kept { color: #166534; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
-    .section { margin-top: 12px; }
-    .section h3 { font-size: 14px; margin: 0 0 8px; color: #344054; }
-    figure { margin: 0; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: #fafafa; }
-    figure img { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; background: #111827; display: block; }
-    figcaption { font-size: 11px; color: #475467; padding: 6px; line-height: 1.35; word-break: break-all; }
-    .target { max-width: 340px; }
-    .target img { aspect-ratio: 16 / 9; }
-    pre { max-height: 260px; overflow: auto; white-space: pre-wrap; background: #111827; color: #d1d5db; border-radius: 6px; padding: 10px; font-size: 12px; }
-    .empty { padding: 32px; text-align: center; color: #667085; }
+    body { margin:0; font-family:Arial,sans-serif; background:#f6f7f9; color:#1f2933; }
+    header { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #d7dde8; padding:14px 18px; }
+    h1 { margin:0 0 8px; font-size:20px; }
+    .summary,.controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .summary span { padding:4px 8px; background:#eef1f5; border-radius:999px; font-size:12px; }
+    .controls { margin-top:10px; }
+    input,select,button { height:32px; border:1px solid #c8d0dc; border-radius:6px; background:#fff; padding:0 8px; }
+    main { padding:16px 18px 48px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(390px,1fr)); gap:12px; }
+    .card { background:#fff; border:1px solid #d7dde8; border-radius:8px; padding:12px; }
+    .head { display:flex; justify-content:space-between; gap:12px; }
+    .title { font-weight:700; font-size:13px; }
+    .sub { color:#667085; font-size:12px; margin-top:3px; word-break:break-all; }
+    .badge { height:22px; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #c8d0dc; }
+    .badge.pass { background:#e8f5e9; border-color:#9ccc9c; color:#166534; }
+    .badge.fail { background:#fff0f0; border-color:#ef9a9a; color:#991b1b; }
+    .image { margin-top:10px; }
+    img { width:100%; max-height:260px; object-fit:contain; background:#111827; border-radius:6px; display:block; }
+    .chips { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:10px; }
+    .chip { border:1px solid #d7dde8; border-radius:6px; padding:7px; background:#fafafa; font-size:12px; min-height:64px; }
+    .chip.pass { background:#edf7ee; border-color:#a7d8a7; }
+    .chip.fail { background:#fff0f0; border-color:#ef9a9a; }
+    .chip.skip { background:#eef6ff; border-color:#9ec5fe; }
+    .chip.missing { color:#7b8494; }
+    .chip b { display:block; margin-bottom:3px; }
+    .metric { color:#4b5563; font-size:11px; line-height:1.35; overflow:hidden; text-overflow:ellipsis; }
+    pre { white-space:pre-wrap; word-break:break-all; max-height:260px; overflow:auto; font-size:11px; background:#111827; color:#d1d5db; border-radius:6px; padding:9px; }
+    details { margin-top:8px; }
+    summary { cursor:pointer; font-size:12px; color:#344054; }
   </style>
 </head>
 <body>
   <header>
-    <div class="title">
-      <h1>Training Pair Viewer</h1>
-      <a class="pill {{ 'active' if status == 'kept' else '' }}" href="/?status=kept">Kept {{ kept_count }}</a>
-      <a class="pill {{ 'active' if status == 'rejected' else '' }}" href="/?status=rejected">Rejected {{ rejected_count }}</a>
+    <h1>Stage4 Quality Viewer</h1>
+    <div class="summary" id="summary"><span>loading...</span></div>
+    <div class="controls">
+      <input id="search" placeholder="person / shot / reason / path">
+      <select id="label"><option value="">all labels</option><option value="fail">quality_label=false</option><option value="pass">quality_label=true</option></select>
+      <select id="imageType"><option value="">all image types</option></select>
+      <select id="failedKey"><option value="">all failure keys</option></select>
+      <input id="limit" type="number" min="1" step="100" value="300">
+      <button id="apply">Apply</button>
     </div>
-    <div class="meta">
-      video_dir: {{ video_dir }}<br>
-      pairs: {{ pairs_jsonl }}<br>
-      rejected: {{ rejected_jsonl }}
-    </div>
-    <form class="filters" method="get">
-      <input type="hidden" name="status" value="{{ status }}">
-      <input name="person" placeholder="person_id" value="{{ person }}">
-      {% if status == 'rejected' %}
-      <select name="reason">
-        <option value="">all reasons</option>
-        {% for item in reasons %}
-        <option value="{{ item }}" {{ 'selected' if item == reason else '' }}>{{ item }}</option>
-        {% endfor %}
-      </select>
-      {% endif %}
-      <button type="submit">Filter</button>
-      <a class="pill" href="/?status={{ status }}">Reset</a>
-    </form>
   </header>
-  <main>
-    {% if not rows %}
-      <div class="empty">No rows to show.</div>
-    {% endif %}
-    {% for row in rows %}
-    <article class="card">
-      <div class="row-head">
-        <div>
-          <div><strong>#{{ row.id }}</strong> <span class="{{ 'kept' if row.status == 'kept' else 'reason' }}">{{ row.reason }}</span></div>
-          <div class="meta">person={{ row.person_id }} | uid={{ row.source_uid }} | shot={{ row.source_shot_key }} | frame={{ row.source_frame_idx }}</div>
-          <div class="meta">target_video={{ row.target_video }}</div>
-        </div>
+  <main><div class="grid" id="grid"></div></main>
+<script>
+let rows = [];
+const keys = ["mask_hole","face_bbox_boundary","face_mask_coverage","face_occlusion","image_clarity_laplacian","image_clarity_vlm"];
+const $ = id => document.getElementById(id);
+function enc(v){ return encodeURIComponent(v || ""); }
+function esc(v){ return String(v ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+function metric(k,v){ return (v === undefined || v === null || v === "") ? "" : `<div class="metric">${esc(k)}: ${esc(v)}</div>`; }
+function chip(key, q) {
+  q = q || {state:"missing"};
+  const lines = [
+    metric("status", q.status),
+    metric("passed", q.passed),
+    metric("holes", q.hole_count),
+    metric("sharpness", q.sharpness == null ? null : Number(q.sharpness).toFixed(3)),
+    metric("threshold", q.threshold),
+    metric("occluded", q.face_occluded),
+    metric("clear", q.is_clear),
+    metric("confidence", q.confidence),
+    metric("reason", q.reason),
+  ].join("");
+  return `<div class="chip ${esc(q.state)}"><b>${esc(key)}: ${esc(q.state)}</b>${lines}</div>`;
+}
+function card(row, idx) {
+  const pass = row.quality_label !== false;
+  const image = row.image_path ? `<img loading="lazy" src="/image?path=${enc(row.image_path)}">` : "";
+  const chips = keys.map(k => chip(k, (row.quality_states || {})[k])).join("");
+  return `<article class="card">
+    <div class="head">
+      <div>
+        <div class="title">#${idx + 1} ${esc(row.person_id)} · ${esc(row.image_type)}</div>
+        <div class="sub">${esc(row.shot_key)} / id_${esc(row.obj_id)} / frame ${esc(row.frame_idx)}</div>
       </div>
-
-      {% if row.target_url %}
-      <div class="section">
-        <h3>Target first frame</h3>
-        <figure class="target">
-          <img src="{{ row.target_url }}">
-          <figcaption>{{ row.target_path }}</figcaption>
-        </figure>
-      </div>
-      {% endif %}
-
-      {% if row.status == 'rejected' %}
-      <div class="section">
-        <h3>Reject detail</h3>
-        <pre>{{ row.detail_text }}</pre>
-      </div>
-      {% else %}
-      <div class="section">
-        <h3>Selection stats</h3>
-        <pre>{{ row.detail_text }}</pre>
-      </div>
-      {% endif %}
-
-      {% for group_name, refs in [('Angle refs', row.angle), ('Emotion refs', row.emotion), ('Body pose refs', row.body_pose)] %}
-      <div class="section">
-        <h3>{{ group_name }} ({{ refs|length }})</h3>
-        <div class="grid">
-          {% for ref in refs %}
-          <figure>
-            {% if ref.url %}
-              <img src="{{ ref.url }}">
-            {% else %}
-              <div style="height:136px;display:flex;align-items:center;justify-content:center;color:#667085;">missing image</div>
-            {% endif %}
-            <figcaption>
-              {{ ref.path }}<br>
-              yaw={{ ref.meta.get('yaw') }} pitch={{ ref.meta.get('pitch') }} emotion={{ ref.meta.get('emotion') }} quality={{ ref.meta.get('quality_label') }}
-            </figcaption>
-          </figure>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-
-      <details class="section">
-        <summary>Raw row</summary>
-        <pre>{{ row.raw_text }}</pre>
-      </details>
-    </article>
-    {% endfor %}
-  </main>
+      <div class="badge ${pass ? "pass" : "fail"}">${pass ? "pass" : "fail"}</div>
+    </div>
+    <div class="image">${image}</div>
+    <div class="chips">${chips}</div>
+    <details><summary>raw quality</summary><pre>${esc(JSON.stringify({quality_label: row.quality_label, failed_quality_keys: row.failed_quality_keys, quality: row.quality, pose: row.pose, expression: row.expression, body_pose: row.body_pose, image_path: row.image_path, index_path: row.index_path}, null, 2))}</pre></details>
+  </article>`;
+}
+function addOptions(id, values) {
+  for (const [key, count] of Object.entries(values).sort()) {
+    const opt = document.createElement("option");
+    opt.value = key; opt.textContent = `${key} (${count})`;
+    $(id).appendChild(opt);
+  }
+}
+function render() {
+  const needle = $("search").value.toLowerCase();
+  const label = $("label").value;
+  const imageType = $("imageType").value;
+  const failedKey = $("failedKey").value;
+  const limit = Number($("limit").value || 300);
+  const filtered = rows.filter(row => {
+    if (needle && !JSON.stringify(row).toLowerCase().includes(needle)) return false;
+    if (label === "fail" && row.quality_label !== false) return false;
+    if (label === "pass" && row.quality_label === false) return false;
+    if (imageType && row.image_type !== imageType) return false;
+    if (failedKey && !(row.failed_quality_keys || []).includes(failedKey)) return false;
+    return true;
+  });
+  $("grid").innerHTML = filtered.slice(0, limit).map(card).join("");
+}
+fetch("/data").then(r => r.json()).then(data => {
+  rows = data.rows;
+  $("summary").innerHTML = `<span>rows: <b>${data.total}</b></span><span>failed: <b>${data.failed}</b></span><span>index files: <b>${data.index_file_count}</b></span><span>root: ${esc(data.root)}</span>`;
+  addOptions("imageType", data.by_type);
+  addOptions("failedKey", data.by_failed_quality);
+  render();
+});
+["search","label","imageType","failedKey","limit"].forEach(id => $(id).addEventListener("input", render));
+$("apply").addEventListener("click", render);
+</script>
 </body>
 </html>
 """
@@ -317,6 +326,8 @@ TEMPLATE = """
 def main():
     args = parse_args()
     app = create_app(args)
+    print(f"Viewer: http://{args.host}:{args.port}")
+    print(f"Root: {Path(args.root).expanduser().resolve()}")
     app.run(host=args.host, port=args.port, debug=args.debug)
 
 
