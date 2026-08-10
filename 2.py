@@ -22,3 +22,18 @@ TASK_NAME=generate_training_pairs python3 main.py \
   --angle_front_up_max_pitch 20 \
   --angle_front_down_min_pitch 40 \
   --angle_front_down_max_pitch 70
+
+TASK_NAME=generate_training_pairs python main.py \
+  --video_dir /data/huanan/code/jwx1520881/HUAWEI_CrossPairDataset_v4/outputs/outputs_from_multi_person/0ae41a56-67d4-4635-b5e7-96e5a8d3de4b \
+  --index_filename post_process_index.json \
+  --angle_ref_count 5 \
+  --emo_ref_count 5 \
+  --body_pose_ref_count 5 \
+  --bucket_candidate_topk 5 \
+  --min_same_prefix_shot_gap 3 \
+  --enable_dino_ref_diversity true \
+  --dino_max_pairwise_cosine 0.95 \
+  --angle_front_up_min_pitch -10 \
+  --angle_front_up_max_pitch 20 \
+  --angle_front_down_min_pitch 40 \
+  --angle_front_down_max_pitch 70
