@@ -1,2341 +1,28 @@
-#!/usr/bin/env python3
-"""
-After-pipeline index builder (v3) —— 自包含版本，不依赖 index_add.py。
-
-分发逻辑：
-  1. 直接列出 person_clusters_dir 下的 person 目录列表；
-  2. 先剔除「已处理且未开启 overwrite」的 person；
-  3. 对剩余列表按 rank / total_rank 切出连续区间 [st, en)，得到本 rank 应处理的 person；
-  4. 逐个构建索引。
-
-v3 与 v2 的主要差异：
-  - 输入目录与输出目录分离；
-  - 当指定 output_dir 时，输出目录镜像输入目录在 identity_root 下的相对结构；
-  - 只创建输出目录和 post-process json，不复制图片、cluster_meta 或其它原始文件。
-"""
+import hashlib
 import json
 import os
+import random
 import re
-from collections import defaultdict
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from collections import Counter, defaultdict
+from dataclasses import asdict, replace
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+import cv2
+import numpy as np
 from tqdm import tqdm
 
-try:
-    from .path_utils import (
-        resolve_path_fields,
-        resolve_repo_path as _resolve_repo_path,
-        to_repo_relative_path,
-    )
-except ImportError:
-    from path_utils import (
-        resolve_path_fields,
-        resolve_repo_path as _resolve_repo_path,
-        to_repo_relative_path,
-    )
-
-# ---- constants ----
-CORE_IMAGE_TYPES = ("face_orig", "face_white", "full_orig", "full_white")
-DERIVED_IMAGE_TYPES = (
-    "face_angle_left",
-    "face_angle_front",
-    "face_angle_right",
-    "face_diversity_topk",
-    "dino_diversity_topk",
-)
-IMAGE_TYPES = CORE_IMAGE_TYPES + DERIVED_IMAGE_TYPES
-ONE_SHOT_DIR_FIELDS = {
-    "face_orig": "cropped_id_face_orig_dir_path",
-    "face_white": "cropped_id_face_white_dir_path",
-    "full_orig": "id_full_orig_dir_path",
-    "full_white": "id_full_white_dir_path",
-}
-WHITE_IMAGE_MASK_DIR_FIELDS = {
-    "face_white": "cropped_id_face_mask_for_face_dir_path",
-    "full_white": "id_cropped_full_mask_dir_path",
-}
-QUALITY_MASK_IMAGE_TYPES = {
-    "face_orig": "face_white",
-    "face_white": "face_white",
-    "full_orig": "full_white",
-    "full_white": "full_white",
-}
-IMAGE_EXTENSIONS = {
-    "face_orig": ("jpg", "jpeg", "png"),
-    "face_white": ("png", "jpg", "jpeg"),
-    "full_orig": ("jpg", "jpeg", "png"),
-    "full_white": ("png", "jpg", "jpeg"),
-}
-CLUSTER_IMAGE_RE = re.compile(
-    r"^(?P<shot>.+)_id(?P<obj>[^_]+)_frame(?P<frame>\d+)\.[^.]+$"
-)
-FACE_ANGLE_RE = re.compile(
-    r"^(?P<shot>.+)_id(?P<obj>[^_]+)_frame(?P<frame>\d+)_yaw(?P<yaw>[+-]?\d+(?:\.\d+)?)\.[^.]+$"
-)
-DIVERSITY_RE = re.compile(r"^rank_(?P<rank>\d+)_(?P<shot>.+)_frame(?P<frame>\d+)\.[^.]+$")
-
-
-# ---- helper functions ----
-def resolve_repo_path(value: str) -> str:
-    return _resolve_repo_path(value)
-
-
-def read_jsonl(path: str) -> List[dict]:
-    records = []
-    with open(path, "r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                records.append(json.loads(line))
-            except json.JSONDecodeError as exc:
-                print(f"[AfterPipelineV3] Skip invalid JSON at line {line_number}: {exc}")
-    return records
-
-
-def to_jsonable(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): to_jsonable(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_jsonable(item) for item in value]
-    if hasattr(value, "item"):  # numpy / torch scalar
-        return value.item()
-    return value
-
-
-def relativize_index_output(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            to_repo_relative_path(key) if isinstance(key, str) else key: relativize_index_output(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, (list, tuple)):
-        return [relativize_index_output(item) for item in value]
-    if isinstance(value, str):
-        return to_repo_relative_path(value)
-    return value
-
-
-def load_json_object(path: Optional[str]) -> Dict[str, dict]:
-    path = resolve_repo_path(path) if path else path
-    if not path or not os.path.isfile(path):
-        return {}
-    with open(path, "r", encoding="utf-8") as file:
-        data = json.load(file)
-    return data if isinstance(data, dict) else {}
-
-
-def member_key(record: dict) -> Tuple[str, str]:
-    shot_key = record.get("shot_key")
-    if not shot_key:
-        shot_key = Path(record.get("source_shot_path", "unknown")).stem
-    return str(shot_key), str(record.get("obj_id"))
-
-
-def load_all_cluster_members(
-    person_clusters_dir: str,
-    identity_records: List[dict],
-    recovery_records: List[dict],
-    person_ids: Optional[set] = None,
-) -> Dict[str, List[dict]]:
-    grouped = defaultdict(list)
-    seen = defaultdict(set)
-
-    for record in identity_records:
-        person_id = record.get("identity_matching_person_id")
-        if not person_id:
-            continue
-        person_id = str(person_id)
-        if person_ids is not None and person_id not in person_ids:
-            continue
-        key = member_key(record)
-        grouped[person_id].append(record)
-        seen[person_id].add(key)
-
-    recovery_lookup = {member_key(record): record for record in recovery_records}
-    if not recovery_lookup or not os.path.isdir(person_clusters_dir):
-        return grouped
-
-    for name in sorted(os.listdir(person_clusters_dir)):
-        cluster_dir = os.path.join(person_clusters_dir, name)
-        meta_path = os.path.join(cluster_dir, "cluster_meta.json")
-        if not os.path.isdir(cluster_dir) or not os.path.isfile(meta_path):
-            continue
-        with open(meta_path, "r", encoding="utf-8") as file:
-            metadata = json.load(file)
-        person_id = str(metadata.get("person_id") or name)
-        if person_ids is not None and person_id not in person_ids:
-            continue
-        grouped[person_id]
-        for member in metadata.get("members", []) or []:
-            key = member_key(member)
-            if key in seen[person_id]:
-                continue
-            source = recovery_lookup.get(key)
-            if source is None:
-                print(
-                    f"[AfterPipelineV3] Missing recovery record for "
-                    f"{person_id}: {key[0]}::id_{key[1]}"
-                )
-                continue
-            recovered = dict(source)
-            recovered["identity_matching_person_id"] = person_id
-            recovered["identity_matching_person_cluster_dir"] = cluster_dir
-            grouped[person_id].append(recovered)
-            seen[person_id].add(key)
-
-    return grouped
-
-
-def candidate_image_path(
-    directory: Optional[str],
-    frame_idx: int,
-    extensions: Iterable[str],
-) -> Optional[str]:
-    if not directory:
-        return None
-    directory = resolve_repo_path(directory)
-    for extension in extensions:
-        path = os.path.join(directory, f"{frame_idx}.{extension}")
-        if os.path.isfile(path):
-            return os.path.abspath(path)
-    first_extension = next(iter(extensions), None)
-    if first_extension is None:
-        return None
-    return os.path.abspath(os.path.join(directory, f"{frame_idx}.{first_extension}"))
-
-
-def load_one_shot_pose_map(record: dict) -> Dict[str, dict]:
-    return load_json_object(record.get("face_euler_angles_jsonl_path"))
-
-
-def source_shot_frame_idx(record: dict, frame_idx: int) -> Optional[int]:
-    mapping = record.get("frame_index_mapping") or {}
-    value = mapping.get(str(frame_idx), mapping.get(frame_idx))
-    try:
-        return int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def build_one_shot_paths(record: dict, frame_idx: int) -> Dict[str, Optional[str]]:
-    paths = {}
-    for image_type in CORE_IMAGE_TYPES:
-        directory = record.get(ONE_SHOT_DIR_FIELDS[image_type])
-        paths[image_type] = candidate_image_path(
-            directory, frame_idx, IMAGE_EXTENSIONS[image_type]
-        )
-    return paths
-
-
-def white_image_mask_path(record: dict, image_type: str, frame_idx: int) -> Optional[str]:
-    mask_image_type = QUALITY_MASK_IMAGE_TYPES.get(image_type)
-    directory_field = WHITE_IMAGE_MASK_DIR_FIELDS.get(mask_image_type)
-    if not directory_field:
-        return None
-    return candidate_image_path(record.get(directory_field), frame_idx, ("npy", "png"))
-
-
-def _count_mask_holes(mask) -> int:
-    import cv2
-    import numpy as np
-
-    fg = np.asarray(mask) > 0
-    if not np.any(fg):
-        return 0
-
-    bg = (~fg).astype(np.uint8)
-    h, w = bg.shape
-    flood = bg.copy()
-    mask_pad = np.zeros((h + 2, w + 2), dtype=np.uint8)
-    for x in range(w):
-        if flood[0, x]:
-            cv2.floodFill(flood, mask_pad, (x, 0), 0)
-        if flood[h - 1, x]:
-            cv2.floodFill(flood, mask_pad, (x, h - 1), 0)
-    for y in range(h):
-        if flood[y, 0]:
-            cv2.floodFill(flood, mask_pad, (0, y), 0)
-        if flood[y, w - 1]:
-            cv2.floodFill(flood, mask_pad, (w - 1, y), 0)
-
-    return max(0, int(cv2.connectedComponents(flood, connectivity=8)[0]) - 1)
-
-
-def mask_hole_quality(
-    image_path: Optional[str],
-    mask_path: Optional[str],
-    image_type: str,
-    threshold: int,
-) -> dict:
-    mask_image_type = QUALITY_MASK_IMAGE_TYPES.get(image_type)
-    is_mask_checked_image = mask_image_type in WHITE_IMAGE_MASK_DIR_FIELDS
-    result = {
-        "checked": False,
-        "entry_image_type": image_type,
-        "mask_image_type": mask_image_type,
-        "is_white_image": image_type in WHITE_IMAGE_MASK_DIR_FIELDS,
-        "is_mask_source_white_image": mask_image_type in WHITE_IMAGE_MASK_DIR_FIELDS,
-        "mask_path": mask_path,
-        "hole_count": 0,
-        "threshold": int(threshold),
-        "passed": True,
-        "status": "not_mask_checked_image",
-    }
-    if not is_mask_checked_image:
-        return result
-
-    try:
-        import cv2
-        import numpy as np
-
-        mask = None
-        resolved_mask_path = resolve_repo_path(mask_path) if mask_path else None
-        if resolved_mask_path and os.path.isfile(resolved_mask_path):
-            if resolved_mask_path.lower().endswith(".npy"):
-                mask = np.load(resolved_mask_path)
-            else:
-                mask = cv2.imread(resolved_mask_path, cv2.IMREAD_GRAYSCALE)
-
-        if mask is None and image_path:
-            img = cv2.imread(resolve_repo_path(image_path), cv2.IMREAD_UNCHANGED)
-            if img is not None and img.ndim == 3 and img.shape[2] >= 4:
-                mask = img[:, :, 3]
-                result["status"] = "fallback_alpha"
-
-        if mask is None:
-            result["status"] = "missing_mask"
-            return result
-
-        hole_count = _count_mask_holes(mask)
-        passed = hole_count <= int(threshold)
-        result.update({
-            "checked": True,
-            "hole_count": hole_count,
-            "passed": passed,
-            "status": result["status"] if result["status"] == "fallback_alpha" else "ok",
-        })
-        return result
-    except Exception as exc:
-        result.update({"status": "error", "error_msg": str(exc)})
-        return result
-
-
-def _mask_hole_quality_for_entry(quality: dict, entry_image_type: str) -> dict:
-    value = dict(quality)
-    value["entry_image_type"] = entry_image_type
-    value["is_white_image"] = entry_image_type in WHITE_IMAGE_MASK_DIR_FIELDS
-    return value
-
-
-def _quality_passed(entry: dict) -> bool:
-    quality = entry.get("quality")
-    if isinstance(quality, dict):
-        for item in quality.values():
-            if isinstance(item, dict) and item.get("passed") is False:
-                return False
-    return bool(entry.get("quality_label", True))
-
-
-def _set_quality_item(entry: dict, name: str, value: dict) -> None:
-    quality = entry.get("quality")
-    if not isinstance(quality, dict):
-        quality = {}
-    quality[name] = dict(value)
-    entry["quality"] = quality
-    entry["quality_label"] = _quality_passed(entry)
-
-
-def _has_quality_item(entry: Optional[dict], name: str) -> bool:
-    if not isinstance(entry, dict):
-        return False
-    quality = entry.get("quality")
-    if not isinstance(quality, dict):
-        return False
-    item = quality.get(name)
-    if not isinstance(item, dict):
-        return False
-    if name == "mask_hole":
-        return item.get("hole_count") is not None
-    status = item.get("status")
-    if name == "face_bbox_boundary":
-        if status == "no_face_detected":
-            return True
-        return item.get("touches_boundary") is not None and item.get("expanded_face_bbox") is not None
-    if name == "face_mask_coverage":
-        if status in {"no_face_detected", "skipped_non_frontal_face"}:
-            return True
-        return item.get("mask_foreground_ratio") is not None and item.get("mask_face_bbox") is not None
-    return True
-
-
-def _load_binary_mask(mask_path: Optional[str]):
-    if not mask_path:
-        return None
-    resolved = resolve_repo_path(mask_path)
-    if not os.path.isfile(resolved):
-        return None
-    import cv2
-    import numpy as np
-
-    if resolved.lower().endswith(".npy"):
-        return np.load(resolved) > 0
-    mask = cv2.imread(resolved, cv2.IMREAD_GRAYSCALE)
-    return None if mask is None else mask > 0
-
-
-def _expanded_bbox(bbox, ratio: float):
-    x1, y1, x2, y2 = map(float, bbox)
-    cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
-    w, h = max(0.0, x2 - x1), max(0.0, y2 - y1)
-    nw, nh = w * float(ratio), h * float(ratio)
-    return (cx - nw / 2.0, cy - nh / 2.0, cx + nw / 2.0, cy + nh / 2.0)
-
-
-def _bbox_touches_image_boundary(bbox, image_shape) -> bool:
-    if bbox is None or image_shape is None:
-        return False
-    h, w = image_shape[:2]
-    x1, y1, x2, y2 = map(float, bbox)
-    return x1 <= 0 or y1 <= 0 or x2 >= w or y2 >= h
-
-
-class FaceBoundaryQualityChecker:
-    """Stage4 face quality: expanded bbox boundary + original bbox SAM coverage."""
-
-    def __init__(
-        self,
-        model_name: str = "buffalo_l",
-        model_root: str = "./pretrained_models/insightface",
-        device: str = "cuda:0",
-        det_size: int = 640,
-        expand_ratio: float = 1.1,
-        min_foreground_ratio: float = 1.0,
-        max_abs_yaw_for_mask_coverage: float = 30.0,
-        check_boundary: bool = True,
-        check_mask_coverage: bool = True,
-    ):
-        self._model_name = model_name
-        self._model_root = model_root
-        self._device = device
-        self._det_size = int(det_size)
-        self._expand_ratio = float(expand_ratio)
-        self._min_foreground_ratio = float(min_foreground_ratio)
-        self._max_abs_yaw_for_mask_coverage = float(max_abs_yaw_for_mask_coverage)
-        self._check_boundary = bool(check_boundary)
-        self._check_mask_coverage = bool(check_mask_coverage)
-        self._app = None
-        self._cv2 = None
-        self._np = None
-
-    def _load_cv_backend(self) -> None:
-        if self._cv2 is not None and self._np is not None:
-            return
-        import cv2
-        import numpy as np
-
-        self._cv2 = cv2
-        self._np = np
-
-    def _load_backend(self) -> None:
-        if self._app is not None:
-            return
-        self._load_cv_backend()
-        from insightface.app import FaceAnalysis
-
-        providers = ["CPUExecutionProvider"] if str(self._device).lower() == "cpu" else ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        ctx_id = -1
-        if str(self._device).startswith("cuda"):
-            try:
-                ctx_id = int(str(self._device).split(":", 1)[1])
-            except (IndexError, ValueError):
-                ctx_id = 0
-        self._app = FaceAnalysis(
-            name=self._model_name,
-            root=resolve_repo_path(self._model_root),
-            providers=providers,
-        )
-        self._app.prepare(ctx_id=ctx_id, det_size=(self._det_size, self._det_size))
-
-    def check(
-        self,
-        image_path: Optional[str],
-        mask_path: Optional[str],
-        pose: Optional[dict] = None,
-        existing_face_bbox: Optional[List[float]] = None,
-        existing_det_score: Optional[float] = None,
-        requested_quality_names: Optional[Iterable[str]] = None,
-    ) -> dict:
-        requested_quality_names = {str(name) for name in (requested_quality_names or []) if str(name)}
-        check_boundary = self._check_boundary and (not requested_quality_names or "face_bbox_boundary" in requested_quality_names)
-        check_mask_coverage = self._check_mask_coverage and (not requested_quality_names or "face_mask_coverage" in requested_quality_names)
-        common = {
-            "image_path": image_path,
-            "mask_path": mask_path,
-            "face_bbox": None,
-            "det_score": None,
-            "image_size": None,
-            "bbox_source": None,
-        }
-        boundary = {
-            **common,
-            "checked": False,
-            "expanded_face_bbox": None,
-            "expand_ratio": self._expand_ratio,
-            "touches_boundary": False,
-            "passed": True,
-            "status": "disabled" if not check_boundary else "missing_face_orig",
-        }
-        mask_coverage = {
-            **common,
-            "checked": False,
-            "mask_face_bbox": None,
-            "mask_foreground_ratio": None,
-            "mask_background_pixel_count": None,
-            "min_foreground_ratio": self._min_foreground_ratio,
-            "max_abs_yaw": self._max_abs_yaw_for_mask_coverage,
-            "yaw": None,
-            "is_frontal": None,
-            "passed": True,
-            "status": "disabled" if not check_mask_coverage else "missing_face_orig",
-        }
-        result = {}
-        if check_boundary:
-            result["face_bbox_boundary"] = boundary
-        if check_mask_coverage:
-            result["face_mask_coverage"] = mask_coverage
-        if not image_path:
-            return result
-
-        try:
-            self._load_cv_backend()
-            image = self._cv2.imread(resolve_repo_path(image_path))
-            if image is None:
-                for item in result.values():
-                    item["status"] = "cannot_read_image"
-                return result
-
-            bbox = None
-            det_score = existing_det_score
-            bbox_source = None
-            if existing_face_bbox is not None:
-                try:
-                    candidate = self._np.asarray(existing_face_bbox, dtype=float).reshape(-1)
-                    if candidate.size == 4 and self._np.all(self._np.isfinite(candidate)):
-                        bbox = candidate
-                        bbox_source = "existing"
-                except Exception:
-                    bbox = None
-
-            if bbox is None:
-                self._load_backend()
-                faces = self._app.get(image)
-                if faces is None or len(faces) == 0:
-                    for item in result.values():
-                        item.update({"checked": True, "status": "no_face_detected", "passed": False})
-                    return result
-
-                face = max(faces, key=lambda item: item.det_score)
-                bbox = face.bbox.astype(float)
-                det_score = float(face.det_score)
-                bbox_source = "detected"
-
-            common_update = {
-                "checked": True,
-                "face_bbox": [float(v) for v in bbox],
-                "det_score": float(det_score) if det_score is not None else None,
-                "image_size": [int(image.shape[1]), int(image.shape[0])],
-                "bbox_source": bbox_source,
-                "status": "ok",
-            }
-            for item in result.values():
-                item.update(common_update)
-
-            if check_boundary:
-                expanded = _expanded_bbox(bbox, self._expand_ratio)
-                touches_boundary = _bbox_touches_image_boundary(expanded, image.shape)
-                boundary.update({
-                    "expanded_face_bbox": [float(v) for v in expanded],
-                    "touches_boundary": bool(touches_boundary),
-                    "passed": not touches_boundary,
-                    "status": "face_bbox_touches_boundary" if touches_boundary else "ok",
-                })
-
-            if not check_mask_coverage:
-                return result
-
-            yaw = None
-            if isinstance(pose, dict):
-                try:
-                    yaw = float(pose.get("yaw"))
-                except (TypeError, ValueError):
-                    yaw = None
-            is_frontal = yaw is not None and abs(yaw) <= self._max_abs_yaw_for_mask_coverage
-            mask_coverage.update({
-                "yaw": yaw,
-                "is_frontal": bool(is_frontal),
-            })
-            if not is_frontal:
-                mask_coverage.update({
-                    "checked": False,
-                    "passed": True,
-                    "status": "skipped_non_frontal_face",
-                })
-                return result
-
-            mask = _load_binary_mask(mask_path)
-            if mask is None:
-                mask_coverage["status"] = "missing_mask"
-                return result
-            if mask.shape[:2] != image.shape[:2]:
-                mask = self._cv2.resize(
-                    mask.astype("uint8"),
-                    (image.shape[1], image.shape[0]),
-                    interpolation=self._cv2.INTER_NEAREST,
-                ) > 0
-
-            h, w = mask.shape[:2]
-            x1, y1, x2, y2 = map(int, [
-                self._np.floor(bbox[0]),
-                self._np.floor(bbox[1]),
-                self._np.ceil(bbox[2]),
-                self._np.ceil(bbox[3]),
-            ])
-            x1, y1 = max(0, x1), max(0, y1)
-            x2, y2 = min(w, x2), min(h, y2)
-            if x2 <= x1 or y2 <= y1:
-                mask_coverage.update({"status": "empty_face_bbox", "passed": False})
-                return result
-            roi = mask[y1:y2, x1:x2]
-            fg_count = int(self._np.count_nonzero(roi))
-            total = int(roi.size)
-            bg_count = total - fg_count
-            fg_ratio = float(fg_count / total) if total else 0.0
-            mask_passed = fg_ratio >= self._min_foreground_ratio
-            mask_coverage.update({
-                "mask_face_bbox": [int(x1), int(y1), int(x2), int(y2)],
-                "mask_foreground_ratio": fg_ratio,
-                "mask_background_pixel_count": bg_count,
-                "passed": bool(mask_passed),
-                "status": "ok" if mask_passed else "face_bbox_contains_mask_background",
-            })
-            return result
-        except Exception as exc:
-            for item in result.values():
-                item.update({"status": "error", "error_msg": str(exc)})
-            return result
-
-
-def load_cluster_meta(cluster_dir: str) -> dict:
-    meta_path = os.path.join(cluster_dir, "cluster_meta.json")
-    if not os.path.isfile(meta_path):
-        return {}
-    with open(meta_path, "r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def scan_cluster_images(
-    cluster_dir: str,
-) -> Tuple[
-    Dict[str, Dict[Tuple[str, str, int], str]],
-    Dict[str, Dict[Tuple[str, str, int], dict]],
-]:
-    indexes = {image_type: {} for image_type in IMAGE_TYPES}
-    metadata = {image_type: {} for image_type in IMAGE_TYPES}
-
-    for image_type in CORE_IMAGE_TYPES:
-        directory = os.path.join(cluster_dir, image_type)
-        if not os.path.isdir(directory):
-            continue
-        for name in sorted(os.listdir(directory)):
-            path = os.path.join(directory, name)
-            if not os.path.isfile(path):
-                continue
-            match = CLUSTER_IMAGE_RE.match(name)
-            if not match:
-                continue
-            key = (
-                match.group("shot"),
-                str(match.group("obj")),
-                int(match.group("frame")),
-            )
-            indexes[image_type][key] = os.path.abspath(path)
-
-    for bucket in ("left", "front", "right"):
-        image_type = f"face_angle_{bucket}"
-        bucket_dir = os.path.join(cluster_dir, "face_angle_library", bucket)
-        if not os.path.isdir(bucket_dir):
-            continue
-        for name in sorted(os.listdir(bucket_dir)):
-            path = os.path.join(bucket_dir, name)
-            if not os.path.isfile(path):
-                continue
-            match = FACE_ANGLE_RE.match(name)
-            if not match:
-                continue
-            key = (
-                match.group("shot"),
-                str(match.group("obj")),
-                int(match.group("frame")),
-            )
-            indexes[image_type][key] = os.path.abspath(path)
-            metadata[image_type][key] = {
-                "derived_image_type": "face_angle_library",
-                "angle_bucket": bucket,
-                "filename_smoothed_yaw": float(match.group("yaw")),
-            }
-
-    cluster_meta = load_cluster_meta(cluster_dir)
-    diversity_specs = (
-        ("face_diversity_topk", "face_diversity_topk"),
-        ("dino_diversity_topk", "dino_diversity_topk"),
-    )
-    for image_type, meta_key in diversity_specs:
-        directory = os.path.join(cluster_dir, image_type)
-        if not os.path.isdir(directory):
-            continue
-        by_rank = {
-            int(item.get("rank", 0)): item
-            for item in (cluster_meta.get(meta_key, []) or [])
-        }
-        for name in sorted(os.listdir(directory)):
-            path = os.path.join(directory, name)
-            if not os.path.isfile(path):
-                continue
-            match = DIVERSITY_RE.match(name)
-            if not match:
-                continue
-            rank = int(match.group("rank"))
-            item = by_rank.get(rank, {})
-            shot_key = item.get("shot_key") or match.group("shot")
-            obj_id = item.get("obj_id")
-            frame_idx = item.get("frame_idx")
-            if obj_id is None or frame_idx is None:
-                continue
-            key = (str(shot_key), str(obj_id), int(frame_idx))
-            indexes[image_type][key] = os.path.abspath(path)
-            metadata[image_type][key] = {
-                "derived_image_type": image_type,
-                "rank": rank,
-                "stage3_diversity_metadata": item or None,
-            }
-
-    return indexes, metadata
-
-
-def cluster_frame_keys(
-    cluster_images: Dict[str, Dict[Tuple[str, str, int], str]],
-    shot_key: str,
-    obj_id: str,
-) -> List[Tuple[str, str, int]]:
-    keys = set()
-    for image_index in cluster_images.values():
-        for key in image_index:
-            if key[0] == shot_key and key[1] == str(obj_id):
-                keys.add(key)
-    return sorted(keys, key=lambda item: item[2])
-
-
-_VLM_BACKEND_CACHE: Dict[Tuple[str, str], Tuple[Any, Any, Any]] = {}
-
-
-def load_qwen3_vlm_backend(model_path: str, device: str) -> Tuple[Any, Any, Any]:
-    resolved_model_path = resolve_repo_path(model_path)
-    key = (resolved_model_path, str(device))
-    cached = _VLM_BACKEND_CACHE.get(key)
-    if cached is not None:
-        return cached
-
-    import torch
-    from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
-
-    model = Qwen3VLForConditionalGeneration.from_pretrained(
-        resolved_model_path,
-        torch_dtype="auto",
-        device_map=device,
-    )
-    processor = AutoProcessor.from_pretrained(resolved_model_path)
-    cached = (model, processor, torch)
-    _VLM_BACKEND_CACHE[key] = cached
-    return cached
-
-
-def empty_output(person_id: str, cluster_dir: str, enabled_features: List[str]) -> dict:
-    return {
-        "person_id": person_id,
-        "cluster_dir": cluster_dir,
-        "schema": "images.image_type.image_path.attributes",
-        "enabled_features": enabled_features,
-        "images": {image_type: {} for image_type in IMAGE_TYPES},
-        "face_diversity_topk": [],
-        "dino_diversity_topk": [],
-        "stats": {
-            "member_count": 0,
-            "frame_count": 0,
-            "image_count": 0,
-            "members_without_pose": 0,
-        },
-    }
-
-
-
-# ---- VLM quality checkers ----
-class FaceQualityVLMChecker:
-    def __init__(
-        self,
-        model_path: str = "pretrained_models/Qwen3-VL-8B-Instruct",
-        device: str = "cuda:0",
-        max_new_tokens: int = 512,
-        laplacian_threshold: float = 10.0,
-        check_occlusion: bool = True,
-        check_clarity: bool = True,
-        check_clarity_vlm: bool = True,
-    ):
-        self._model_path = model_path
-        self._device = device
-        self._max_new_tokens = int(max_new_tokens)
-        self._laplacian_threshold = float(laplacian_threshold)
-        self._check_occlusion = bool(check_occlusion)
-        self._check_clarity = bool(check_clarity)
-        self._check_clarity_vlm = bool(check_clarity_vlm)
-        self._vlm_model = None
-        self._vlm_processor = None
-        self._torch = None
-
-    @property
-    def quality_names(self) -> Tuple[str, ...]:
-        names = []
-        if self._check_occlusion:
-            names.append("face_occlusion")
-        if self._check_clarity:
-            names.append("image_clarity_laplacian")
-            if self._check_clarity_vlm:
-                names.append("image_clarity_vlm")
-        return tuple(names)
-
-    def _load_vlm_backend(self) -> None:
-        if self._vlm_model is not None and self._vlm_processor is not None:
-            return
-        self._vlm_model, self._vlm_processor, self._torch = load_qwen3_vlm_backend(
-            self._model_path,
-            self._device,
-        )
-
-    @staticmethod
-    def _parse_json_response(text: str) -> Tuple[dict, str]:
-        raw = (text or "").strip()
-        json_text = raw
-        fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL | re.IGNORECASE)
-        if fence_match:
-            json_text = fence_match.group(1).strip()
-        elif "{" in raw and "}" in raw:
-            json_text = raw[raw.find("{"):raw.rfind("}") + 1]
-        try:
-            data = json.loads(json_text)
-            return (data if isinstance(data, dict) else {}), "success"
-        except json.JSONDecodeError:
-            return {}, "parse_error"
-
-    @staticmethod
-    def _bool_value(value: Any, default: bool = False) -> bool:
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return bool(value)
-        if isinstance(value, str):
-            return value.strip().lower() in {"true", "yes", "1", "y", "pass", "passed"}
-        return default
-
-    def _generate_vlm_response(self, image_path: str, prompt: str) -> Tuple[str, int]:
-        self._load_vlm_backend()
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": image_path},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ]
-        inputs = self._vlm_processor.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=True,
-            return_dict=True,
-            return_tensors="pt",
-        )
-        inputs = inputs.to(self._vlm_model.device)
-        max_new_tokens = max(128, int(self._max_new_tokens))
-        with self._torch.no_grad():
-            generated_ids = self._vlm_model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-            )
-        generated_ids_trimmed = [
-            out_ids[len(in_ids):]
-            for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        output_text = self._vlm_processor.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=False,
-        )[0]
-        return output_text, max_new_tokens
-
-    def face_occlusion_quality(self, image_path: Optional[str]) -> dict:
-        result = {
-            "checked": False,
-            "image_path": image_path,
-            "passed": False,
-            "status": "missing_image",
-            "face_occluded": None,
-            "model": self._model_path,
-        }
-        if not image_path or not os.path.isfile(resolve_repo_path(image_path)):
-            return result
-        try:
-            prompt = (
-                "You are checking face quality for a portrait dataset. Determine whether the visible face is occluded "
-                "by objects, hands, hair, masks, text, extreme cropping, or any obstruction that hides important facial features. "
-                "Return pure JSON only: {\"face_occluded\": true or false, \"confidence\": 0.0 to 1.0, \"reason\": \"within 20 words\"}."
-            )
-            output_text, max_new_tokens = self._generate_vlm_response(resolve_repo_path(image_path), prompt)
-            data, parse_status = self._parse_json_response(output_text)
-            face_occluded = self._bool_value(data.get("face_occluded"), default=True)
-            result.update({
-                "checked": parse_status == "success",
-                "passed": parse_status == "success" and not face_occluded,
-                "status": "ok" if parse_status == "success" else parse_status,
-                "face_occluded": face_occluded,
-                "confidence": data.get("confidence"),
-                "reason": str(data.get("reason", "")).strip(),
-                "parse_status": parse_status,
-                "max_new_tokens": max_new_tokens,
-                "raw_response": output_text,
-            })
-            return result
-        except Exception as exc:
-            result.update({"status": "error", "error_msg": str(exc)})
-            return result
-
-    def laplacian_clarity_quality(self, image_path: Optional[str]) -> dict:
-        result = {
-            "checked": False,
-            "image_path": image_path,
-            "passed": False,
-            "status": "missing_image",
-            "sharpness": None,
-            "threshold": self._laplacian_threshold,
-        }
-        if not image_path or not os.path.isfile(resolve_repo_path(image_path)):
-            return result
-        try:
-            import cv2
-
-            img = cv2.imread(resolve_repo_path(image_path), cv2.IMREAD_COLOR)
-            if img is None:
-                result["status"] = "read_failed"
-                return result
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-            result.update({
-                "checked": True,
-                "passed": sharpness >= self._laplacian_threshold,
-                "status": "ok",
-                "sharpness": sharpness,
-            })
-            return result
-        except Exception as exc:
-            result.update({"status": "error", "error_msg": str(exc)})
-            return result
-
-    def vlm_clarity_quality(self, image_path: Optional[str]) -> dict:
-        result = {
-            "checked": False,
-            "image_path": image_path,
-            "passed": False,
-            "status": "missing_image",
-            "is_clear": None,
-            "model": self._model_path,
-        }
-        if not image_path or not os.path.isfile(resolve_repo_path(image_path)):
-            return result
-        try:
-            prompt = (
-                "You are checking image clarity for a face dataset. Decide whether the face image is clear enough for identity, "
-                "expression, and pose supervision. Mark unclear if it is blurry, motion-blurred, defocused, very low resolution, "
-                "or has compression artifacts that obscure facial details. Return pure JSON only: "
-                "{\"is_clear\": true or false, \"confidence\": 0.0 to 1.0, \"reason\": \"within 20 words\"}."
-            )
-            output_text, max_new_tokens = self._generate_vlm_response(resolve_repo_path(image_path), prompt)
-            data, parse_status = self._parse_json_response(output_text)
-            is_clear = self._bool_value(data.get("is_clear"), default=False)
-            result.update({
-                "checked": parse_status == "success",
-                "passed": parse_status == "success" and is_clear,
-                "status": "ok" if parse_status == "success" else parse_status,
-                "is_clear": is_clear,
-                "confidence": data.get("confidence"),
-                "reason": str(data.get("reason", "")).strip(),
-                "parse_status": parse_status,
-                "max_new_tokens": max_new_tokens,
-                "raw_response": output_text,
-            })
-            return result
-        except Exception as exc:
-            result.update({"status": "error", "error_msg": str(exc)})
-            return result
-
-    def check(self, image_path: Optional[str]) -> Dict[str, dict]:
-        quality = {}
-        if self._check_occlusion:
-            quality["face_occlusion"] = self.face_occlusion_quality(image_path)
-        if self._check_clarity:
-            quality["image_clarity_laplacian"] = self.laplacian_clarity_quality(image_path)
-            if self._check_clarity_vlm:
-                quality["image_clarity_vlm"] = self.vlm_clarity_quality(image_path)
-        return quality
-
-# ---- feature extractors ----
-class EmotionExtractor:
-    def __init__(
-        self,
-        enable_vlm: bool = False,
-        vlm_model_path: str = "pretrained_models/Qwen3-VL-8B-Instruct",
-        vlm_device: str = "cuda:0",
-        vlm_max_new_tokens: int = 2048,
-    ):
-        self._cv2 = None
-        self._np = None
-        self._torch = None
-        self._recognizer = None
-        self._model_name = None
-        self._enable_vlm = bool(enable_vlm)
-        self._vlm_model_path = vlm_model_path
-        self._vlm_device = vlm_device
-        self._vlm_max_new_tokens = int(vlm_max_new_tokens)
-        self._vlm_model = None
-        self._vlm_processor = None
-        self._emotion_labels = [
-            "angry",
-            "contempt",
-            "disgust",
-            "fear",
-            "happy",
-            "neutral",
-            "sad",
-            "surprise",
-        ]
-
-    @staticmethod
-    def _normalize_emotion_label(label: Any) -> str:
-        text = str(label).strip().lower()
-        aliases = {
-            "anger": "angry",
-            "happiness": "happy",
-            "sadness": "sad",
-        }
-        return aliases.get(text, text)
-
-    def _load_backend(self) -> None:
-        if self._cv2 is not None and self._recognizer is not None:
-            return
-        import cv2
-        import numpy as np
-        import torch
-        from emotiefflib.facial_analysis import EmotiEffLibRecognizer, get_model_list
-
-        self._cv2 = cv2
-        self._np = np
-        self._torch = torch
-        self._model_name = get_model_list()[0]
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        self._recognizer = EmotiEffLibRecognizer(
-            engine="torch",
-            model_name=self._model_name,
-            device=device,
-        )
-        idx_to_class = getattr(self._recognizer, "idx_to_emotion_class", None)
-        if isinstance(idx_to_class, dict) and idx_to_class:
-            self._emotion_labels = [
-                self._normalize_emotion_label(idx_to_class[key])
-                for key in sorted(idx_to_class)
-            ]
-            return
-        for attr_name in ("emotion_labels", "class_names", "classes", "idx_to_class"):
-            labels = getattr(self._recognizer, attr_name, None)
-            if isinstance(labels, dict):
-                labels = [labels[key] for key in sorted(labels)]
-            if isinstance(labels, (list, tuple)) and labels:
-                self._emotion_labels = [self._normalize_emotion_label(label) for label in labels]
-                break
-
-    def _load_vlm_backend(self) -> None:
-        if self._vlm_model is not None and self._vlm_processor is not None:
-            return
-        self._vlm_model, self._vlm_processor, self._torch = load_qwen3_vlm_backend(
-            self._vlm_model_path,
-            self._vlm_device,
-        )
-
-    def _parse_vlm_response(self, text: str, expected_emotion: str = "") -> dict:
-        raw = (text or "").strip()
-        json_text = raw
-        fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL | re.IGNORECASE)
-        if fence_match:
-            json_text = fence_match.group(1).strip()
-        elif "{" in raw and "}" in raw:
-            json_text = raw[raw.find("{"):raw.rfind("}") + 1]
-
-        valid_emotions = set(self._emotion_labels)
-        expected_emotion = self._normalize_emotion_label(expected_emotion)
-        try:
-            data = json.loads(json_text)
-            if isinstance(data, dict):
-                final_expression = self._normalize_emotion_label(data.get("final_expression", ""))
-                if final_expression not in valid_emotions:
-                    final_expression = self._normalize_emotion_label(data.get("correct_emotion", ""))
-                if final_expression not in valid_emotions:
-                    final_expression = ""
-
-                is_correct = data.get("is_emotiefflib_correct", data.get("match", False))
-                if isinstance(is_correct, str):
-                    is_correct = is_correct.strip().lower() in {"true", "yes", "1", "correct", "match"}
-                else:
-                    is_correct = bool(is_correct)
-                if final_expression and expected_emotion:
-                    is_correct = final_expression == expected_emotion
-
-                correct_emotion = self._normalize_emotion_label(data.get("correct_emotion", ""))
-                if correct_emotion not in valid_emotions and final_expression:
-                    correct_emotion = "" if is_correct else final_expression
-                elif correct_emotion not in valid_emotions:
-                    correct_emotion = ""
-
-                return {
-                    "match": is_correct,
-                    "correct_emotion": correct_emotion,
-                    "final_expression": final_expression,
-                    "facial_analysis": str(data.get("facial_analysis", "")).strip(),
-                    "reasoning": str(data.get("reasoning", "")).strip(),
-                    "parse_status": "success",
-                }
-        except json.JSONDecodeError:
-            pass
-
-        lowered = raw.lower()
-        if '"match"' in lowered and "true" in lowered and "false" not in lowered:
-            return {"match": True, "correct_emotion": "", "final_expression": "", "facial_analysis": "", "reasoning": "", "parse_status": "fallback"}
-        if lowered in {"true", "yes", "match"}:
-            return {"match": True, "correct_emotion": "", "final_expression": "", "facial_analysis": "", "reasoning": "", "parse_status": "fallback"}
-        detected_emotion = ""
-        for emotion in valid_emotions:
-            if emotion in lowered:
-                detected_emotion = emotion
-                break
-        return {
-            "match": bool(detected_emotion and expected_emotion and detected_emotion == expected_emotion),
-            "correct_emotion": "" if detected_emotion == expected_emotion else detected_emotion,
-            "final_expression": detected_emotion,
-            "facial_analysis": "",
-            "reasoning": "",
-            "parse_status": "fallback",
-        }
-
-    def _generate_vlm_response(self, inputs: Any, max_new_tokens: int) -> str:
-        with self._torch.no_grad():
-            generated_ids = self._vlm_model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-            )
-        generated_ids_trimmed = [
-            out_ids[len(in_ids):]
-            for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        return self._vlm_processor.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=False,
-        )[0]
-
-    def _verify_emotion_with_vlm(self, img_path: str, emotion: str) -> dict:
-        if not emotion:
-            return {
-                "emo_flag": False,
-                "final_expression": "",
-                "vlm_check": {
-                    "status": "missing_emotion",
-                    "expected_emotion": emotion,
-                    "final_expression": "",
-                    "model": self._vlm_model_path,
-                },
-            }
-        try:
-            self._load_vlm_backend()
-            prompt = (
-                "You are a professional micro-expression analysis and computer vision expert. "
-                "Your task is to perform a second-stage verification / double check of a facial expression label.\n\n"
-
-                'The standard facial expression categories are: '
-                '["angry", "contempt", "disgust", "fear", "happy", "neutral", "sad", "surprise"].\n\n'
-
-                "Please analyze the provided image carefully and output the final classification result. "
-                "You must return pure JSON only. Do not include any Markdown formatting or explanatory text outside the JSON.\n\n"
-
-                f"The preliminary prediction made by the previous model (EmotiEffLib) is: {emotion}.\n\n"
-
-                "Please perform the following verification steps:\n\n"
-
-                "1. Facial action analysis: Carefully observe the person's eyebrows, eyes, mouth, "
-                "and facial muscle patterns, such as frown lines, nasolabial folds, and other visible cues, "
-                "to determine the emotional features.\n\n"
-
-                f"2. Logical comparison: Evaluate whether the preliminary prediction {emotion} is reasonable. "
-                "If it is unreasonable, correct it.\n\n"
-
-                '3. Final decision: Choose the most accurate category from '
-                '["angry", "contempt", "disgust", "fear", "happy", "neutral", "sad", "surprise"].\n\n'
-
-                "Please strictly return the result in the following JSON format:\n"
-                "{\n"
-                '  "facial_analysis": "Briefly describe the key facial features you observed, within 25 words.",\n'
-                '  "reasoning": "Explain why the final classification is supported, within 25 words.",\n'
-                '  "is_emotiefflib_correct": true or false,\n'
-                '  "final_expression": "Must be one of the 8 standard categories."\n'
-                "}"
-            )
-
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "image": img_path},
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ]
-            inputs = self._vlm_processor.apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_dict=True,
-                return_tensors="pt",
-            )
-            inputs = inputs.to(self._vlm_model.device)
-            max_new_tokens = max(256, int(self._vlm_max_new_tokens))
-            output_text = self._generate_vlm_response(inputs, max_new_tokens)
-            parsed = self._parse_vlm_response(output_text, expected_emotion=emotion)
-            retry_count = 0
-            if parsed["parse_status"] != "success":
-                retry_count = 1
-                retry_max_new_tokens = max(max_new_tokens * 2, 1024)
-                output_text = self._generate_vlm_response(inputs, retry_max_new_tokens)
-                parsed = self._parse_vlm_response(output_text, expected_emotion=emotion)
-                max_new_tokens = retry_max_new_tokens
-            final_expression = parsed["final_expression"] or emotion
-            return {
-                "emo_flag": parsed["match"],
-                "final_expression": final_expression,
-                "vlm_check": {
-                    "status": "success",
-                    "expected_emotion": emotion,
-                    "is_emotiefflib_correct": parsed["match"],
-                    "final_expression": final_expression,
-                    "correct_emotion": parsed["correct_emotion"],
-                    "facial_analysis": parsed["facial_analysis"],
-                    "reasoning": parsed["reasoning"],
-                    "parse_status": parsed["parse_status"],
-                    "retry_count": retry_count,
-                    "max_new_tokens": max_new_tokens,
-                    "model": self._vlm_model_path,
-                    "raw_response": output_text,
-                },
-            }
-        except Exception as exc:
-            return {
-                "emo_flag": False,
-                "final_expression": "",
-                "vlm_check": {
-                    "status": "error",
-                    "expected_emotion": emotion,
-                    "final_expression": "",
-                    "model": self._vlm_model_path,
-                    "error_msg": str(exc),
-                },
-            }
-
-    def verify_existing_emotion(self, img_path: str, emotion: str) -> dict:
-        return self._verify_emotion_with_vlm(img_path, self._normalize_emotion_label(emotion))
-
-    def _format_scores(self, raw_scores: Any) -> Dict[str, float]:
-        if raw_scores is None:
-            return {}
-        if self._np is None:
-            import numpy as np
-
-            self._np = np
-        if isinstance(raw_scores, dict):
-            return {
-                self._normalize_emotion_label(key): float(value)
-                * (100.0 if float(value) <= 1.0 else 1.0)
-                for key, value in raw_scores.items()
-            }
-
-        arr = self._np.asarray(raw_scores, dtype=float).reshape(-1)
-        if arr.size == 0:
-            return {}
-        if arr.size == len(self._emotion_labels):
-            labels = self._emotion_labels
-        else:
-            labels = [f"emotion_{idx}" for idx in range(arr.size)]
-
-        if arr.min(initial=0.0) < 0.0 or arr.max(initial=0.0) > 1.0:
-            arr = arr - arr.max()
-            exp = self._np.exp(arr)
-            denom = exp.sum()
-            arr = exp / denom if denom > 0 else exp
-
-        return {label: float(score) * 100.0 for label, score in zip(labels, arr)}
-
-    def _analyze(self, img_path: str) -> dict:
-        self._load_backend()
-        img = self._cv2.imread(img_path)
-        if img is None:
-            raise FileNotFoundError(f"Cannot read image: {img_path}")
-        face_img = self._cv2.cvtColor(img, self._cv2.COLOR_BGR2RGB)
-        emotions, raw_scores = self._recognizer.predict_emotions(face_img, logits=False)
-        dominant = ""
-        if emotions is not None and len(emotions) > 0:
-            dominant = self._normalize_emotion_label(emotions[0])
-        scores = self._format_scores(raw_scores)
-        if not dominant and scores:
-            dominant = max(scores.items(), key=lambda item: item[1])[0]
-        expression = {
-            "scores": scores,
-            "dominant": dominant,
-            "status": "success",
-            "backend": "emotiefflib",
-            "model_name": self._model_name,
-        }
-        if self._enable_vlm:
-            expression.update(self._verify_emotion_with_vlm(img_path, dominant))
-        return {
-            "expression": expression
-        }
-
-    def extract(self, context: dict) -> dict:
-        img_path = (
-            context["identity_matching_paths"].get("face_orig")
-            or context["one_shot_paths"].get("face_orig")
-        )
-        if not img_path:
-            expression = {
-                "scores": {},
-                "dominant": "",
-                "status": "missing_face_orig",
-            }
-            if self._enable_vlm:
-                expression.update({
-                    "emo_flag": False,
-                    "final_expression": "",
-                    "vlm_check": {
-                        "status": "skipped_missing_face_orig",
-                        "expected_emotion": "",
-                        "final_expression": "",
-                        "model": self._vlm_model_path,
-                    },
-                })
-            return {
-                "expression": expression
-            }
-        try:
-            return self._analyze(img_path)
-        except Exception as exc:
-            expression = {
-                "scores": {},
-                "dominant": "",
-                "status": "error",
-                "error_msg": str(exc),
-            }
-            if self._enable_vlm:
-                expression.update({
-                    "emo_flag": False,
-                    "final_expression": "",
-                    "vlm_check": {
-                        "status": "skipped_emotion_error",
-                        "expected_emotion": "",
-                        "final_expression": "",
-                        "model": self._vlm_model_path,
-                    },
-                })
-            return {
-                "expression": expression
-            }
-
-
-class BodyPoseExtractor:
-    """Estimate body extent and coarse body orientation from a full-body crop."""
-
-    POSE_DET_CONF_THR = 0.45
-    POSE_KEYPOINT_CONF_THR = 0.5
-
-    def __init__(
-        self,
-        checkpoint_path: str,
-        pose_checkpoint: str,
-        detector_name: str = "vitdet",
-        device: Optional[str] = None,
-    ):
-        self._checkpoint_path = checkpoint_path
-        self._pose_checkpoint = pose_checkpoint
-        self._detector_name = detector_name
-        self._device_name = device
-        self._device = None
-        self._orientation_estimator = None
-        self._pose_model = None
-        self._cv2 = None
-        self._np = None
-        self._torch = None
-
-    def _load_backend(self) -> None:
-        if self._orientation_estimator is not None and self._pose_model is not None:
-            return
-        import cv2
-        import numpy as np
-        import torch
-        from ultralytics import YOLO
-
-        try:
-            from .human_orientation_4dhumans import HumanBodyOrientationEstimator
-        except ImportError:
-            from human_orientation_4dhumans import HumanBodyOrientationEstimator
-
-        self._cv2 = cv2
-        self._np = np
-        self._torch = torch
-        self._device = self._device_name or ("cuda" if torch.cuda.is_available() else "cpu")
-        self._orientation_estimator = HumanBodyOrientationEstimator(
-            checkpoint_path=resolve_repo_path(self._checkpoint_path),
-            detector_name=self._detector_name,
-            yolo_checkpoint=resolve_repo_path(self._pose_checkpoint),
-            device=self._device,
-        )
-        self._pose_model = YOLO(resolve_repo_path(self._pose_checkpoint))
-        self._pose_model.to(self._device)
-        self._pose_model.eval()
-
-    def _person_keypoints_to_body_part(
-        self,
-        keypoints: Any,
-        confidence: Any,
-        bbox: Any,
-    ) -> str:
-        del keypoints, bbox
-        confidence = self._np.asarray(confidence)
-        if confidence.size == 0:
-            return "unknown"
-
-        visible = confidence >= self.POSE_KEYPOINT_CONF_THR
-        if not self._np.any(visible):
-            return "unknown"
-
-        visible_idxs = set(self._np.where(visible)[0].tolist())
-        upper_idxs = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-        torso_idxs = {5, 6, 11, 12}
-        lower_idxs = {13, 14, 15, 16}
-        ankle_idxs = {15, 16}
-        upper_visible = len(upper_idxs.intersection(visible_idxs))
-        torso_visible = len(torso_idxs.intersection(visible_idxs))
-        lower_visible = len(lower_idxs.intersection(visible_idxs))
-        ankle_visible = len(ankle_idxs.intersection(visible_idxs))
-
-        if lower_visible >= 2 or ankle_visible >= 1:
-            return "full_body"
-        if torso_visible >= 2:
-            return "half_body"
-        if upper_visible >= 1:
-            return "head_closeup"
-        return "unknown"
-
-    def _predict(self, img_path: str) -> Optional[Dict[str, Any]]:
-        self._load_backend()
-        image_bgr = self._cv2.imread(img_path)
-        if image_bgr is None:
-            raise FileNotFoundError(f"Cannot read image: {img_path}")
-
-        pose_result = self._pose_model.predict(
-            image_bgr,
-            save=False,
-            verbose=False,
-            device=self._device,
-            conf=self.POSE_DET_CONF_THR,
-        )[0]
-        if pose_result.boxes is None or len(pose_result.boxes) == 0:
-            return None
-
-        valid_idx = pose_result.boxes.conf >= self.POSE_DET_CONF_THR
-        valid_idx_np = valid_idx.detach().cpu().numpy() if self._torch.is_tensor(valid_idx) else valid_idx
-        if not self._np.any(valid_idx_np):
-            return None
-        if pose_result.keypoints is None:
-            return None
-
-        person_idx = int(self._np.argmax(pose_result.boxes.conf.detach().cpu().numpy()))
-        bbox = pose_result.boxes.xyxy[person_idx].detach().cpu().numpy()
-        keypoints = pose_result.keypoints.xy[person_idx].detach().cpu().numpy()
-        confidence = pose_result.keypoints.conf[person_idx].detach().cpu().numpy()
-        body_part = self._person_keypoints_to_body_part(keypoints, confidence, bbox)
-
-        orientation = self._orientation_estimator.predict(image_bgr)
-        if orientation is None:
-            return {
-                "body_part": body_part,
-                "orientation": None,
-                "status": "success",
-            }
-
-        orientation["body_part"] = body_part
-        orientation["status"] = "success"
-        return orientation
-
-    def extract(self, context: dict) -> dict:
-        img_path = context["identity_matching_paths"].get("full_orig")
-        if not img_path:
-            return {
-                "body_pose": {
-                    "body_part": "unknown",
-                    "orientation": None,
-                    "status": "missing_full_orig",
-                    "available_identity_image_types": sorted(context["identity_matching_paths"].keys()),
-                    "available_one_shot_image_types": sorted(context["one_shot_paths"].keys()),
-                }
-            }
-        try:
-            result = self._predict(img_path)
-            if result is None:
-                result = {
-                    "body_part": "unknown",
-                    "orientation": None,
-                    "status": "no_person_detected",
-                }
-            return {"body_pose": result}
-        except Exception as exc:
-            return {
-                "body_pose": {
-                    "body_part": "unknown",
-                    "orientation": None,
-                    "status": "error",
-                    "error_msg": str(exc),
-                }
-            }
-
-
-def build_face_boundary_quality_checker(config, force: bool = False) -> Optional[FaceBoundaryQualityChecker]:
-    del force
-    enable_all = bool(getattr(config, "enable_face_boundary_quality_check", False))
-    check_boundary = enable_all or bool(getattr(config, "enable_face_bbox_boundary_quality_check", False))
-    check_mask_coverage = enable_all or bool(getattr(config, "enable_face_mask_coverage_quality_check", False))
-    if not check_boundary and not check_mask_coverage:
-        return None
-    return FaceBoundaryQualityChecker(
-        model_name=getattr(config, "face_quality_model_name", "buffalo_l"),
-        model_root=getattr(config, "face_quality_model_root", "./pretrained_models/insightface"),
-        device=getattr(config, "face_quality_device", "cuda:0"),
-        det_size=getattr(config, "face_quality_det_size", 640),
-        expand_ratio=getattr(config, "face_boundary_expand_ratio", 1.1),
-        min_foreground_ratio=getattr(config, "face_mask_min_foreground_ratio", 1.0),
-        max_abs_yaw_for_mask_coverage=getattr(config, "face_mask_coverage_max_abs_yaw", 30.0),
-        check_boundary=check_boundary,
-        check_mask_coverage=check_mask_coverage,
-    )
-
-
-def build_face_quality_vlm_checker(
-    config,
-    check_occlusion: Optional[bool] = None,
-    check_clarity: Optional[bool] = None,
-    check_clarity_vlm: Optional[bool] = None,
-) -> Optional[FaceQualityVLMChecker]:
-    if check_occlusion is None:
-        check_occlusion = bool(getattr(config, "enable_face_occlusion_quality_check", False))
-    if check_clarity is None:
-        check_clarity = bool(getattr(config, "enable_image_clarity_quality_check", False))
-    if check_clarity_vlm is None:
-        check_clarity_vlm = bool(getattr(config, "enable_image_clarity_vlm_check", True))
-    if not check_occlusion and not check_clarity:
-        return None
-    return FaceQualityVLMChecker(
-        model_path=getattr(config, "quality_vlm_model_path", getattr(config, "emotion_vlm_model_path", "pretrained_models/Qwen3-VL-8B-Instruct")),
-        device=getattr(config, "quality_vlm_device", getattr(config, "emotion_vlm_device", "cuda:0")),
-        max_new_tokens=getattr(config, "quality_vlm_max_new_tokens", getattr(config, "emotion_vlm_max_new_tokens", 512)),
-        laplacian_threshold=getattr(config, "clarity_laplacian_threshold", 10.0),
-        check_occlusion=bool(check_occlusion),
-        check_clarity=bool(check_clarity),
-        check_clarity_vlm=bool(check_clarity_vlm),
-    )
-
-
-def build_feature_extractors(config) -> Dict[str, Callable[[dict], dict]]:
-    extractors = {}
-    if config.enable_emotion:
-        extractors["emotion"] = EmotionExtractor(
-            enable_vlm=config.enable_emotion_vlm,
-            vlm_model_path=config.emotion_vlm_model_path,
-            vlm_device=config.emotion_vlm_device,
-            vlm_max_new_tokens=config.emotion_vlm_max_new_tokens,
-        ).extract
-    if config.enable_body_pose:
-        extractors["body_pose"] = BodyPoseExtractor(
-            checkpoint_path=config.body_pose_checkpoint,
-            pose_checkpoint=config.body_pose_yolo_checkpoint,
-            detector_name=config.body_pose_detector,
-            device=config.body_pose_device,
-        ).extract
-    return extractors
-
-
-def build_person_index(
-    person_id: str,
-    cluster_dir: str,
-    member_records: List[dict],
-    include_pose: bool,
-    feature_extractors: Dict[str, Callable[[dict], dict]],
-    progress_position: int = 1,
-    enable_mask_hole_quality_check: bool = True,
-    mask_hole_threshold: int = 0,
-    face_boundary_quality_checker: Optional[FaceBoundaryQualityChecker] = None,
-    face_quality_vlm_checker: Optional[FaceQualityVLMChecker] = None,
-) -> dict:
-    enabled_features = []
-    if include_pose:
-        enabled_features.append("pose")
-    if enable_mask_hole_quality_check:
-        enabled_features.append("mask_hole_quality")
-    if face_boundary_quality_checker is not None:
-        enabled_features.append("face_boundary_quality")
-    if face_quality_vlm_checker is not None:
-        if face_quality_vlm_checker._check_occlusion:
-            enabled_features.append("face_occlusion_quality")
-        if face_quality_vlm_checker._check_clarity:
-            enabled_features.append("image_clarity_quality")
-    enabled_features.extend(feature_extractors.keys())
-
-    output = empty_output(person_id, cluster_dir, enabled_features)
-    output["stats"]["member_count"] = len(member_records)
-    cluster_images, cluster_image_metadata = scan_cluster_images(cluster_dir)
-    frame_contexts = []
-
-    for record in member_records:
-        shot_key, obj_id = member_key(record)
-        uid = f"{shot_key}::id_{obj_id}"
-        pose_map = load_one_shot_pose_map(record)
-        if not pose_map:
-            output["stats"]["members_without_pose"] += 1
-            continue
-
-        for key in cluster_frame_keys(cluster_images, shot_key, str(obj_id)):
-            frame_key = str(key[2])
-            pose = pose_map.get(frame_key)
-            if not isinstance(pose, dict):
-                continue
-            frame_idx = int(frame_key)
-            one_shot_paths = build_one_shot_paths(record, frame_idx)
-            identity_paths = {
-                image_type: cluster_images[image_type].get(key)
-                for image_type in IMAGE_TYPES
-            }
-            related_images = {
-                image_type: identity_paths.get(image_type) or one_shot_paths.get(image_type)
-                for image_type in CORE_IMAGE_TYPES
-            }
-            face_boundary_quality_by_type = {}
-            if face_boundary_quality_checker is not None:
-                for orig_type, white_type in (("face_orig", "face_white"), ("full_orig", "full_white")):
-                    group_quality = face_boundary_quality_checker.check(
-                        image_path=related_images.get(orig_type),
-                        mask_path=white_image_mask_path(record, white_type, frame_idx),
-                        pose=pose,
-                    )
-                    face_boundary_quality_by_type[orig_type] = group_quality
-                    face_boundary_quality_by_type[white_type] = group_quality
-            face_quality_vlm = {}
-            if face_quality_vlm_checker is not None:
-                face_quality_vlm = face_quality_vlm_checker.check(
-                    related_images.get("face_orig") or related_images.get("face_white")
-                )
-            context = {
-                "person_id": person_id,
-                "uid": uid,
-                "shot_key": shot_key,
-                "obj_id": obj_id,
-                "frame_idx": frame_idx,
-                "record": record,
-                "pose": pose,
-                "identity_matching_paths": identity_paths,
-                "one_shot_paths": one_shot_paths,
-            }
-
-            output["stats"]["frame_count"] += 1
-            frame_entries = []
-            for image_type in IMAGE_TYPES:
-                image_path = related_images.get(image_type)
-                if image_type in DERIVED_IMAGE_TYPES:
-                    image_path = identity_paths.get(image_type)
-                if not image_path:
-                    continue
-                attrs = {
-                    "person_id": person_id,
-                    "uid": uid,
-                    "shot_key": shot_key,
-                    "obj_id": obj_id,
-                    "frame_idx": frame_idx,
-                    "source_shot_frame_idx": source_shot_frame_idx(record, frame_idx),
-                    "source_shot_path": record.get("source_shot_path"),
-                    "image_type": image_type,
-                    "image_path": image_path,
-                    "identity_matching_image_path": identity_paths.get(image_type),
-                    "one_shot_image_path": one_shot_paths.get(image_type),
-                    "related_images": related_images,
-                    "related_identity_matching_images": identity_paths,
-                    "related_one_shot_images": one_shot_paths,
-                }
-                derived_metadata = cluster_image_metadata.get(image_type, {}).get(key)
-                if derived_metadata:
-                    attrs.update(derived_metadata)
-                attrs["quality_label"] = True
-                if enable_mask_hole_quality_check:
-                    quality = mask_hole_quality(
-                        image_path=image_path,
-                        mask_path=white_image_mask_path(record, image_type, frame_idx),
-                        image_type=image_type,
-                        threshold=mask_hole_threshold,
-                    )
-                    _set_quality_item(attrs, "mask_hole", quality)
-                face_boundary_quality = face_boundary_quality_by_type.get(image_type)
-                if face_boundary_quality is not None:
-                    for quality_name, quality_value in face_boundary_quality.items():
-                        _set_quality_item(attrs, quality_name, quality_value)
-                if face_quality_vlm:
-                    for quality_name, quality_value in face_quality_vlm.items():
-                        _set_quality_item(attrs, quality_name, quality_value)
-                if include_pose:
-                    pose_attrs = {
-                        "pitch": float(pose.get("pitch", 0.0)),
-                        "yaw": float(pose.get("yaw", 0.0)),
-                        "roll": float(pose.get("roll", 0.0)),
-                    }
-                    attrs["pose"] = pose_attrs
-                output["images"][image_type][image_path] = attrs
-                if image_type in ("face_diversity_topk", "dino_diversity_topk"):
-                    output[image_type].append(dict(attrs))
-                frame_entries.append(attrs)
-                output["stats"]["image_count"] += 1
-            if frame_entries:
-                frame_contexts.append((context, frame_entries))
-
-    for image_type in ("face_diversity_topk", "dino_diversity_topk"):
-        output[image_type].sort(key=lambda item: int(item.get("rank") or 0))
-
-    tqdm.write(
-        f"[AfterPipelineV3] {person_id}: pose/image mapping done, "
-        f"frames={output['stats']['frame_count']}, "
-        f"images={output['stats']['image_count']}"
-    )
-
-    for feature_name, extractor in feature_extractors.items():
-        total = len(frame_contexts)
-        tqdm.write(f"[AfterPipelineV3] {person_id}: start {feature_name}, total_frames={total}")
-        progress = tqdm(
-            frame_contexts,
-            desc=f"{person_id} {feature_name}",
-            unit="frame",
-            position=progress_position,
-            leave=False,
-        )
-        for context, frame_entries in progress:
-            progress.set_postfix_str(f"{context['uid']} frame={context['frame_idx']}", refresh=False)
-            feature_attrs = extractor(context)
-            for entry in frame_entries:
-                entry.update(feature_attrs)
-        tqdm.write(f"[AfterPipelineV3] {person_id}: {feature_name} done")
-
-    return output
-
-
-def output_cluster_dir(
-    person_id: str,
-    input_cluster_dir: str,
-    output_dir: Optional[str],
-) -> str:
-    if output_dir:
-        return os.path.join(output_dir, person_id)
-    return input_cluster_dir
-
-
-# ---- 增量更新（对已建好的索引补加 emotion / emotion_vlm / body_pose） ----
-def _entry_face_orig_path(entry: dict) -> Optional[str]:
-    for field in ("related_identity_matching_images", "related_images", "related_one_shot_images"):
-        paths = entry.get(field) or {}
-        if isinstance(paths, dict) and paths.get("face_orig"):
-            return paths["face_orig"]
-    if entry.get("image_type") == "face_orig":
-        return (
-            entry.get("identity_matching_image_path")
-            or entry.get("image_path")
-            or entry.get("one_shot_image_path")
-        )
-    return None
-
-
-def _entry_full_orig_path(entry: dict) -> Optional[str]:
-    for field in ("related_identity_matching_images", "related_images", "related_one_shot_images"):
-        paths = entry.get(field) or {}
-        if isinstance(paths, dict) and paths.get("full_orig"):
-            return paths["full_orig"]
-    if entry.get("image_type") == "full_orig":
-        return (
-            entry.get("identity_matching_image_path")
-            or entry.get("image_path")
-            or entry.get("one_shot_image_path")
-        )
-    return None
-
-
-def _existing_entry_context(entry: dict) -> dict:
-    identity_paths = dict(entry.get("related_identity_matching_images") or {})
-    one_shot_paths = dict(entry.get("related_one_shot_images") or {})
-    if entry.get("image_type") and entry.get("identity_matching_image_path"):
-        identity_paths.setdefault(entry["image_type"], entry.get("identity_matching_image_path"))
-    if entry.get("image_type") and entry.get("one_shot_image_path"):
-        one_shot_paths.setdefault(entry["image_type"], entry.get("one_shot_image_path"))
-    full_orig_path = _entry_full_orig_path(entry)
-    if full_orig_path:
-        identity_paths.setdefault("full_orig", full_orig_path)
-    face_orig_path = _entry_face_orig_path(entry)
-    if face_orig_path:
-        identity_paths.setdefault("face_orig", face_orig_path)
-    return {
-        "person_id": entry.get("person_id"),
-        "uid": entry.get("uid"),
-        "shot_key": entry.get("shot_key"),
-        "obj_id": entry.get("obj_id"),
-        "frame_idx": entry.get("frame_idx"),
-        "record": {},
-        "pose": entry.get("pose") or {},
-        "identity_matching_paths": identity_paths,
-        "one_shot_paths": one_shot_paths,
-    }
-
-
-def _expression_dominant(expression: dict) -> str:
-    dominant = EmotionExtractor._normalize_emotion_label(expression.get("dominant", ""))
-    if dominant:
-        return dominant
-    scores = expression.get("scores") or {}
-    if not isinstance(scores, dict) or not scores:
-        return ""
-    try:
-        return EmotionExtractor._normalize_emotion_label(
-            max(scores.items(), key=lambda item: float(item[1]))[0]
-        )
-    except (TypeError, ValueError):
-        return ""
-
-
-def _iter_after_pipeline_entries_for_update(index_data: dict):
-    images = index_data.get("images", {}) if isinstance(index_data, dict) else {}
-    for image_type_entries in images.values():
-        if not isinstance(image_type_entries, dict):
-            continue
-        for image_path, entry in image_type_entries.items():
-            if isinstance(entry, dict):
-                yield image_path, entry
-
-
-def _entry_image_path(entry: dict) -> Optional[str]:
-    return (
-        entry.get("image_path")
-        or entry.get("identity_matching_image_path")
-        or entry.get("one_shot_image_path")
-    )
-
-
-def _mask_path_from_white_image_path(image_path: Optional[str], image_type: str) -> Optional[str]:
-    if not image_path:
-        return None
-    resolved = resolve_repo_path(image_path)
-    dirname, filename = os.path.split(resolved)
-    stem, _ = os.path.splitext(filename)
-    parent = os.path.dirname(dirname)
-    if image_type == "face_white" and os.path.basename(dirname) == "face_pic_white":
-        mask_dir = os.path.join(parent, "face_mask_for_face")
-    elif image_type == "full_white" and os.path.basename(dirname) == "full_pic_white":
-        mask_dir = os.path.join(parent, "cropped_full_mask")
-    else:
-        return None
-    for extension in ("npy", "png"):
-        candidate = os.path.join(mask_dir, f"{stem}.{extension}")
-        if os.path.isfile(candidate):
-            return candidate
-    return None
-
-
-def update_group_mask_hole_quality(
-    entries: List[dict],
-    threshold: int,
-    recovery_record: Optional[dict] = None,
-    overwrite_existing_quality: bool = True,
-) -> int:
-    entries_by_type = {entry.get("image_type"): entry for entry in entries if entry.get("image_type")}
-    updated = 0
-    for mask_image_type, affected_types in (
-        ("face_white", ("face_orig", "face_white")),
-        ("full_white", ("full_orig", "full_white")),
-    ):
-        source_entry = entries_by_type.get(mask_image_type)
-        if not source_entry:
-            continue
-        target_entries = [entries_by_type.get(image_type) for image_type in affected_types]
-        if not overwrite_existing_quality and all(_has_quality_item(entry, "mask_hole") for entry in target_entries if entry):
-            continue
-        image_path = _entry_image_path(source_entry)
-        frame_idx = source_entry.get("frame_idx")
-        try:
-            frame_idx = int(frame_idx)
-        except (TypeError, ValueError):
-            frame_idx = None
-        recovery_mask_path = (
-            white_image_mask_path(recovery_record, mask_image_type, frame_idx)
-            if recovery_record and frame_idx is not None
-            else None
-        )
-        quality = mask_hole_quality(
-            image_path=image_path,
-            mask_path=recovery_mask_path or _mask_path_from_white_image_path(image_path, mask_image_type),
-            image_type=mask_image_type,
-            threshold=threshold,
-        )
-        for image_type in affected_types:
-            entry = entries_by_type.get(image_type)
-            if not entry:
-                continue
-            if overwrite_existing_quality or not _has_quality_item(entry, "mask_hole"):
-                _set_quality_item(entry, "mask_hole", _mask_hole_quality_for_entry(quality, image_type))
-                updated += 1
-    return updated
-
-
-def _existing_quality_face_bbox(*entries: Optional[dict]) -> Tuple[Optional[List[float]], Optional[float]]:
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        quality = entry.get("quality") or {}
-        if not isinstance(quality, dict):
-            continue
-        for quality_name in ("face_bbox_boundary", "face_mask_coverage"):
-            item = quality.get(quality_name) or {}
-            if not isinstance(item, dict):
-                continue
-            bbox = item.get("face_bbox")
-            if (
-                (not isinstance(bbox, (list, tuple)) or len(bbox) != 4)
-                and quality_name == "face_mask_coverage"
-            ):
-                bbox = item.get("mask_face_bbox")
-            if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
-                continue
-            try:
-                bbox_values = [float(value) for value in bbox]
-            except (TypeError, ValueError):
-                continue
-            det_score = item.get("det_score")
-            try:
-                det_score = float(det_score) if det_score is not None else None
-            except (TypeError, ValueError):
-                det_score = None
-            return bbox_values, det_score
-    return None, None
-
-
-def update_group_face_boundary_quality(
-    entries: List[dict],
-    checker: FaceBoundaryQualityChecker,
-    recovery_record: Optional[dict] = None,
-    reuse_existing_bbox: bool = True,
-    overwrite_existing_quality: bool = True,
-) -> int:
-    entries_by_type = {entry.get("image_type"): entry for entry in entries if entry.get("image_type")}
-    updated = 0
-    for orig_type, white_type in (("face_orig", "face_white"), ("full_orig", "full_white")):
-        orig_entry = entries_by_type.get(orig_type)
-        if not orig_entry:
-            continue
-        target_entries = [entry for entry in (orig_entry, entries_by_type.get(white_type)) if entry]
-        quality_names = []
-        if checker._check_boundary:
-            quality_names.append("face_bbox_boundary")
-        if checker._check_mask_coverage:
-            quality_names.append("face_mask_coverage")
-        requested_quality_names = quality_names
-        if not overwrite_existing_quality:
-            requested_quality_names = [
-                name
-                for name in quality_names
-                if any(not _has_quality_item(entry, name) for entry in target_entries)
-            ]
-            if not requested_quality_names:
-                continue
-        image_path = _entry_image_path(orig_entry)
-        frame_idx = orig_entry.get("frame_idx")
-        try:
-            frame_idx = int(frame_idx)
-        except (TypeError, ValueError):
-            frame_idx = None
-        recovery_mask_path = (
-            white_image_mask_path(recovery_record, white_type, frame_idx)
-            if recovery_record and frame_idx is not None
-            else None
-        )
-        mask_path = recovery_mask_path
-        if not mask_path:
-            source_entry = entries_by_type.get(white_type)
-            mask_path = _mask_path_from_white_image_path(_entry_image_path(source_entry), white_type) if source_entry else None
-        existing_bbox, existing_det_score = (None, None)
-        if reuse_existing_bbox:
-            existing_bbox, existing_det_score = _existing_quality_face_bbox(
-                orig_entry,
-                entries_by_type.get(white_type),
-            )
-        quality = checker.check(
-            image_path=image_path,
-            mask_path=mask_path,
-            pose=orig_entry.get("pose") or {},
-            existing_face_bbox=existing_bbox,
-            existing_det_score=existing_det_score,
-            requested_quality_names=requested_quality_names,
-        )
-        for image_type in (orig_type, white_type):
-            entry = entries_by_type.get(image_type)
-            if not entry:
-                continue
-            wrote_entry = False
-            for quality_name, quality_value in quality.items():
-                if overwrite_existing_quality or not _has_quality_item(entry, quality_name):
-                    _set_quality_item(entry, quality_name, quality_value)
-                    wrote_entry = True
-            if wrote_entry:
-                updated += 1
-    return updated
-
-
-def update_group_face_quality_vlm(
-    entries: List[dict],
-    checker: FaceQualityVLMChecker,
-    overwrite_existing_quality: bool = True,
-) -> int:
-    target_entries = [entry for entry in entries if isinstance(entry, dict)]
-    if not target_entries:
-        return 0
-    quality_names = checker.quality_names
-    if not overwrite_existing_quality and all(
-        all(_has_quality_item(entry, name) for name in quality_names)
-        for entry in target_entries
-    ):
-        return 0
-    entries_by_type = {entry.get("image_type"): entry for entry in target_entries if entry.get("image_type")}
-    source_entry = entries_by_type.get("face_orig") or entries_by_type.get("face_white") or target_entries[0]
-    quality = checker.check(_entry_image_path(source_entry))
-    updated = 0
-    for entry in target_entries:
-        wrote_entry = False
-        for quality_name, quality_value in quality.items():
-            if overwrite_existing_quality or not _has_quality_item(entry, quality_name):
-                _set_quality_item(entry, quality_name, quality_value)
-                wrote_entry = True
-        if wrote_entry:
-            updated += 1
-    return updated
-
-
-def build_update_feature_extractors(feature_names: List[str], config: Any) -> Dict[str, Any]:
-    feature_names = {str(name).strip().lower() for name in feature_names if str(name).strip()}
-    extractors: Dict[str, Any] = {}
-    if "emotion" in feature_names or "emotion_vlm" in feature_names:
-        extractors["emotion"] = EmotionExtractor(
-            enable_vlm="emotion_vlm" in feature_names,
-            vlm_model_path=config.emotion_vlm_model_path,
-            vlm_device=config.emotion_vlm_device,
-            vlm_max_new_tokens=config.emotion_vlm_max_new_tokens,
-        )
-    if "body_pose" in feature_names:
-        extractors["body_pose"] = BodyPoseExtractor(
-            checkpoint_path=config.body_pose_checkpoint,
-            pose_checkpoint=config.body_pose_yolo_checkpoint,
-            detector_name=config.body_pose_detector,
-            device=config.body_pose_device,
-        )
-    if "face_boundary_quality" in feature_names:
-        checker = build_face_boundary_quality_checker(config, force=True)
-        if checker is not None:
-            extractors["face_boundary_quality"] = checker
-    if "face_occlusion_quality" in feature_names or "image_clarity_quality" in feature_names:
-        checker = build_face_quality_vlm_checker(
-            config,
-            check_occlusion="face_occlusion_quality" in feature_names,
-            check_clarity="image_clarity_quality" in feature_names,
-            check_clarity_vlm=bool(getattr(config, "enable_image_clarity_vlm_check", True)),
-        )
-        if checker is not None:
-            extractors["face_quality_vlm"] = checker
-    return extractors
-
-
-def update_existing_index_features(
-    index_path: str,
-    feature_names: List[str],
-    config: Any,
-    update_extractors: Optional[Dict[str, Any]] = None,
-    progress_position: int = 1,
-    recovery_lookup: Optional[Dict[Tuple[str, str], dict]] = None,
-) -> Tuple[int, int, int]:
-    feature_names = [str(name).strip().lower() for name in feature_names if str(name).strip()]
-    valid_features = {"emotion", "emotion_vlm", "body_pose", "mask_hole_quality", "face_boundary_quality", "face_occlusion_quality", "image_clarity_quality"}
-    unknown_features = sorted(set(feature_names) - valid_features)
-    if unknown_features:
-        raise ValueError(f"Unknown update_features: {', '.join(unknown_features)}")
-
-    with open(index_path, "r", encoding="utf-8") as file:
-        index_data = json.load(file)
-
-    frame_groups: Dict[Tuple[str, str, str], dict] = {}
-    for _, entry in _iter_after_pipeline_entries_for_update(index_data):
-        key = (
-            str(entry.get("uid") or ""),
-            str(entry.get("shot_key") or ""),
-            str(entry.get("frame_idx") or ""),
-        )
-        group = frame_groups.setdefault(key, {"entries": [], "context_entry": entry})
-        group["entries"].append(entry)
-        if _entry_face_orig_path(entry) or _entry_full_orig_path(entry):
-            group["context_entry"] = entry
-
-    update_extractors = update_extractors or build_update_feature_extractors(feature_names, config)
-    emotion_extractor = update_extractors.get("emotion")
-    body_pose_extractor = update_extractors.get("body_pose")
-    face_boundary_checker = update_extractors.get("face_boundary_quality")
-    face_quality_vlm_checker = update_extractors.get("face_quality_vlm")
-
-    updated_frames = skipped_frames = updated_entries = 0
-    progress = tqdm(
-        list(frame_groups.values()),
-        desc="update_features",
-        unit="frame",
-        position=progress_position,
-        leave=False,
-    )
-    for group in progress:
-        context = _existing_entry_context(group["context_entry"])
-        progress.set_postfix_str(
-            f"{context.get('uid') or context.get('shot_key')} frame={context.get('frame_idx')}",
-            refresh=False,
-        )
-        frame_attrs: Dict[str, Any] = {}
-
-        if "emotion" in feature_names and emotion_extractor is not None:
-            frame_attrs.update(emotion_extractor.extract(context))
-        elif "emotion_vlm" in feature_names and emotion_extractor is not None:
-            expression = None
-            for entry in group["entries"]:
-                if isinstance(entry.get("expression"), dict):
-                    expression = entry["expression"]
-                    break
-            dominant = _expression_dominant(expression or {})
-            face_orig_path = context["identity_matching_paths"].get("face_orig") or context["one_shot_paths"].get("face_orig")
-            if not dominant or not face_orig_path:
-                frame_attrs["expression"] = {
-                    **(expression or {}),
-                    "emo_flag": False,
-                    "final_expression": "",
-                    "vlm_check": {
-                        "status": "skipped_missing_face_or_emotion",
-                        "expected_emotion": dominant,
-                        "final_expression": "",
-                        "model": emotion_extractor._vlm_model_path,
-                    },
-                }
-                skipped_frames += 1
-            else:
-                vlm_attrs = emotion_extractor.verify_existing_emotion(resolve_repo_path(face_orig_path), dominant)
-                frame_attrs["expression"] = {**(expression or {}), **vlm_attrs}
-
-        if "body_pose" in feature_names and body_pose_extractor is not None:
-            frame_attrs.update(body_pose_extractor.extract(context))
-
-        quality_updated_entries = 0
-        recovery_record = None
-        if recovery_lookup:
-            recovery_record = recovery_lookup.get((
-                str(context.get("shot_key")),
-                str(context.get("obj_id")),
-            ))
-        if "mask_hole_quality" in feature_names:
-            quality_updated_entries += update_group_mask_hole_quality(
-                group["entries"],
-                threshold=config.mask_hole_threshold,
-                recovery_record=recovery_record,
-                overwrite_existing_quality=bool(getattr(config, "quality_update_overwrite", True)),
-            )
-        if "face_boundary_quality" in feature_names:
-            if face_boundary_checker is None:
-                face_boundary_checker = build_face_boundary_quality_checker(config, force=True)
-            if face_boundary_checker is not None:
-                quality_updated_entries += update_group_face_boundary_quality(
-                    group["entries"],
-                    checker=face_boundary_checker,
-                    recovery_record=recovery_record,
-                    reuse_existing_bbox=not bool(getattr(config, "face_quality_recompute_bbox", False)),
-                    overwrite_existing_quality=bool(getattr(config, "quality_update_overwrite", True)),
-                )
-        if "face_occlusion_quality" in feature_names or "image_clarity_quality" in feature_names:
-            if face_quality_vlm_checker is None:
-                face_quality_vlm_checker = build_face_quality_vlm_checker(
-                    config,
-                    check_occlusion="face_occlusion_quality" in feature_names,
-                    check_clarity="image_clarity_quality" in feature_names,
-                    check_clarity_vlm=bool(getattr(config, "enable_image_clarity_vlm_check", True)),
-                )
-            if face_quality_vlm_checker is not None:
-                quality_updated_entries += update_group_face_quality_vlm(
-                    group["entries"],
-                    checker=face_quality_vlm_checker,
-                    overwrite_existing_quality=bool(getattr(config, "quality_update_overwrite", True)),
-                )
-
-        if not frame_attrs and not quality_updated_entries:
-            skipped_frames += 1
-            continue
-
-        frame_attr_updated_entries = 0
-        if frame_attrs:
-            for entry in group["entries"]:
-                for feature_name, feature_value in frame_attrs.items():
-                    if feature_name == "expression" and "emotion" in feature_names:
-                        entry["expression"] = feature_value
-                    elif feature_name == "expression" and isinstance(entry.get("expression"), dict) and isinstance(feature_value, dict):
-                        entry["expression"].update(feature_value)
-                    else:
-                        entry[feature_name] = feature_value
-                frame_attr_updated_entries += 1
-        updated_entries += max(frame_attr_updated_entries, quality_updated_entries)
-        updated_frames += 1
-
-    enabled_features = index_data.get("enabled_features")
-    if isinstance(enabled_features, list):
-        for feature_name in feature_names:
-            if feature_name not in enabled_features:
-                enabled_features.append(feature_name)
-
-    with open(index_path, "w", encoding="utf-8") as file:
-        json.dump(
-            to_jsonable(relativize_index_output(index_data)),
-            file,
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    return updated_frames, skipped_frames, updated_entries
-
-
-# ---- v3 分发逻辑 ----
-# 目录结构：identity_root / <video> / identity_matching / {output.jsonl, person_clusters/<person_id>}
-#   即 video 与 person_clusters 之间还有一层 identity_matching（含该 video 的 output.jsonl）。
-# video_base_dir() 会自动探测这一中间层，并兼容没有它的旧结构。
-PERSON_CLUSTERS_SUBDIR = "person_clusters"
-IDENTITY_SUBDIR = "identity_matching"   # video 与 person_clusters 之间的中间层目录名
-
-
-def list_person_dirs(person_clusters_dir: str) -> List[str]:
-    """列出 person_clusters_dir 下所有 person 子目录名（即 person_id），按名称排序保证多卡一致。"""
-    names = []
-    if not os.path.isdir(person_clusters_dir):
-        return names
-    for name in sorted(os.listdir(person_clusters_dir)):
-        if os.path.isdir(os.path.join(person_clusters_dir, name)):
-            names.append(name)
-    return names
-
-
-def video_base_dir(identity_root: str, video: str) -> str:
-    """
-    返回某 video 下「含 output.jsonl 与 person_clusters」的基目录。
-    优先新结构 <root>/<video>/identity_matching；若该层下没有 person_clusters，则回退 <root>/<video>。
-    （video 为 "" 时 os.path.join 自动忽略该层，可表示单 video / 旧结构。）
-    """
-    cand = os.path.join(identity_root, video, IDENTITY_SUBDIR)
-    if os.path.isdir(os.path.join(cand, PERSON_CLUSTERS_SUBDIR)):
-        return cand
-    return os.path.join(identity_root, video)
-
-
-def enumerate_units(identity_root: str) -> List[Tuple[str, str]]:
-    """
-    枚举所有处理单元 (video, person_id)。
-
-    主结构：identity_root/<video>/identity_matching/person_clusters/<person_id>。
-    兼容旧结构（视为单 video，video 名为 ""）：
-      - identity_root/person_clusters/<person_id>
-      - identity_root/identity_matching/person_clusters/<person_id>
-    """
-    # 旧结构兼容：identity_root[/identity_matching]/person_clusters/<person_id>
-    for direct in (
-        os.path.join(identity_root, PERSON_CLUSTERS_SUBDIR),
-        os.path.join(identity_root, IDENTITY_SUBDIR, PERSON_CLUSTERS_SUBDIR),
-    ):
-        if os.path.isdir(direct):
-            return [("", person_id) for person_id in list_person_dirs(direct)]
-
-    # 新结构：逐 video -> identity_matching -> person
-    units: List[Tuple[str, str]] = []
-    for video in sorted(os.listdir(identity_root)):
-        if not os.path.isdir(os.path.join(identity_root, video)):
-            continue
-        person_clusters_dir = os.path.join(video_base_dir(identity_root, video), PERSON_CLUSTERS_SUBDIR)
-        for person_id in list_person_dirs(person_clusters_dir):
-            units.append((video, person_id))
-    return units
-
-
-def unit_dirs(
-    identity_root: str,
-    video: str,
-    person_id: str,
-    output_dir: Optional[str],
-) -> Tuple[str, str]:
-    """返回某单元的 (输入聚类目录, 输出目录)。
-
-    输入按 video_base_dir 定位（含 identity_matching 中间层）。
-    v3 输出策略：若指定 output_dir，则在 output_dir 下镜像 input_cluster_dir
-    相对 identity_root 的目录结构，只写 post-process json，不复制原始文件。
-    """
-    input_cluster_dir = os.path.join(video_base_dir(identity_root, video), PERSON_CLUSTERS_SUBDIR, person_id)
-    if output_dir:
-        relative_cluster_dir = os.path.relpath(input_cluster_dir, identity_root)
-        target_dir = os.path.join(output_dir, relative_cluster_dir)
-    else:
-        target_dir = input_cluster_dir
-    return input_cluster_dir, target_dir
+from .config import TrainingPairsConfig
+from .path_utils import resolve_repo_path, to_repo_relative_path
 
 
 WORKSPACE_REL_PATHS = {
     "manifest": "pipeline_manifest.json",
-    "identity_dir": "identity_matching",
-    "identity_jsonl": "identity_matching/output.jsonl",
     "person_clusters_dir": "identity_matching/person_clusters",
-    "person_registry_jsonl": "identity_matching/persons.jsonl",
+    "training_dir": "training_pairs",
+    "pairs_jsonl": "training_pairs/pairs.jsonl",
+    "rejected_pairs_jsonl": "training_pairs/rejected_pairs.jsonl",
+    "training_stats_json": "training_pairs/stats.json",
+    "first_frame_dir": "training_pairs/first_frames",
 }
 
 
@@ -2355,6 +42,17 @@ def _workspace_person_clusters_dir(video_dir: str) -> str:
     return _workspace_path(video_dir, "person_clusters_dir")
 
 
+def _shard_range(total: int, rank: int, world_size: int) -> Tuple[int, int]:
+    if world_size <= 0:
+        raise ValueError("total must be positive")
+    if not 0 <= rank < world_size:
+        raise ValueError(f"phase must be in [0, {world_size}), got {rank}")
+    base, remainder = divmod(total, world_size)
+    start = rank * base + min(rank, remainder)
+    end = start + base + (1 if rank < remainder else 0)
+    return start, end
+
+
 def _load_task_units(input_jsonl: str, output_root: str) -> List[Dict[str, str]]:
     units = []
     seen = set()
@@ -2370,7 +68,7 @@ def _load_task_units(input_jsonl: str, output_root: str) -> List[Dict[str, str]]
             video_path = os.path.abspath(os.path.expanduser(str(record.get("video_path") or "")))
             if not video_path:
                 raise ValueError(f"Missing video_path at line {line_number}")
-            video_id = _safe_video_id(record.get("video_id") or Path(video_path).stem)
+            video_id = _safe_video_id(record.get("video_id") or os.path.splitext(os.path.basename(video_path))[0])
             if video_id in seen:
                 raise ValueError(f"Duplicate video_id in task JSONL: {video_id}")
             seen.add(video_id)
@@ -2386,10 +84,6 @@ def _load_task_units(input_jsonl: str, output_root: str) -> List[Dict[str, str]]
 def _workspace_units_from_config(config: Any) -> List[Dict[str, str]]:
     phase = int(getattr(config, "phase", 0))
     total = int(getattr(config, "total", 1))
-    if total <= 0:
-        raise ValueError("total must be positive")
-    if not 0 <= phase < total:
-        raise ValueError(f"phase must be in [0, {total}), got {phase}")
     if getattr(config, "video_dir", None):
         video_dir = os.path.abspath(os.path.expanduser(str(config.video_dir)))
         manifest_path = _workspace_path(video_dir, "manifest")
@@ -2404,20 +98,20 @@ def _workspace_units_from_config(config: Any) -> List[Dict[str, str]]:
         if not getattr(config, "pipeline_input_jsonl", None):
             raise ValueError("Set --pipeline_input_jsonl for batch mode or --video_dir for standalone workspace mode.")
         units = _load_task_units(config.pipeline_input_jsonl, getattr(config, "output_root", "outputs"))
-    st, en = compute_shard_range(len(units), phase, total)
+    st, en = _shard_range(len(units), phase, total)
     return units[st:en]
 
 
 def _ensure_workspace_manifest(unit: Dict[str, str]) -> Dict[str, Any]:
     video_dir = unit["video_dir"]
-    os.makedirs(video_dir, exist_ok=True)
-    for key in ("identity_dir", "person_clusters_dir"):
-        os.makedirs(_workspace_path(video_dir, key), exist_ok=True)
+    os.makedirs(_workspace_path(video_dir, "training_dir"), exist_ok=True)
+    os.makedirs(_workspace_path(video_dir, "first_frame_dir"), exist_ok=True)
     manifest_path = _workspace_path(video_dir, "manifest")
     if os.path.isfile(manifest_path):
         with open(manifest_path, "r", encoding="utf-8") as handle:
             manifest = json.load(handle)
     else:
+        os.makedirs(video_dir, exist_ok=True)
         manifest = {
             "schema_version": 1,
             "video_id": unit.get("video_id"),
@@ -2445,143 +139,922 @@ def _update_workspace_stage(unit: Dict[str, str], stage: str, status: str, outpu
         json.dump(manifest, handle, ensure_ascii=False, indent=2)
 
 
-def _write_workspace_person_cluster_units(path: str, units: Iterable[Dict[str, str]]) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        for unit in units:
-            handle.write(f"{_workspace_person_clusters_dir(unit['video_dir'])}|{unit['video_id']}||{unit['video_id']}\n")
+SHOT_RE = re.compile(r"^(?P<prefix>.+)_shot_(?P<number>\d+)$")
+EMOTIONS_8 = ("angry", "contempt", "disgust", "fear", "happy", "neutral", "sad", "surprise")
+BODY_LABEL_BUCKETS = ("front", "back", "left", "right")
+BODY_POSE_LABEL_GRID = ("left", "right", "front")
+BODY_PART_BUCKETS = ("full_body", "half_body", "Head_Close_up")
+BODY_POSE_BUCKETS = BODY_LABEL_BUCKETS + BODY_PART_BUCKETS
+BODY_POSE_GRID_BUCKETS = tuple(
+    f"{label}__{body_part}"
+    for label in BODY_POSE_LABEL_GRID
+    for body_part in BODY_PART_BUCKETS
+)
+BODY_POSE_PRIORITY_BUCKETS = tuple(f"{label}__full_body" for label in BODY_POSE_LABEL_GRID)
+PERSON_CLUSTERS_SUBDIR = "person_clusters"
 
 
-def compute_shard_range(total: int, rank: int, total_rank: int) -> Tuple[int, int]:
-    """
-    把长度为 total 的列表按 rank 连续切片，返回本 rank 负责的 [st, en)。
-
-    - total_rank <= 0 或 rank 非法时不分片，处理全部 [0, total)；
-    - 余数均摊给前面的 rank，保证各分片长度最多相差 1，且无重叠、无遗漏。
-    """
-    if total_rank <= 0 or not (0 <= rank < total_rank):
-        return 0, total
-    base = total // total_rank          # 每个 rank 至少处理的数量
-    remainder = total % total_rank      # 多出来的若干个，分给前 remainder 个 rank
-    st = rank * base + min(rank, remainder)
-    en = st + base + (1 if rank < remainder else 0)
-    return st, en
-
-
-class IndexAddPipeline:
-    def __init__(self, config):
+class TrainingPairGenerator:
+    def __init__(self, config: TrainingPairsConfig):
         self.config = config
+        self.feature_cache: Dict[str, Optional[np.ndarray]] = {}
+        self.dino_feature_cache: Dict[str, Optional[np.ndarray]] = {}
+        self.first_frame_cache: Dict[str, Optional[str]] = {}
 
-    def run(self) -> Tuple[int, int, int, int, int]:
-        """
-        Returns:
-            total_units, written, skipped, total_frames, total_images
-        （total_units 为所有 (video, person) 处理单元数）
-        """
-        config = self.config
+    # @staticmethod
+    # def _load_json(path: str) -> dict:
+    #     with open(path, "r", encoding="utf-8") as f:
+    #         data = json.load(f)
+    #     return data if isinstance(data, dict) else {}
+    
+    @staticmethod
+    def _load_json(path: str) -> dict:
+        # 过滤 JSON 文件里真实存在的非法控制字符，避免 json.load 报：
+        # JSONDecodeError: Invalid control character
+        ctrl_re = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
-        if config.unit_list_file:
-            return self._run_unit_list(config)
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
 
-        workspace_mode = bool(getattr(config, "video_dir", None) or getattr(config, "pipeline_input_jsonl", None))
-        if workspace_mode and not bool(getattr(config, "global_mode", False)):
-            return self._run_workspace(config)
-        if bool(getattr(config, "global_mode", False)):
-            config.rank = int(getattr(config, "phase", config.rank))
-            config.total_rank = int(getattr(config, "total", config.total_rank))
+        text = ctrl_re.sub("", text)
 
-        # ---- 1. 解析路径 ----
-        identity_root = resolve_repo_path(config.path)
-        output_dir = resolve_repo_path(config.output_dir) if config.output_dir else None
-        # identity jsonl 是「每个 video 一份」：取 basename，在各 video 目录下分别查找
-        identity_name = os.path.basename(config.identity_jsonl) if config.identity_jsonl else "output.jsonl"
-        # recovery jsonl 是「单一全局文件」（上游 one_shot 输出，含全部成员），直接整路径解析，所有 video 共用
-        recovery_jsonl = resolve_repo_path(config.member_recovery_jsonl) if config.member_recovery_jsonl else None
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to load JSON: {path}")
+            print(f"[ERROR] {e}")
+            raise
 
-        if not os.path.isdir(identity_root):
-            raise FileNotFoundError(f"identity_matching root does not exist: {identity_root}")
+        return data if isinstance(data, dict) else {}
 
-        # ---- 2. 解析运行模式：有 update_features -> 增量更新；否则 -> 构建 ----
-        update_features = list(config.update_features or [])
-        if config.update_emotion_vlm_only and "emotion_vlm" not in update_features:
-            update_features.append("emotion_vlm")
-        update_features = [str(name).strip().lower() for name in update_features if str(name).strip()]
-        is_update = bool(update_features)
+    @staticmethod
+    def _safe_text(value: str) -> str:
+        text = str(value or "").strip()
+        return "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in text) or "unknown"
 
-        # ---- 3. 枚举 (video, person) 单元，按模式筛出「待处理列表」 ----
-        #   构建模式：剔除「已存在结果且未 overwrite」的单元（已处理则跳过）；
-        #   增量模式：只保留「已存在结果」的单元（缺索引无法更新则跳过）。
-        all_units = enumerate_units(identity_root)
-        pending_units: List[Tuple[str, str]] = []
-        skipped = 0
-        for video, person_id in all_units:
-            _, target_dir = unit_dirs(identity_root, video, person_id, output_dir)
-            output_path = os.path.join(target_dir, config.output_filename)
-            exists = os.path.isfile(output_path)
-            if is_update:
-                if not exists:
-                    skipped += 1
+    @staticmethod
+    def _parse_shot(shot_key: str) -> Tuple[str, Optional[int]]:
+        match = SHOT_RE.match(str(shot_key or ""))
+        if not match:
+            return str(shot_key or ""), None
+        return match.group("prefix"), int(match.group("number"))
+
+    @staticmethod
+    def _unique_key(item: dict) -> Tuple[str, str, int]:
+        return (str(item.get("shot_key")), str(item.get("obj_id")), int(item.get("frame_idx", -1)))
+
+    def _passes_shot_gap(self, candidate: dict, selected: List[dict]) -> bool:
+        gap = int(self.config.min_same_prefix_shot_gap)
+        if gap < 0:
+            return True
+        candidate_prefix = candidate.get("video_prefix")
+        candidate_shot = candidate.get("shot_no")
+        if candidate_prefix is None or candidate_shot is None:
+            return True
+        for item in selected:
+            if item.get("video_prefix") != candidate_prefix:
+                continue
+            item_shot = item.get("shot_no")
+            if item_shot is None:
+                continue
+            if abs(int(candidate_shot) - int(item_shot)) <= gap:
+                return False
+        return True
+
+    def _rng(self, *parts) -> random.Random:
+        text = "::".join(str(part) for part in (self.config.seed,) + parts)
+        digest = hashlib.md5(text.encode("utf-8")).hexdigest()
+        return random.Random(int(digest[:12], 16))
+
+    def _video_part_from_cluster_dir(self) -> Tuple[Optional[str], Optional[str]]:
+        parts = list(os.path.abspath(self.config.person_clusters_dir).split(os.sep))
+        if "identity_matching" not in parts:
+            return None, None
+        idx = len(parts) - 1 - parts[::-1].index("identity_matching")
+        tail = parts[idx + 1 :]
+        if len(tail) >= 3 and tail[-1] == PERSON_CLUSTERS_SUBDIR:
+            return tail[0], tail[1]
+        return None, None
+
+    def _feature_path(self, item: dict) -> str:
+        if self.config.one_shot_process_dir:
+            video, part = self._video_part_from_cluster_dir()
+            if video and part:
+                return os.path.join(
+                    self.config.one_shot_process_dir,
+                    video,
+                    part,
+                    str(item["shot_key"]),
+                    f"id_{item['obj_id']}",
+                    "features",
+                    "face_feature",
+                    f"{int(item['frame_idx'])}.npy",
+                )
+
+        cluster_dir = os.path.abspath(self.config.person_clusters_dir)
+        outputs_root = os.path.dirname(os.path.dirname(cluster_dir))
+        return os.path.join(
+            outputs_root,
+            "one_shot_process",
+            str(item["shot_key"]),
+            f"id_{item['obj_id']}",
+            "features",
+            "face_feature",
+            f"{int(item['frame_idx'])}.npy",
+        )
+
+    def _dino_feature_path(self, item: dict) -> str:
+        if self.config.one_shot_process_dir:
+            video, part = self._video_part_from_cluster_dir()
+            if video and part:
+                return os.path.join(
+                    self.config.one_shot_process_dir,
+                    video,
+                    part,
+                    str(item["shot_key"]),
+                    f"id_{item['obj_id']}",
+                    "features",
+                    "dino_feature",
+                    f"{int(item['frame_idx'])}.npy",
+                )
+
+        cluster_dir = os.path.abspath(self.config.person_clusters_dir)
+        outputs_root = os.path.dirname(os.path.dirname(cluster_dir))
+        return os.path.join(
+            outputs_root,
+            "one_shot_process",
+            str(item["shot_key"]),
+            f"id_{item['obj_id']}",
+            "features",
+            "dino_feature",
+            f"{int(item['frame_idx'])}.npy",
+        )
+
+    def _load_feature(self, path: str) -> Optional[np.ndarray]:
+        path = resolve_repo_path(path)
+        if path in self.feature_cache:
+            return self.feature_cache[path]
+        try:
+            feat = np.asarray(np.load(path), dtype=np.float32).reshape(-1)
+            norm = float(np.linalg.norm(feat))
+            if feat.size == 0 or norm <= 1e-12:
+                self.feature_cache[path] = None
+            else:
+                self.feature_cache[path] = feat / norm
+        except Exception:
+            self.feature_cache[path] = None
+        return self.feature_cache[path]
+
+    def _load_dino_feature(self, path: str) -> Optional[np.ndarray]:
+        path = resolve_repo_path(path)
+        if path in self.dino_feature_cache:
+            return self.dino_feature_cache[path]
+        try:
+            feat = np.asarray(np.load(path), dtype=np.float32).reshape(-1)
+            norm = float(np.linalg.norm(feat))
+            if feat.size == 0 or norm <= 1e-12:
+                self.dino_feature_cache[path] = None
+            else:
+                self.dino_feature_cache[path] = feat / norm
+        except Exception:
+            self.dino_feature_cache[path] = None
+        return self.dino_feature_cache[path]
+
+    @staticmethod
+    def _cosine(a: dict, b: dict) -> float:
+        return float(np.dot(a["feature"], b["feature"]))
+
+    def _similarity(self, a: dict, b: dict) -> float:
+        matrix = getattr(self, "current_similarity_matrix", None)
+        if matrix is not None and a.get("matrix_idx") is not None and b.get("matrix_idx") is not None:
+            return float(matrix[int(a["matrix_idx"]), int(b["matrix_idx"])])
+        if a.get("feature") is None or b.get("feature") is None:
+            return 1.0
+        return self._cosine(a, b)
+
+    @staticmethod
+    def _dino_cosine(a: dict, b: dict) -> float:
+        return float(np.dot(a["dino_feature"], b["dino_feature"]))
+
+    def _dino_similarity(self, a: dict, b: dict) -> float:
+        if a.get("dino_feature") is None or b.get("dino_feature") is None:
+            return 1.0
+        return self._dino_cosine(a, b)
+
+    def _selection_similarity(self, a: dict, b: dict) -> float:
+        if bool(getattr(self.config, "enable_dino_ref_diversity", False)):
+            return self._dino_similarity(a, b)
+        return self._similarity(a, b)
+
+    def _combo_pairwise_stats(self, selected: List[dict]) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
+        selected = [item for item in selected if item.get("feature") is not None]
+        if len(selected) < 2:
+            return None, None, None
+        values = []
+        max_pair = None
+        max_value = None
+        for i in range(len(selected)):
+            for j in range(i + 1, len(selected)):
+                value = self._similarity(selected[i], selected[j])
+                values.append(value)
+                if max_value is None or value > max_value:
+                    max_value = value
+                    max_pair = {
+                        "similarity": float(value),
+                        "left": self._pair_item_summary(selected[i]),
+                        "right": self._pair_item_summary(selected[j]),
+                    }
+        return float(np.mean(values)), float(max_value), max_pair
+
+    def _combo_dino_pairwise_stats(self, selected: List[dict]) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
+        selected = [item for item in selected if item.get("dino_feature") is not None]
+        if len(selected) < 2:
+            return None, None, None
+        values = []
+        max_pair = None
+        max_value = None
+        for i in range(len(selected)):
+            for j in range(i + 1, len(selected)):
+                value = self._dino_similarity(selected[i], selected[j])
+                values.append(value)
+                if max_value is None or value > max_value:
+                    max_value = value
+                    max_pair = {
+                        "similarity": float(value),
+                        "left": self._pair_item_summary(selected[i]),
+                        "right": self._pair_item_summary(selected[j]),
+                    }
+        return float(np.mean(values)), float(max_value), max_pair
+
+    def _combo_cos_stats(self, selected: List[dict]) -> Tuple[Optional[float], Optional[float]]:
+        mean_value, max_value, _ = self._combo_pairwise_stats(selected)
+        return mean_value, max_value
+
+    @staticmethod
+    def _pair_item_summary(item: dict) -> dict:
+        return {
+            "path": item.get("path"),
+            "shot_key": item.get("shot_key"),
+            "obj_id": item.get("obj_id"),
+            "frame_idx": item.get("frame_idx"),
+            "source_shot_path": item.get("source_shot_path"),
+            "bucket": item.get("bucket"),
+            "bucket_source": item.get("bucket_source"),
+        }
+
+    def _image_path(self, attrs: dict) -> Optional[str]:
+        related = attrs.get("related_images") or {}
+        path = related.get(self.config.ref_image_type) or related.get(self.config.ref_fallback_image_type)
+        if not path:
+            path = attrs.get("image_path")
+        return path if path and os.path.isfile(resolve_repo_path(path)) else None
+
+    @staticmethod
+    def _full_image_path(attrs: dict) -> Optional[str]:
+        related = attrs.get("related_images") or {}
+        path = related.get("full_orig") or related.get("full_white")
+        return path if path and os.path.isfile(resolve_repo_path(path)) else None
+
+    @staticmethod
+    def _exists(path: Optional[str]) -> Optional[str]:
+        return path if path and os.path.isfile(resolve_repo_path(path)) else None
+
+    def _white_image_path(self, attrs: dict) -> Optional[str]:
+        related = attrs.get("related_images") or {}
+        return self._exists(related.get(self.config.ref_fallback_image_type) or related.get("face_white"))
+
+    def _full_white_image_path(self, attrs: dict) -> Optional[str]:
+        related = attrs.get("related_images") or {}
+        return self._exists(related.get("full_white"))
+
+    @staticmethod
+    def _final_expression(expression: dict) -> str:
+        if not isinstance(expression, dict):
+            return ""
+        candidates = [
+            expression.get("final_expression"),
+            (expression.get("vlm_check") or {}).get("final_expression"),
+            (expression.get("vlm_check") or {}).get("correct_emotion"),
+            expression.get("dominant"),
+        ]
+        for value in candidates:
+            value = str(value or "").strip().lower()
+            if value in EMOTIONS_8:
+                return value
+        return ""
+
+    def _build_candidates(self, person_index: dict) -> Tuple[List[dict], dict]:
+        images = person_index.get("images") or {}
+        primary = images.get(self.config.ref_image_type) or images.get("face_orig") or {}
+        candidates = []
+        skipped = Counter()
+        entries_by_frame = {}
+        for image_type, entries in images.items():
+            if not isinstance(entries, dict):
+                continue
+            for entry in entries.values():
+                if not isinstance(entry, dict):
+                    continue
+                key = (
+                    image_type,
+                    str(entry.get("shot_key") or ""),
+                    str(entry.get("obj_id")),
+                    str(entry.get("frame_idx")),
+                )
+                entries_by_frame[key] = entry
+
+        def related_entry(attrs: dict, image_type: str) -> Optional[dict]:
+            related = attrs.get("related_images") or {}
+            path = related.get(image_type)
+            entry = (images.get(image_type) or {}).get(path) if path else None
+            if not isinstance(entry, dict):
+                key = (
+                    image_type,
+                    str(attrs.get("shot_key") or ""),
+                    str(attrs.get("obj_id")),
+                    str(attrs.get("frame_idx")),
+                )
+                entry = entries_by_frame.get(key)
+            return entry if isinstance(entry, dict) else None
+
+        def related_quality_label(attrs: dict, image_type: str) -> bool:
+            entry = related_entry(attrs, image_type)
+            if isinstance(entry, dict):
+                return bool(entry.get("quality_label", True))
+            return True
+
+        def related_quality(attrs: dict, image_type: str) -> dict:
+            entry = related_entry(attrs, image_type)
+            if not isinstance(entry, dict):
+                return {}
+            return {
+                "quality_label": entry.get("quality_label", True),
+                "quality": entry.get("quality") if isinstance(entry.get("quality"), dict) else {},
+            }
+
+        for attrs in primary.values():
+            if not isinstance(attrs, dict):
+                continue
+            image_path = self._image_path(attrs)
+            if not image_path:
+                skipped["missing_image"] += 1
+                continue
+
+            shot_key = str(attrs.get("shot_key") or "")
+            obj_id = str(attrs.get("obj_id"))
+            frame_idx = attrs.get("frame_idx")
+            if not shot_key or frame_idx is None or obj_id in ("", "None"):
+                skipped["missing_key"] += 1
+                continue
+
+            feature_path = self._feature_path({"shot_key": shot_key, "obj_id": obj_id, "frame_idx": frame_idx})
+            feature = self._load_feature(feature_path)
+            if feature is None:
+                skipped["missing_feature"] += 1
+            dino_feature_path = self._dino_feature_path({"shot_key": shot_key, "obj_id": obj_id, "frame_idx": frame_idx})
+            dino_feature = self._load_dino_feature(dino_feature_path)
+            if bool(getattr(self.config, "enable_dino_ref_diversity", False)) and dino_feature is None:
+                skipped["missing_dino_feature"] += 1
+
+            prefix, shot_no = self._parse_shot(shot_key)
+            pose = attrs.get("pose") or {}
+            expression = attrs.get("expression") or {}
+            body_pose = attrs.get("body_pose") or {}
+            quality_by_image_type = {
+                "face_orig": related_quality_label(attrs, "face_orig"),
+                "face_white": related_quality_label(attrs, "face_white"),
+                "full_orig": related_quality_label(attrs, "full_orig"),
+                "full_white": related_quality_label(attrs, "full_white"),
+            }
+            quality_detail_by_image_type = {
+                "face_orig": related_quality(attrs, "face_orig"),
+                "face_white": related_quality(attrs, "face_white"),
+                "full_orig": related_quality(attrs, "full_orig"),
+                "full_white": related_quality(attrs, "full_white"),
+            }
+            face_quality_label = quality_by_image_type["face_orig"] and quality_by_image_type["face_white"]
+            full_quality_label = quality_by_image_type["full_orig"] and quality_by_image_type["full_white"]
+            if not face_quality_label:
+                skipped["low_quality_face_ref"] += 1
+            if not full_quality_label:
+                skipped["low_quality_full_ref"] += 1
+            emotion = self._final_expression(expression)
+            scores = expression.get("scores") or {}
+            try:
+                emotion_score = float(scores.get(emotion, 0.0)) if emotion else 0.0
+            except Exception:
+                emotion_score = 0.0
+
+            candidates.append({
+                "person_id": attrs.get("person_id") or person_index.get("person_id"),
+                "uid": attrs.get("uid"),
+                "shot_key": shot_key,
+                "video_prefix": prefix,
+                "shot_no": shot_no,
+                "obj_id": obj_id,
+                "frame_idx": int(frame_idx),
+                "source_shot_frame_idx": attrs.get("source_shot_frame_idx"),
+                "source_shot_path": attrs.get("source_shot_path"),
+                "path": image_path,
+                "white_path": self._white_image_path(attrs),
+                "full_path": self._full_image_path(attrs),
+                "full_white_path": self._full_white_image_path(attrs),
+                "feature_path": to_repo_relative_path(feature_path),
+                "feature": feature,
+                "dino_feature_path": to_repo_relative_path(dino_feature_path),
+                "dino_feature": dino_feature,
+                "pitch": float((pose or {}).get("pitch", 0.0)),
+                "yaw": float((pose or {}).get("yaw", 0.0)),
+                "roll": float((pose or {}).get("roll", 0.0)),
+                "emotion": emotion,
+                "emotion_score": emotion_score,
+                "expression_status": expression.get("status"),
+                "body_pose": body_pose if isinstance(body_pose, dict) else {},
+                "face_quality_label": face_quality_label,
+                "full_quality_label": full_quality_label,
+                "quality_label": attrs.get("quality_label", True),
+                "quality": attrs.get("quality") if isinstance(attrs.get("quality"), dict) else {},
+                "quality_by_image_type": quality_by_image_type,
+                "quality_detail_by_image_type": quality_detail_by_image_type,
+            })
+
+        return candidates, dict(skipped)
+
+    def _similarity_matrix_path(self, person_id: str) -> str:
+        out_dir = os.path.dirname(os.path.abspath(self.config.output_jsonl))
+        return os.path.join(out_dir, f"{self._safe_text(person_id)}_candidate_similarity.npz")
+
+    def _build_or_load_similarity_matrix(self, candidates: List[dict], person_id: str) -> dict:
+        matrix_path = self._similarity_matrix_path(person_id)
+        keys = [self._unique_key(item) for item in candidates]
+        key_strings = np.asarray([f"{key[0]}::id_{key[1]}::frame_{key[2]}" for key in keys], dtype=object)
+        feature_paths = np.asarray([str(item.get("feature_path") or "") for item in candidates], dtype=object)
+
+        if (
+            os.path.isfile(matrix_path)
+            and not bool(getattr(self.config, "overwrite_similarity_matrix", False))
+        ):
+            try:
+                cached = np.load(matrix_path, allow_pickle=True)
+                cached_keys = cached["keys"].astype(object).tolist()
+                requested_keys = key_strings.tolist()
+                matrix = np.asarray(cached["similarity"], dtype=np.float32)
+                if cached_keys == requested_keys:
+                    if matrix.shape == (len(candidates), len(candidates)):
+                        for idx, item in enumerate(candidates):
+                            item["matrix_idx"] = idx
+                        self.current_similarity_matrix = matrix
+                        return {
+                            "path": to_repo_relative_path(matrix_path),
+                            "status": "loaded",
+                            "shape": [int(matrix.shape[0]), int(matrix.shape[1])],
+                        }
+                elif len(cached_keys) == matrix.shape[0] == matrix.shape[1]:
+                    cached_key_to_idx = {key: idx for idx, key in enumerate(cached_keys)}
+                    if all(key in cached_key_to_idx for key in requested_keys):
+                        subset_indices = np.asarray([cached_key_to_idx[key] for key in requested_keys], dtype=np.int64)
+                        subset_matrix = matrix[np.ix_(subset_indices, subset_indices)].astype(np.float32, copy=False)
+                        for idx, item in enumerate(candidates):
+                            item["matrix_idx"] = idx
+                        self.current_similarity_matrix = subset_matrix
+                        return {
+                            "path": to_repo_relative_path(matrix_path),
+                            "status": "loaded_subset",
+                            "shape": [int(subset_matrix.shape[0]), int(subset_matrix.shape[1])],
+                            "cached_shape": [int(matrix.shape[0]), int(matrix.shape[1])],
+                        }
+            except Exception as exc:
+                tqdm.write(f"[TrainingPairs] Rebuild similarity matrix for {person_id}: failed to load cache ({exc})")
+
+        feature_dim = 0
+        for item in candidates:
+            if item.get("feature") is not None:
+                feature_dim = int(item["feature"].shape[0])
+                break
+        features = np.zeros((len(candidates), feature_dim), dtype=np.float32)
+        valid = np.zeros((len(candidates),), dtype=bool)
+        if feature_dim > 0:
+            for idx, item in enumerate(candidates):
+                feature = item.get("feature")
+                if feature is not None and int(feature.shape[0]) == feature_dim:
+                    features[idx] = feature
+                    valid[idx] = True
+
+        if feature_dim > 0 and len(candidates) > 0:
+            matrix = np.matmul(features, features.T).astype(np.float32)
+            invalid = ~valid
+            if np.any(invalid):
+                matrix[invalid, :] = 1.0
+                matrix[:, invalid] = 1.0
+            np.fill_diagonal(matrix, 1.0)
+        else:
+            matrix = np.ones((len(candidates), len(candidates)), dtype=np.float32)
+
+        os.makedirs(os.path.dirname(matrix_path), exist_ok=True)
+        np.savez_compressed(
+            matrix_path,
+            similarity=matrix,
+            keys=key_strings,
+            feature_paths=feature_paths,
+            valid_feature=valid,
+        )
+        for idx, item in enumerate(candidates):
+            item["matrix_idx"] = idx
+        self.current_similarity_matrix = matrix
+        return {
+            "path": to_repo_relative_path(matrix_path),
+            "status": "built",
+            "shape": [int(matrix.shape[0]), int(matrix.shape[1])],
+            "valid_feature_count": int(valid.sum()),
+        }
+
+    def _diverse_topk(self, items: List[dict], topk: int) -> List[dict]:
+        if len(items) <= topk:
+            return list(items)
+        with_features = [item for item in items if item.get("feature") is not None and item.get("matrix_idx") is not None]
+        if len(with_features) < 2:
+            return sorted(items, key=lambda x: (x.get("source_shot_frame_idx") is None, x.get("source_shot_frame_idx") or x.get("frame_idx") or 0))[:topk]
+
+        best_pair = None
+        best_cos = float("inf")
+        for i in range(len(with_features)):
+            for j in range(i + 1, len(with_features)):
+                cos = self._selection_similarity(with_features[i], with_features[j])
+                if cos < best_cos:
+                    best_cos = cos
+                    best_pair = (i, j)
+
+        selected = [with_features[best_pair[0]], with_features[best_pair[1]]]
+        selected_keys = {self._unique_key(item) for item in selected}
+        remaining = [item for item in with_features if self._unique_key(item) not in selected_keys]
+
+        while len(selected) < topk and remaining:
+            best_idx = 0
+            best_score = float("inf")
+            for idx, candidate in enumerate(remaining):
+                max_cos = max(self._selection_similarity(candidate, item) for item in selected)
+                if max_cos < best_score:
+                    best_score = max_cos
+                    best_idx = idx
+            chosen = remaining.pop(best_idx)
+            selected.append(chosen)
+            selected_keys.add(self._unique_key(chosen))
+
+        if len(selected) < topk:
+            for item in items:
+                if self._unique_key(item) not in selected_keys:
+                    selected.append(item)
+                    selected_keys.add(self._unique_key(item))
+                if len(selected) >= topk:
+                    break
+        return selected[:topk]
+
+    def _balanced_allocation(self, buckets: List[str], count: int, rng: random.Random) -> Dict[str, int]:
+        if not buckets or count <= 0:
+            return {}
+        buckets = list(buckets)
+        if len(buckets) > count:
+            buckets = rng.sample(buckets, count)
+        base = count // len(buckets)
+        remainder = count % len(buckets)
+        allocation = {bucket: base for bucket in buckets}
+        if remainder:
+            for bucket in rng.sample(buckets, remainder):
+                allocation[bucket] += 1
+        return allocation
+
+    def _sample_from_bucket_candidates(
+        self,
+        buckets: Dict[str, List[dict]],
+        count: int,
+        person_id: str,
+        ref_type: str,
+        sample_key: str,
+        priority_buckets: Optional[List[str]] = None,
+        fallback_pool: Optional[List[dict]] = None,
+    ) -> Tuple[List[dict], dict]:
+        rng = self._rng(person_id, ref_type, sample_key)
+        available = sorted([bucket for bucket, items in buckets.items() if items])
+        priority_buckets = [bucket for bucket in (priority_buckets or []) if bucket in available]
+        secondary_buckets = [bucket for bucket in available if bucket not in set(priority_buckets)]
+        allocation = {}
+        if priority_buckets:
+            priority_count = min(count, len(priority_buckets))
+            allocation.update(self._balanced_allocation(priority_buckets, priority_count, rng))
+            remaining_count = count - sum(allocation.values())
+            if remaining_count > 0:
+                allocation.update(self._balanced_allocation(secondary_buckets, remaining_count, rng))
+        else:
+            allocation = self._balanced_allocation(available, count, rng)
+        topk = max(1, int(self.config.bucket_candidate_topk))
+
+        bucket_candidates = {
+            bucket: self._diverse_topk(items, topk)
+            for bucket, items in buckets.items()
+            if items
+        }
+
+        selected = []
+        selected_keys = set()
+
+        def best_from_pool(pool: List[dict]) -> Optional[dict]:
+            candidates = list(pool)
+            rng.shuffle(candidates)
+            best_candidate = None
+            best_score = float("inf")
+            for candidate in candidates:
+                key = self._unique_key(candidate)
+                if key in selected_keys:
+                    continue
+                if not self._passes_shot_gap(candidate, selected):
+                    continue
+                score = max((self._selection_similarity(candidate, item) for item in selected), default=-1.0)
+                if score < best_score:
+                    best_score = score
+                    best_candidate = candidate
+            if best_candidate is None:
+                return None
+            selected_keys.add(self._unique_key(best_candidate))
+            return dict(best_candidate)
+
+        def bucket_pool(bucket_names: List[str]) -> List[dict]:
+            pool = []
+            for bucket in bucket_names:
+                for item in bucket_candidates.get(bucket, []):
+                    pool.append(dict(item, bucket=item.get("bucket") or bucket))
+            return pool
+
+        def take_from_bucket(bucket: str) -> Optional[dict]:
+            return best_from_pool(bucket_pool([bucket]))
+
+        deficits = 0
+        for bucket, quota in allocation.items():
+            for _ in range(quota):
+                item = take_from_bucket(bucket)
+                if item is None:
+                    deficits += 1
+                else:
+                    selected.append(item)
+
+        allocated_buckets = list(allocation.keys())
+        secondary_added = 0
+        while deficits > 0:
+            remaining_buckets = [bucket for bucket in available if bucket not in set(allocated_buckets)]
+            item = best_from_pool(bucket_pool(remaining_buckets))
+            if item is None:
+                break
+            selected.append(item)
+            deficits -= 1
+            secondary_added += 1
+
+        global_added = 0
+        while len(selected) < count:
+            item = best_from_pool(bucket_pool(available))
+            if item is None:
+                break
+            selected.append(item)
+            global_added += 1
+
+        meta = {
+            "available_buckets": {bucket: len(items) for bucket, items in buckets.items()},
+            "topk_bucket_sizes": {bucket: len(items) for bucket, items in bucket_candidates.items()},
+            "bucket_allocation": allocation,
+            "priority_buckets": priority_buckets,
+            "bucket_candidate_topk": topk,
+            "requested_count": count,
+            "selected_count": len(selected),
+            "fallback_added_without_shot_gap": 0,
+            "strict_secondary_bucket_added": secondary_added,
+            "strict_global_bucket_added": global_added,
+            "strict_shot_gap_failed": len(selected) < count,
+            "fallback_pool_size": len(fallback_pool or []),
+            "fallback_pool_used": False,
+            "dedup_key": "shot_key::obj_id::frame_idx",
+            "min_same_prefix_shot_gap": int(self.config.min_same_prefix_shot_gap),
+            "sample_key": sample_key,
+        }
+        return selected, meta
+
+    def _angle_buckets(self, candidates: List[dict]) -> Dict[str, List[dict]]:
+        buckets = defaultdict(list)
+        for item in candidates:
+            if item.get("face_quality_label") is False:
+                continue
+            yaw = float(item["yaw"])
+            pitch = float(item["pitch"])
+            if abs(yaw) <= 20.0 and abs(pitch - 30.0) <= 10.0:
+                buckets["front"].append(dict(item, bucket="front"))
+            up_min = float(getattr(self.config, "angle_front_up_min_pitch", -10.0))
+            up_max = float(getattr(self.config, "angle_front_up_max_pitch", 20.0))
+            down_min = float(getattr(self.config, "angle_front_down_min_pitch", 40.0))
+            down_max = float(getattr(self.config, "angle_front_down_max_pitch", 70.0))
+            if up_min <= pitch < up_max:
+                buckets["front_up"].append(dict(item, bucket="front_up"))
+            if down_min < pitch <= down_max:
+                buckets["front_down"].append(dict(item, bucket="front_down"))
+            if yaw <= -30.0:
+                buckets["left"].append(dict(item, bucket="left"))
+            if yaw >= 30.0:
+                buckets["right"].append(dict(item, bucket="right"))
+        return dict(buckets)
+
+    def _emotion_buckets(self, candidates: List[dict]) -> Dict[str, List[dict]]:
+        buckets = defaultdict(list)
+        for item in candidates:
+            if item.get("face_quality_label") is False:
+                continue
+            emotion = str(item.get("emotion") or "").lower()
+            if emotion not in EMOTIONS_8:
+                continue
+            buckets[emotion].append(dict(item, bucket=emotion))
+        return dict(buckets)
+
+    def _body_pose_buckets(self, candidates: List[dict]) -> Dict[str, List[dict]]:
+        buckets = defaultdict(list)
+        for item in candidates:
+            full_path = item.get("full_path")
+            full_white_path = item.get("full_white_path")
+            if full_path:
+                if item.get("full_quality_label") is False:
                     continue
             else:
-                if exists and not config.overwrite:
-                    skipped += 1
+                if item.get("face_quality_label") is False:
                     continue
-            pending_units.append((video, person_id))
+                full_path = item.get("path")
+                full_white_path = item.get("white_path")
+            body_pose = item.get("body_pose") or {}
+            if body_pose.get("status") and body_pose.get("status") != "success":
+                continue
+            label = str(body_pose.get("label") or "").strip()
+            body_part = str(body_pose.get("body_part") or "").strip()
+            if label in BODY_POSE_LABEL_GRID and body_part in BODY_PART_BUCKETS:
+                bucket = f"{label}__{body_part}"
+                buckets[bucket].append(dict(
+                    item,
+                    bucket=bucket,
+                    bucket_source="body_label_body_part",
+                    body_label=label,
+                    body_part_bucket=body_part,
+                    path=full_path,
+                    white_path=full_white_path,
+                ))
+        return dict(buckets)
 
-        # ---- 4. 对「待处理列表」按 rank 切出连续区间 [st, en) ----
-        st, en = compute_shard_range(len(pending_units), config.rank, config.total_rank)
-        my_units = pending_units[st:en]
-        tqdm.write(
-            f"[AfterPipelineV3] mode={'update' if is_update else 'build'}, "
-            f"total={len(all_units)}, skipped={skipped}, pending={len(pending_units)}, "
-            f"rank={config.rank}/{config.total_rank}, shard=[{st}:{en}] -> my_units={len(my_units)}"
-        )
-        if not my_units:
-            tqdm.write("[AfterPipelineV3] No unit to process for this rank.")
-            return len(all_units), 0, skipped, 0, 0
+    @staticmethod
+    def _body_pose_fallback_pool(candidates: List[dict]) -> List[dict]:
+        pool = []
+        for item in candidates:
+            full_path = item.get("full_path")
+            full_white_path = item.get("full_white_path")
+            if full_path:
+                if item.get("full_quality_label") is False:
+                    continue
+            else:
+                if item.get("face_quality_label") is False:
+                    continue
+                full_path = item.get("path")
+                full_white_path = item.get("white_path")
+            if not full_path:
+                continue
+            pool.append(dict(
+                item,
+                bucket="matrix_fallback",
+                bucket_source="matrix_fallback",
+                path=full_path,
+                white_path=full_white_path,
+            ))
+        return pool
 
-        if is_update:
-            return self._run_update(config, identity_root, output_dir, my_units, update_features, all_units, skipped)
-        return self._run_build(
-            config, identity_root, output_dir, my_units, identity_name, recovery_jsonl, all_units, skipped,
-        )
-
-    def _run_workspace(self, config) -> Tuple[int, int, int, int, int]:
-        units = _workspace_units_from_config(config)
-        tqdm.write(f"[index_add] phase={config.phase}/{config.total} assigned={len(units)}")
-        if not units:
-            return 0, 0, 0, 0, 0
-        runtime_dir = os.path.join(resolve_repo_path(getattr(config, "output_root", "outputs")), "_pipeline_runtime")
-        os.makedirs(runtime_dir, exist_ok=True)
-        unit_file = os.path.join(runtime_dir, f"stage4_phase_{int(config.phase)}.txt")
-        _write_workspace_person_cluster_units(unit_file, units)
-        for unit in units:
-            _update_workspace_stage(unit, "index_add", "running")
-        original = {
-            "unit_list_file": config.unit_list_file,
-            "unit_list_input_base_dir": config.unit_list_input_base_dir,
-            "output_dir": config.output_dir,
-            "member_recovery_jsonl": config.member_recovery_jsonl,
-            "rank": config.rank,
-            "total_rank": config.total_rank,
+    @staticmethod
+    def _strip_feature(item: dict) -> dict:
+        body_pose = item.get("body_pose") or {}
+        return {
+            "path": item.get("path"),
+            "white_path": item.get("white_path"),
+            "uid": item.get("uid"),
+            "shot_key": item.get("shot_key"),
+            "video_prefix": item.get("video_prefix"),
+            "shot_no": item.get("shot_no"),
+            "obj_id": item.get("obj_id"),
+            "frame_idx": item.get("frame_idx"),
+            "feature_path": item.get("feature_path"),
+            "dino_feature_path": item.get("dino_feature_path"),
+            "bucket": item.get("bucket"),
+            "bucket_source": item.get("bucket_source"),
+            "body_label": item.get("body_label"),
+            "body_part_bucket": item.get("body_part_bucket"),
+            "yaw": round(float(item.get("yaw", 0.0)), 4),
+            "pitch": round(float(item.get("pitch", 0.0)), 4),
+            "roll": round(float(item.get("roll", 0.0)), 4),
+            "emotion": item.get("emotion"),
+            "emotion_score": round(float(item.get("emotion_score", 0.0)), 6),
+            "body_pose": {
+                "label": body_pose.get("label"),
+                "body_part": body_pose.get("body_part"),
+                "yaw_deg": body_pose.get("yaw_deg"),
+                "status": body_pose.get("status"),
+            },
+            "quality_label": item.get("quality_label"),
+            "quality": item.get("quality") or {},
+            "face_quality_label": item.get("face_quality_label"),
+            "full_quality_label": item.get("full_quality_label"),
+            "quality_by_image_type": item.get("quality_by_image_type") or {},
+            "quality_detail_by_image_type": item.get("quality_detail_by_image_type") or {},
         }
-        try:
-            config.unit_list_file = unit_file
-            config.unit_list_input_base_dir = None
-            config.output_dir = None
-            config.member_recovery_jsonl = None
-            config.rank = 0
-            config.total_rank = 0
-            result = self._run_unit_list(config)
-        finally:
-            for key, value in original.items():
-                setattr(config, key, value)
-        for unit in units:
-            _update_workspace_stage(unit, "index_add", "complete", {
-                "person_clusters_dir": os.path.relpath(_workspace_person_clusters_dir(unit["video_dir"]), unit["video_dir"]),
-                "index_filename": config.output_filename,
-            })
-        return result
+
+    def _first_frame_path(self, video_path: str) -> Optional[str]:
+        if not video_path:
+            return None
+        resolved_video = resolve_repo_path(video_path)
+        if resolved_video in self.first_frame_cache:
+            return self.first_frame_cache[resolved_video]
+        stem = self._safe_text(os.path.splitext(os.path.basename(video_path))[0])
+        out_path = os.path.join(self.config.first_frame_dir, f"{stem}.jpg")
+        if os.path.isfile(out_path) and not bool(self.config.overwrite_first_frames):
+            self.first_frame_cache[resolved_video] = to_repo_relative_path(out_path)
+            return self.first_frame_cache[resolved_video]
+        cap = cv2.VideoCapture(resolved_video)
+        ok, frame = cap.read()
+        cap.release()
+        if not ok or frame is None:
+            self.first_frame_cache[resolved_video] = None
+            return None
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        if not cv2.imwrite(out_path, frame):
+            self.first_frame_cache[resolved_video] = None
+            return None
+        self.first_frame_cache[resolved_video] = to_repo_relative_path(out_path)
+        return self.first_frame_cache[resolved_video]
+
+    def _target_videos(self, candidates: List[dict]) -> List[dict]:
+        by_video = {}
+        for item in candidates:
+            video = item.get("source_shot_path")
+            if not video:
+                continue
+            current = by_video.get(video)
+            idx = item.get("source_shot_frame_idx")
+            if current is None or (idx is not None and idx < current.get("source_shot_frame_idx", 10**12)):
+                by_video[video] = item
+        return [by_video[key] for key in sorted(by_video.keys())]
+
+    def _person_dirs(self) -> List[str]:
+        person_dirs = []
+        wanted = set(self.config.person_ids or [])
+        for name in sorted(os.listdir(self.config.person_clusters_dir)):
+            path = os.path.join(self.config.person_clusters_dir, name)
+            if not os.path.isdir(path) or not name.startswith("person_"):
+                continue
+            if wanted and name not in wanted:
+                continue
+            person_dirs.append(path)
+        return person_dirs
+
+    def _select_refs(self, candidates: List[dict], person_id: str, sample_key: str) -> dict:
+        angle_refs, angle_meta = self._sample_from_bucket_candidates(
+            self._angle_buckets(candidates),
+            int(self.config.angle_ref_count),
+            person_id,
+            "angle",
+            sample_key,
+            fallback_pool=candidates,
+        )
+        emo_refs, emo_meta = self._sample_from_bucket_candidates(
+            self._emotion_buckets(candidates),
+            int(self.config.emo_ref_count),
+            person_id,
+            "emotion",
+            sample_key,
+            fallback_pool=candidates,
+        )
+        body_refs, body_meta = self._sample_from_bucket_candidates(
+            self._body_pose_buckets(candidates),
+            int(self.config.body_pose_ref_count),
+            person_id,
+            "body_pose",
+            sample_key,
+            priority_buckets=list(BODY_POSE_PRIORITY_BUCKETS),
+            fallback_pool=self._body_pose_fallback_pool(candidates),
+        )
+        return {
+            "angle": (angle_refs, angle_meta),
+            "emotion": (emo_refs, emo_meta),
+            "body_pose": (body_refs, body_meta),
+        }
+
+    @staticmethod
+    def _exclude_target_shot_candidates(candidates: List[dict], target_shot_key: str) -> Tuple[List[dict], int]:
+        if not target_shot_key:
+            return list(candidates), 0
+        filtered = [item for item in candidates if item.get("shot_key") != target_shot_key]
+        return filtered, len(candidates) - len(filtered)
+
+    @staticmethod
+    def _ref_signature(angle_refs: List[dict], emo_refs: List[dict], body_refs: List[dict]) -> Tuple[Tuple[str, ...], ...]:
+        def paths(items: List[dict]) -> Tuple[str, ...]:
+            return tuple(sorted(str(item.get("path") or "") for item in items))
+
+        return paths(angle_refs), paths(emo_refs), paths(body_refs)
 
     def _read_unit_list(self, path: str) -> List[Tuple[str, str, str, str]]:
         units = []
@@ -2591,310 +1064,388 @@ class IndexAddPipeline:
                 if not line:
                     continue
                 parts = line.split("|")
-                if len(parts) < 1 or not parts[0]:
-                    tqdm.write(f"[AfterPipelineV3] Skip invalid unit_list line {line_number}: {line}")
+                if not parts[0]:
+                    tqdm.write(f"[TrainingPairs] Skip invalid unit_list line {line_number}: {line}")
                     continue
-                src_person_clusters = parts[0]
+                person_clusters_dir = parts[0]
                 video = parts[1] if len(parts) > 1 else ""
                 part = parts[2] if len(parts) > 2 else ""
                 uuid = parts[3] if len(parts) > 3 else ""
-                units.append((src_person_clusters, video, part, uuid))
+                units.append((person_clusters_dir, video, part, uuid))
         return units
 
-    def _unit_output_root(self, src_uuid_dir: str, output_base_dir: Optional[str], input_base_dir: Optional[str]) -> Optional[str]:
-        if not output_base_dir:
-            return None
+    def _rejected_output_path(self) -> str:
+        return self.config.rejected_jsonl or os.path.join(
+            os.path.dirname(os.path.abspath(self.config.output_jsonl)),
+            "rejected_pairs.jsonl",
+        )
+
+    @staticmethod
+    def _reject_ref_meta(items: List[dict]) -> List[dict]:
+        return [TrainingPairGenerator._strip_feature(item) for item in items]
+
+    def _reject_record(
+        self,
+        person_id: str,
+        target: dict,
+        reason: str,
+        detail: Optional[dict] = None,
+        angle_refs: Optional[List[dict]] = None,
+        emo_refs: Optional[List[dict]] = None,
+        body_refs: Optional[List[dict]] = None,
+    ) -> dict:
+        return {
+            "person_id": person_id,
+            "source_uid": target.get("uid"),
+            "source_shot_key": target.get("shot_key"),
+            "source_frame_idx": target.get("frame_idx"),
+            "target_video": to_repo_relative_path(target.get("source_shot_path")),
+            "reject_reason": reason,
+            "detail": detail or {},
+            "angle_ref_meta": self._reject_ref_meta(angle_refs or []),
+            "emo_ref_meta": self._reject_ref_meta(emo_refs or []),
+            "body_pose_ref_meta": self._reject_ref_meta(body_refs or []),
+        }
+
+    def _unit_output_root(self, src_person_clusters: str, output_base_dir: str, input_base_dir: Optional[str]) -> str:
+        src_person_clusters = resolve_repo_path(src_person_clusters)
+        parent_dir = os.path.dirname(src_person_clusters)
+        if os.path.basename(src_person_clusters) == PERSON_CLUSTERS_SUBDIR:
+            src_root = parent_dir
+        else:
+            src_root = src_person_clusters
         if input_base_dir:
             try:
-                rel_uuid_path = os.path.relpath(src_uuid_dir, input_base_dir)
+                rel_path = os.path.relpath(src_root, input_base_dir)
             except ValueError:
-                rel_uuid_path = os.path.basename(src_uuid_dir)
-            if rel_uuid_path != "." and not rel_uuid_path.startswith(".."):
-                return os.path.join(output_base_dir, rel_uuid_path)
-        return os.path.join(output_base_dir, os.path.basename(src_uuid_dir))
+                rel_path = os.path.basename(src_root)
+            if rel_path != "." and not rel_path.startswith(".."):
+                return os.path.join(output_base_dir, rel_path)
+        return os.path.join(output_base_dir, os.path.basename(src_root))
 
-    def _run_unit_list(self, config) -> Tuple[int, int, int, int, int]:
-        """Batch mode: one Python process handles many UUID roots from a shard txt.
-
-        This keeps model extractors alive across UUIDs in the same process and avoids
-        reloading Qwen/body/emotion models for every directory.
-        """
-        unit_list_file = resolve_repo_path(config.unit_list_file)
-        output_base_dir = resolve_repo_path(config.output_dir) if config.output_dir else None
+    def _run_unit_list(self) -> Tuple[int, int]:
+        unit_list_file = resolve_repo_path(self.config.unit_list_file)
         input_base_dir = (
-            resolve_repo_path(config.unit_list_input_base_dir)
-            if config.unit_list_input_base_dir
+            resolve_repo_path(self.config.unit_list_input_base_dir)
+            if self.config.unit_list_input_base_dir
             else None
         )
-        identity_name = os.path.basename(config.identity_jsonl) if config.identity_jsonl else "output.jsonl"
-        recovery_jsonl = resolve_repo_path(config.member_recovery_jsonl) if config.member_recovery_jsonl else None
-        recovery_records = (
-            [resolve_path_fields(record) for record in read_jsonl(recovery_jsonl)]
-            if recovery_jsonl and os.path.isfile(recovery_jsonl)
-            else []
-        )
-        if config.member_recovery_jsonl and not recovery_records:
-            tqdm.write(f"[AfterPipelineV3] WARNING: member_recovery_jsonl not found or empty: {recovery_jsonl}")
-        recovery_lookup = {member_key(record): record for record in recovery_records}
+        output_base_dir = os.path.dirname(os.path.abspath(self.config.output_jsonl))
+        stats_base_dir = os.path.dirname(os.path.abspath(self.config.stats_json))
+        first_frame_base_dir = os.path.abspath(self.config.first_frame_dir)
+        output_name = os.path.basename(self.config.output_jsonl)
+        stats_name = os.path.basename(self.config.stats_json)
 
-        update_features = list(config.update_features or [])
-        if config.update_emotion_vlm_only and "emotion_vlm" not in update_features:
-            update_features.append("emotion_vlm")
-        update_features = [str(name).strip().lower() for name in update_features if str(name).strip()]
-        is_update = bool(update_features)
-        include_pose = not config.disable_pose
-        feature_extractors = {} if is_update else build_feature_extractors(config)
-        face_boundary_quality_checker = None if is_update else build_face_boundary_quality_checker(config)
-        face_quality_vlm_checker = None if is_update else build_face_quality_vlm_checker(config)
-        update_extractors = build_update_feature_extractors(update_features, config) if is_update else {}
+        units = self._read_unit_list(unit_list_file)
+        if not units:
+            tqdm.write(f"[TrainingPairs] No units found in unit_list_file: {unit_list_file}")
+            return 0, 0
 
-        src_units = self._read_unit_list(unit_list_file)
-        if not src_units:
-            tqdm.write(f"[AfterPipelineV3] No units found in unit_list_file: {unit_list_file}")
-            return 0, 0, 0, 0, 0
-
-        written = skipped = 0
-        total_frames = total_images = 0
-        total_person_units = 0
-        progress = tqdm(src_units, desc="uuid_roots", unit="uuid", position=0)
-        for src_person_clusters, video_name, part_name, uuid_name in progress:
+        total_persons = 0
+        total_rows = 0
+        progress = tqdm(units, desc="training_pair_roots", unit="root")
+        for src_person_clusters, video, part, uuid in progress:
             src_person_clusters = resolve_repo_path(src_person_clusters)
-            src_uuid_dir = os.path.dirname(src_person_clusters)
-            dst_uuid_dir = self._unit_output_root(src_uuid_dir, output_base_dir, input_base_dir)
-            progress.set_postfix_str(f"{video_name}/{part_name}/{uuid_name}", refresh=False)
-
+            progress.set_postfix_str(f"{video}/{part}/{uuid}", refresh=False)
             if not os.path.isdir(src_person_clusters):
-                tqdm.write(f"[AfterPipelineV3] Skip missing person_clusters: {src_person_clusters}")
-                skipped += 1
-                continue
-            identity_jsonl = os.path.join(src_uuid_dir, identity_name)
-            if not is_update and not os.path.isfile(identity_jsonl):
-                tqdm.write(f"[AfterPipelineV3] Skip UUID (missing identity jsonl): {identity_jsonl}")
-                skipped += 1
+                tqdm.write(f"[TrainingPairs] Skip missing person_clusters: {src_person_clusters}")
                 continue
 
-            persons = list_person_dirs(src_person_clusters)
-            if config.person_ids:
-                wanted = set(config.person_ids)
-                persons = [person_id for person_id in persons if person_id in wanted]
-            total_person_units += len(persons)
-            if not persons:
-                continue
+            output_root = self._unit_output_root(src_person_clusters, output_base_dir, input_base_dir)
+            try:
+                stats_rel = os.path.relpath(output_root, output_base_dir)
+            except ValueError:
+                stats_rel = os.path.basename(output_root)
+            stats_root = os.path.join(stats_base_dir, stats_rel) if stats_rel != "." else stats_base_dir
+            first_frame_root = os.path.join(output_root, os.path.basename(first_frame_base_dir))
 
-            grouped: Dict[str, List[dict]] = {}
-            if not is_update:
-                identity_records = [resolve_path_fields(record) for record in read_jsonl(identity_jsonl)]
-                grouped = load_all_cluster_members(
-                    src_person_clusters,
-                    identity_records,
-                    recovery_records,
-                    person_ids=set(persons),
-                )
+            os.makedirs(output_root, exist_ok=True)
+            os.makedirs(stats_root, exist_ok=True)
+            os.makedirs(first_frame_root, exist_ok=True)
 
-            for person_id in persons:
-                input_cluster_dir = os.path.join(src_person_clusters, person_id)
-                target_uuid_dir = dst_uuid_dir or src_uuid_dir
-                target_dir = os.path.join(target_uuid_dir, PERSON_CLUSTERS_SUBDIR, person_id)
-                output_path = os.path.join(target_dir, config.output_filename)
+            child_config = replace(
+                self.config,
+                person_clusters_dir=src_person_clusters,
+                output_jsonl=os.path.join(output_root, output_name),
+                rejected_jsonl=os.path.join(output_root, os.path.basename(self._rejected_output_path())),
+                stats_json=os.path.join(stats_root, stats_name),
+                first_frame_dir=first_frame_root,
+                unit_list_file=None,
+            )
+            persons, rows = TrainingPairGenerator(child_config)._run_person_clusters()
+            total_persons += persons
+            total_rows += rows
 
-                if is_update:
-                    if not os.path.isfile(output_path):
-                        skipped += 1
+        return total_persons, total_rows
+
+    def run(self) -> Tuple[int, int]:
+        if self.config.unit_list_file:
+            return self._run_unit_list()
+        workspace_mode = bool(getattr(self.config, "video_dir", None) or getattr(self.config, "pipeline_input_jsonl", None))
+        if workspace_mode and not bool(getattr(self.config, "global_mode", False)):
+            return self._run_workspace()
+        return self._run_person_clusters()
+
+    def _run_workspace(self) -> Tuple[int, int]:
+        base_config = self.config
+        units = _workspace_units_from_config(base_config)
+        total_persons = 0
+        total_rows = 0
+        print(f"[generate_training_pairs] phase={base_config.phase}/{base_config.total} assigned={len(units)}")
+        for unit in units:
+            _update_workspace_stage(unit, "generate_training_pairs", "running")
+            video_dir = unit["video_dir"]
+            child_config = replace(
+                base_config,
+                person_clusters_dir=_workspace_person_clusters_dir(video_dir),
+                output_jsonl=_workspace_path(video_dir, "pairs_jsonl"),
+                rejected_jsonl=_workspace_path(video_dir, "rejected_pairs_jsonl"),
+                stats_json=_workspace_path(video_dir, "training_stats_json"),
+                first_frame_dir=_workspace_path(video_dir, "first_frame_dir"),
+                unit_list_file=None,
+                unit_list_input_base_dir=None,
+            )
+            self.config = child_config
+            self.feature_cache = {}
+            self.dino_feature_cache = {}
+            self.first_frame_cache = {}
+            persons, rows = self._run_person_clusters()
+            total_persons += persons
+            total_rows += rows
+            _update_workspace_stage(unit, "generate_training_pairs", "complete", {
+                "output_jsonl": os.path.relpath(child_config.output_jsonl, video_dir),
+                "rejected_jsonl": os.path.relpath(child_config.rejected_jsonl, video_dir),
+                "stats_json": os.path.relpath(child_config.stats_json, video_dir),
+                "total_persons": persons,
+                "rows_written": rows,
+            })
+        self.config = base_config
+        return total_persons, total_rows
+
+    def _run_person_clusters(self) -> Tuple[int, int]:
+        person_dirs = self._person_dirs()
+        rows_written = 0
+        stats = {
+            "config": asdict(self.config),
+            "total_persons": len(person_dirs),
+            "persons": {},
+            "rows_written": 0,
+            "first_frame_error": 0,
+        }
+
+        with open(self.config.output_jsonl, "w", encoding="utf-8") as fout, open(self._rejected_output_path(), "w", encoding="utf-8") as freject:
+            for person_dir in tqdm(person_dirs, desc="Generating training pairs", unit="person"):
+                person_id = os.path.basename(person_dir)
+                index_path = os.path.join(person_dir, self.config.index_filename)
+                if not os.path.isfile(index_path):
+                    stats["persons"][person_id] = {"status": "missing_index"}
+                    continue
+
+                person_index = self._load_json(index_path)
+                candidates, skipped = self._build_candidates(person_index)
+                similarity_meta = self._build_or_load_similarity_matrix(candidates, person_id)
+                target_items = self._target_videos(candidates)
+                used_ref_signatures = set()
+                per_target_stats = []
+
+                stats["persons"][person_id] = {
+                    "status": "ok",
+                    "candidate_count": len(candidates),
+                    "similarity_matrix": similarity_meta,
+                    "target_video_count": len(target_items),
+                    "skipped": skipped,
+                    "per_target": per_target_stats,
+                    "dino_diversity_rejected": 0,
+                    "insufficient_refs_rejected": 0,
+                    "rejected_jsonl": to_repo_relative_path(self._rejected_output_path()),
+                }
+
+                for target in target_items:
+                    target_video = target.get("source_shot_path")
+                    target_shot_key = target.get("shot_key")
+                    ref_candidates, same_target_shot_filtered = self._exclude_target_shot_candidates(candidates, target_shot_key)
+                    base_sample_key = f"{target.get('shot_key')}::{target.get('obj_id')}::{target.get('frame_idx')}::{target_video}"
+                    refs = None
+                    signature = None
+                    duplicate_signature = False
+                    sample_attempt = 0
+                    max_attempts = 20
+                    for attempt in range(max_attempts):
+                        sample_key = base_sample_key if attempt == 0 else f"{base_sample_key}::retry_{attempt}"
+                        refs = self._select_refs(ref_candidates, person_id, sample_key)
+                        angle_refs, _ = refs["angle"]
+                        emo_refs, _ = refs["emotion"]
+                        body_refs, _ = refs["body_pose"]
+                        signature = self._ref_signature(angle_refs, emo_refs, body_refs)
+                        sample_attempt = attempt
+                        if signature not in used_ref_signatures:
+                            break
+                    if signature in used_ref_signatures:
+                        duplicate_signature = True
+                    else:
+                        used_ref_signatures.add(signature)
+
+                    angle_refs, angle_selection_meta = refs["angle"]
+                    emo_refs, emo_selection_meta = refs["emotion"]
+                    body_refs, body_selection_meta = refs["body_pose"]
+
+                    if (
+                        len(angle_refs) < int(self.config.angle_ref_count) or
+                        len(emo_refs) < int(self.config.emo_ref_count) or
+                        len(body_refs) < int(self.config.body_pose_ref_count)
+                    ):
+                        stats["persons"][person_id]["insufficient_refs_rejected"] += 1
+                        freject.write(json.dumps(self._reject_record(
+                            person_id,
+                            target,
+                            "insufficient_refs",
+                            {
+                                "angle_selected": len(angle_refs),
+                                "angle_required": int(self.config.angle_ref_count),
+                                "emotion_selected": len(emo_refs),
+                                "emotion_required": int(self.config.emo_ref_count),
+                                "body_pose_selected": len(body_refs),
+                                "body_pose_required": int(self.config.body_pose_ref_count),
+                                "selection_meta": {
+                                    "angle": angle_selection_meta,
+                                    "emotion": emo_selection_meta,
+                                    "body_pose": body_selection_meta,
+                                },
+                            },
+                            angle_refs,
+                            emo_refs,
+                            body_refs,
+                        ), ensure_ascii=False) + "\n")
                         continue
-                    updated_frames, skipped_frames, updated_entries = update_existing_index_features(
-                        output_path,
-                        update_features,
-                        config,
-                        update_extractors=update_extractors,
-                        progress_position=1,
-                        recovery_lookup=recovery_lookup,
-                    )
-                    total_frames += updated_frames
-                    total_images += updated_entries
-                    written += 1
-                    tqdm.write(
-                        f"[AfterPipelineV3] {video_name}/{part_name}/{uuid_name}/{person_id}: "
-                        f"update_features={','.join(update_features)} updated_frames={updated_frames}, "
-                        f"skipped_frames={skipped_frames}, updated_entries={updated_entries} -> {output_path}"
-                    )
-                    continue
 
-                if os.path.isfile(output_path) and not config.overwrite:
-                    skipped += 1
-                    continue
+                    angle_mean, angle_max, angle_max_pair = self._combo_pairwise_stats(angle_refs)
+                    emo_mean, emo_max, emo_max_pair = self._combo_pairwise_stats(emo_refs)
+                    body_mean, body_max, body_max_pair = self._combo_pairwise_stats(body_refs)
+                    angle_dino_mean, angle_dino_max, angle_dino_max_pair = self._combo_dino_pairwise_stats(angle_refs)
+                    emo_dino_mean, emo_dino_max, emo_dino_max_pair = self._combo_dino_pairwise_stats(emo_refs)
+                    body_dino_mean, body_dino_max, body_dino_max_pair = self._combo_dino_pairwise_stats(body_refs)
+                    if bool(getattr(self.config, "enable_dino_ref_diversity", False)):
+                        dino_threshold = float(getattr(self.config, "dino_max_pairwise_cosine", 0.95))
+                        dino_groups = [angle_refs, emo_refs, body_refs]
+                        missing_group_dino = any(
+                            any(item.get("dino_feature") is None for item in group)
+                            for group in dino_groups
+                        )
+                        dino_max_values = [angle_dino_max, emo_dino_max, body_dino_max]
+                        if missing_group_dino or any(value is None or float(value) > dino_threshold for value in dino_max_values):
+                            stats["persons"][person_id]["dino_diversity_rejected"] += 1
+                            freject.write(json.dumps(self._reject_record(
+                                person_id,
+                                target,
+                                "dino_diversity",
+                                {
+                                    "missing_group_dino": bool(missing_group_dino),
+                                    "threshold": dino_threshold,
+                                    "angle_dino_mean_pairwise_cosine": angle_dino_mean,
+                                    "angle_dino_max_pairwise_cosine": angle_dino_max,
+                                    "angle_dino_max_pairwise_cosine_pair": angle_dino_max_pair,
+                                    "emo_dino_mean_pairwise_cosine": emo_dino_mean,
+                                    "emo_dino_max_pairwise_cosine": emo_dino_max,
+                                    "emo_dino_max_pairwise_cosine_pair": emo_dino_max_pair,
+                                    "body_pose_dino_mean_pairwise_cosine": body_dino_mean,
+                                    "body_pose_dino_max_pairwise_cosine": body_dino_max,
+                                    "body_pose_dino_max_pairwise_cosine_pair": body_dino_max_pair,
+                                },
+                                angle_refs,
+                                emo_refs,
+                                body_refs,
+                            ), ensure_ascii=False) + "\n")
+                            continue
 
-                os.makedirs(target_dir, exist_ok=True)
-                member_records = grouped.get(person_id, [])
-                person_index = build_person_index(
-                    person_id,
-                    input_cluster_dir,
-                    member_records,
-                    include_pose=include_pose,
-                    feature_extractors=feature_extractors,
-                    progress_position=1,
-                    enable_mask_hole_quality_check=config.enable_mask_hole_quality_check,
-                    mask_hole_threshold=config.mask_hole_threshold,
-                    face_boundary_quality_checker=face_boundary_quality_checker,
-                    face_quality_vlm_checker=face_quality_vlm_checker,
-                )
-                with open(output_path, "w", encoding="utf-8") as file:
-                    json.dump(
-                        to_jsonable(relativize_index_output(person_index)),
-                        file,
-                        ensure_ascii=False,
-                        indent=2,
-                    )
+                    def _rel(p):
+                        return to_repo_relative_path(p) if p else None
 
-                stats = person_index["stats"]
-                total_frames += stats["frame_count"]
-                total_images += stats["image_count"]
-                written += 1
-                tqdm.write(
-                    f"[AfterPipelineV3] {video_name}/{part_name}/{uuid_name}/{person_id}: "
-                    f"members={stats['member_count']}, frames={stats['frame_count']}, "
-                    f"images={stats['image_count']}, features={','.join(person_index['enabled_features'])} "
-                    f"-> {output_path}"
-                )
+                    angle_paths = [_rel(item.get("path")) for item in angle_refs]
+                    emo_paths = [_rel(item.get("path")) for item in emo_refs]
+                    body_paths = [_rel(item.get("path")) for item in body_refs]
+                    angle_paths_white = [_rel(item.get("white_path")) for item in angle_refs]
+                    emo_paths_white = [_rel(item.get("white_path")) for item in emo_refs]
+                    body_paths_white = [_rel(item.get("white_path")) for item in body_refs]
+                    angle_meta = [self._strip_feature(item) for item in angle_refs]
+                    emo_meta = [self._strip_feature(item) for item in emo_refs]
+                    body_meta = [self._strip_feature(item) for item in body_refs]
 
-        tqdm.write(
-            f"[AfterPipelineV3] Unit-list {'update' if is_update else 'build'} done. "
-            f"total={total_person_units}, written={written}, skipped={skipped}, "
-            f"frames={total_frames}, images={total_images}"
-        )
-        return total_person_units, written, skipped, total_frames, total_images
+                    first_frame = self._first_frame_path(target.get("source_shot_path"))
+                    if not first_frame:
+                        stats["first_frame_error"] += 1
+                    row = {
+                        "person_id": person_id,
+                        "source_uid": target.get("uid"),
+                        "source_shot_key": target.get("shot_key"),
+                        "source_frame_idx": target.get("frame_idx"),
+                        "first_frame": first_frame,
+                        "target_video": to_repo_relative_path(target.get("source_shot_path")),
+                        "angle_ref": angle_paths,
+                        "emo_ref": emo_paths,
+                        "body_pose_ref": body_paths,
+                        "angle_ref_white": angle_paths_white,
+                        "emo_ref_white": emo_paths_white,
+                        "body_pose_ref_white": body_paths_white,
+                        "angle_ref_meta": angle_meta,
+                        "emo_ref_meta": emo_meta,
+                        "body_pose_ref_meta": body_meta,
+                        "selection_meta": {
+                            "angle": angle_selection_meta,
+                            "emotion": emo_selection_meta,
+                            "body_pose": body_selection_meta,
+                            "sample_attempt": sample_attempt,
+                            "duplicate_ref_signature": duplicate_signature,
+                            "target_shot_ref_filter": {
+                                "target_shot_key": target_shot_key,
+                                "target_video": to_repo_relative_path(target_video),
+                                "filtered_count": same_target_shot_filtered,
+                                "remaining_candidate_count": len(ref_candidates),
+                            },
+                        },
+                        "selection_stats": {
+                            "angle_mean_pairwise_cosine": angle_mean,
+                            "angle_max_pairwise_cosine": angle_max,
+                            "angle_max_pairwise_cosine_pair": angle_max_pair,
+                            "angle_fallback_added_without_shot_gap": angle_selection_meta.get("fallback_added_without_shot_gap"),
+                            "emo_mean_pairwise_cosine": emo_mean,
+                            "emo_max_pairwise_cosine": emo_max,
+                            "emo_max_pairwise_cosine_pair": emo_max_pair,
+                            "emo_fallback_added_without_shot_gap": emo_selection_meta.get("fallback_added_without_shot_gap"),
+                            "body_pose_mean_pairwise_cosine": body_mean,
+                            "body_pose_max_pairwise_cosine": body_max,
+                            "body_pose_max_pairwise_cosine_pair": body_max_pair,
+                            "body_pose_fallback_added_without_shot_gap": body_selection_meta.get("fallback_added_without_shot_gap"),
+                            "angle_dino_mean_pairwise_cosine": angle_dino_mean,
+                            "angle_dino_max_pairwise_cosine": angle_dino_max,
+                            "angle_dino_max_pairwise_cosine_pair": angle_dino_max_pair,
+                            "emo_dino_mean_pairwise_cosine": emo_dino_mean,
+                            "emo_dino_max_pairwise_cosine": emo_dino_max,
+                            "emo_dino_max_pairwise_cosine_pair": emo_dino_max_pair,
+                            "body_pose_dino_mean_pairwise_cosine": body_dino_mean,
+                            "body_pose_dino_max_pairwise_cosine": body_dino_max,
+                            "body_pose_dino_max_pairwise_cosine_pair": body_dino_max_pair,
+                            "dino_max_pairwise_cosine_threshold": float(getattr(self.config, "dino_max_pairwise_cosine", 0.95)),
+                        },
+                    }
+                    fout.write(json.dumps(row, ensure_ascii=False) + "\n")
+                    rows_written += 1
+                    per_target_stats.append({
+                        "target_video": to_repo_relative_path(target_video),
+                        "source_shot_key": target.get("shot_key"),
+                        "sample_attempt": sample_attempt,
+                        "duplicate_ref_signature": duplicate_signature,
+                        "target_shot_ref_filter": {
+                            "target_shot_key": target_shot_key,
+                            "target_video": to_repo_relative_path(target_video),
+                            "filtered_count": same_target_shot_filtered,
+                            "remaining_candidate_count": len(ref_candidates),
+                        },
+                        "angle": angle_selection_meta,
+                        "emotion": emo_selection_meta,
+                        "body_pose": body_selection_meta,
+                    })
 
-    def _run_build(
-        self, config, identity_root, output_dir, my_units, identity_name, recovery_jsonl,
-        all_units, skipped,
-    ) -> Tuple[int, int, int, int, int]:
-        """构建模式：按 video 各读自己的 jsonl，扫聚类图片、抽特征，写回新索引。"""
-        include_pose = not config.disable_pose
-        feature_extractors = build_feature_extractors(config)
-        face_boundary_quality_checker = build_face_boundary_quality_checker(config)
-        face_quality_vlm_checker = build_face_quality_vlm_checker(config)
-
-        # recovery 为单一全局文件，只读一次，供所有 video 共用（用于补回 cluster_meta 里
-        # 但不在 identity jsonl 中的成员）
-        recovery_records = (
-            [resolve_path_fields(record) for record in read_jsonl(recovery_jsonl)]
-            if recovery_jsonl and os.path.isfile(recovery_jsonl)
-            else []
-        )
-        if config.member_recovery_jsonl and not recovery_records:
-            tqdm.write(f"[AfterPipelineV3] WARNING: member_recovery_jsonl not found or empty: {recovery_jsonl}")
-
-        # 把本 rank 的单元按 video 分组，使每个 video 的 identity jsonl 只读一次
-        units_by_video: Dict[str, List[str]] = defaultdict(list)
-        for video, person_id in my_units:
-            units_by_video[video].append(person_id)
-
-        written = 0
-        total_frames = total_images = 0
-        for video in sorted(units_by_video):
-            persons = units_by_video[video]
-            base = video_base_dir(identity_root, video)
-            person_clusters_dir = os.path.join(base, PERSON_CLUSTERS_SUBDIR)
-            identity_jsonl = os.path.join(base, identity_name)
-
-            if not os.path.isfile(identity_jsonl):
-                tqdm.write(f"[AfterPipelineV3] Skip video (missing identity jsonl): {identity_jsonl}")
-                continue
-
-            # 仅为本 video 的待处理 person 加载聚类成员（person_ids 过滤）
-            identity_records = [resolve_path_fields(record) for record in read_jsonl(identity_jsonl)]
-            grouped = load_all_cluster_members(
-                person_clusters_dir,
-                identity_records,
-                recovery_records,
-                person_ids=set(persons),
-            )
-
-            progress = tqdm(persons, desc=f"{video or 'root'} persons", unit="person", position=0, leave=False)
-            for person_id in progress:
-                progress.set_postfix_str(person_id, refresh=False)
-                input_cluster_dir, target_dir = unit_dirs(identity_root, video, person_id, output_dir)
-                os.makedirs(target_dir, exist_ok=True)
-                output_path = os.path.join(target_dir, config.output_filename)
-
-                member_records = grouped.get(person_id, [])
-                person_index = build_person_index(
-                    person_id,
-                    input_cluster_dir,
-                    member_records,
-                    include_pose=include_pose,
-                    feature_extractors=feature_extractors,
-                    progress_position=1,
-                    enable_mask_hole_quality_check=config.enable_mask_hole_quality_check,
-                    mask_hole_threshold=config.mask_hole_threshold,
-                    face_boundary_quality_checker=face_boundary_quality_checker,
-                    face_quality_vlm_checker=face_quality_vlm_checker,
-                )
-                with open(output_path, "w", encoding="utf-8") as file:
-                    json.dump(
-                        to_jsonable(relativize_index_output(person_index)),
-                        file,
-                        ensure_ascii=False,
-                        indent=2,
-                    )
-
-                stats = person_index["stats"]
-                total_frames += stats["frame_count"]
-                total_images += stats["image_count"]
-                written += 1
-                tqdm.write(
-                    f"[AfterPipelineV3] {video}/{person_id}: members={stats['member_count']}, "
-                    f"frames={stats['frame_count']}, images={stats['image_count']}, "
-                    f"features={','.join(person_index['enabled_features'])} -> {output_path}"
-                )
-
-        tqdm.write(
-            f"[AfterPipelineV3] Build done. total={len(all_units)}, written={written}, "
-            f"skipped={skipped}, frames={total_frames}, images={total_images}"
-        )
-        return len(all_units), written, skipped, total_frames, total_images
-
-    def _run_update(
-        self, config, identity_root, output_dir, my_units, update_features, all_units, skipped,
-    ) -> Tuple[int, int, int, int, int]:
-        """增量模式：对已建好的索引补加 emotion / emotion_vlm / body_pose，原地写回。"""
-        update_extractors = build_update_feature_extractors(update_features, config)
-        recovery_jsonl = resolve_repo_path(config.member_recovery_jsonl) if config.member_recovery_jsonl else None
-        recovery_records = (
-            [resolve_path_fields(record) for record in read_jsonl(recovery_jsonl)]
-            if recovery_jsonl and os.path.isfile(recovery_jsonl)
-            else []
-        )
-        recovery_lookup = {member_key(record): record for record in recovery_records}
-        if config.member_recovery_jsonl and not recovery_lookup:
-            tqdm.write(f"[AfterPipelineV3] WARNING: member_recovery_jsonl not found or empty: {recovery_jsonl}")
-
-        written = 0
-        total_frames = total_images = 0
-        progress = tqdm(my_units, desc="persons", unit="person", position=0)
-        for video, person_id in progress:
-            progress.set_postfix_str(f"{video}/{person_id}", refresh=False)
-            _, target_dir = unit_dirs(identity_root, video, person_id, output_dir)
-            output_path = os.path.join(target_dir, config.output_filename)
-
-            updated_frames, skipped_frames, updated_entries = update_existing_index_features(
-                output_path,
-                update_features,
-                config,
-                update_extractors=update_extractors,
-                progress_position=1,
-                recovery_lookup=recovery_lookup,
-            )
-            total_frames += updated_frames
-            total_images += updated_entries
-            written += 1
-            tqdm.write(
-                f"[AfterPipelineV3] {video}/{person_id}: update_features={','.join(update_features)} "
-                f"updated_frames={updated_frames}, skipped_frames={skipped_frames}, "
-                f"updated_entries={updated_entries} -> {output_path}"
-            )
-
-        tqdm.write(
-            f"[AfterPipelineV3] Update done. total={len(all_units)}, written={written}, "
-            f"skipped={skipped}, frames={total_frames}, images={total_images}"
-        )
-        return len(all_units), written, skipped, total_frames, total_images
+        stats["rows_written"] = rows_written
+        with open(self.config.stats_json, "w", encoding="utf-8") as f:
+            json.dump(stats, f, ensure_ascii=False, indent=2)
+        return len(person_dirs), rows_written
