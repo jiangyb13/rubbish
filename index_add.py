@@ -29,11 +29,18 @@ try:
         to_repo_relative_path,
     )
 except ImportError:
-    from path_utils import (
-        resolve_path_fields,
-        resolve_repo_path as _resolve_repo_path,
-        to_repo_relative_path,
-    )
+    try:
+        from utils.path_utils import (
+            resolve_path_fields,
+            resolve_repo_path as _resolve_repo_path,
+            to_repo_relative_path,
+        )
+    except ImportError:
+        from path_utils import (
+            resolve_path_fields,
+            resolve_repo_path as _resolve_repo_path,
+            to_repo_relative_path,
+        )
 
 # ---- constants ----
 CORE_IMAGE_TYPES = ("face_orig", "face_white", "full_orig", "full_white")
@@ -159,7 +166,8 @@ def load_all_cluster_members(
     if not recovery_lookup or not os.path.isdir(person_clusters_dir):
         return grouped
 
-    for name in sorted(os.listdir(person_clusters_dir)):
+    cluster_names = sorted(person_ids) if person_ids is not None else list_person_dirs(person_clusters_dir)
+    for name in cluster_names:
         cluster_dir = os.path.join(person_clusters_dir, name)
         meta_path = os.path.join(cluster_dir, "cluster_meta.json")
         if not os.path.isdir(cluster_dir) or not os.path.isfile(meta_path):
@@ -331,22 +339,37 @@ def _mask_hole_quality_for_entry(quality: dict, entry_image_type: str) -> dict:
     return value
 
 
-def _quality_passed(entry: dict) -> bool:
+def _quality_failed_keys(entry: dict) -> List[str]:
     quality = entry.get("quality")
-    if isinstance(quality, dict):
-        for item in quality.values():
-            if isinstance(item, dict) and item.get("passed") is False:
-                return False
-    return True
+    if not isinstance(quality, dict):
+        return []
+    return [
+        str(name)
+        for name, item in quality.items()
+        if isinstance(item, dict) and item.get("passed") is False
+    ]
 
 
-def _set_quality_item(entry: dict, name: str, value: dict) -> None:
+def _quality_passed(entry: dict) -> bool:
+    return not _quality_failed_keys(entry)
+
+
+def _refresh_quality_label(entry: dict, preserve_existing_false: bool = False) -> None:
+    failed_keys = _quality_failed_keys(entry)
+    entry["failed_quality_keys"] = failed_keys
+    if preserve_existing_false and entry.get("quality_label") is False:
+        entry["quality_label"] = False
+    else:
+        entry["quality_label"] = not failed_keys
+
+
+def _set_quality_item(entry: dict, name: str, value: dict, preserve_existing_false: bool = True) -> None:
     quality = entry.get("quality")
     if not isinstance(quality, dict):
         quality = {}
     quality[name] = dict(value)
     entry["quality"] = quality
-    entry["quality_label"] = _quality_passed(entry)
+    _refresh_quality_label(entry, preserve_existing_false=preserve_existing_false)
 
 
 def _has_quality_item(entry: Optional[dict], name: str) -> bool:
@@ -646,6 +669,46 @@ def scan_cluster_images(
     indexes = {image_type: {} for image_type in IMAGE_TYPES}
     metadata = {image_type: {} for image_type in IMAGE_TYPES}
 
+    # Canonical v4 path: Stage 3 records every generated image explicitly.
+    # Prefer it over directory traversal and filename reverse parsing.
+    frame_manifest_path = os.path.join(cluster_dir, "frame_manifest.jsonl")
+    if os.path.isfile(frame_manifest_path):
+        with open(frame_manifest_path, "r", encoding="utf-8") as manifest:
+            for line_number, line in enumerate(manifest, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        f"Invalid frame manifest {frame_manifest_path}:{line_number}: {exc}"
+                    ) from exc
+                key = (
+                    str(row.get("shot_key") or ""),
+                    str(row.get("obj_id")),
+                    int(row.get("frame_idx", 0)),
+                )
+                images = row.get("images") or {}
+                derived = row.get("derived") or {}
+                for image_type, image_path in images.items():
+                    if image_type not in indexes or not image_path:
+                        continue
+                    indexes[image_type][key] = resolve_repo_path(image_path)
+                    if image_type.startswith("face_angle_"):
+                        metadata[image_type][key] = {
+                            "derived_image_type": "face_angle_library",
+                            "angle_bucket": image_type.rsplit("_", 1)[-1],
+                        }
+                    elif image_type in ("face_diversity_topk", "dino_diversity_topk"):
+                        item = derived.get(image_type) or {}
+                        metadata[image_type][key] = {
+                            "derived_image_type": image_type,
+                            "rank": item.get("rank"),
+                            "stage3_diversity_metadata": item or None,
+                        }
+        return indexes, metadata
+
     for image_type in CORE_IMAGE_TYPES:
         directory = os.path.join(cluster_dir, image_type)
         if not os.path.isdir(directory):
@@ -737,6 +800,24 @@ def cluster_frame_keys(
             if key[0] == shot_key and key[1] == str(obj_id):
                 keys.add(key)
     return sorted(keys, key=lambda item: item[2])
+
+
+def empty_output(person_id: str, cluster_dir: str, enabled_features: List[str]) -> dict:
+    return {
+        "person_id": person_id,
+        "cluster_dir": cluster_dir,
+        "schema": "images.image_type.image_path.attributes",
+        "enabled_features": enabled_features,
+        "images": {image_type: {} for image_type in IMAGE_TYPES},
+        "face_diversity_topk": [],
+        "dino_diversity_topk": [],
+        "stats": {
+            "member_count": 0,
+            "frame_count": 0,
+            "image_count": 0,
+            "members_without_pose": 0,
+        },
+    }
 
 
 _VLM_BACKEND_CACHE: Dict[Tuple[str, str], Tuple[Any, Any, Any]] = {}
@@ -890,7 +971,7 @@ class FaceQualityVLMChecker:
         result = {
             "checked": False,
             "image_path": image_path,
-            "passed": False,
+            "passed": None,
             "status": "missing_image",
             "face_occluded": None,
             "model": self._model_path,
@@ -905,10 +986,14 @@ class FaceQualityVLMChecker:
             )
             output_text, max_new_tokens = self._generate_vlm_response(resolve_repo_path(image_path), prompt)
             data, parse_status = self._parse_json_response(output_text)
-            face_occluded = self._bool_value(data.get("face_occluded"), default=True)
+            face_occluded = (
+                self._bool_value(data.get("face_occluded"), default=True)
+                if parse_status == "success"
+                else None
+            )
             result.update({
                 "checked": parse_status == "success",
-                "passed": parse_status == "success" and not face_occluded,
+                "passed": (not face_occluded) if parse_status == "success" else None,
                 "status": "ok" if parse_status == "success" else parse_status,
                 "face_occluded": face_occluded,
                 "confidence": data.get("confidence"),
@@ -926,7 +1011,7 @@ class FaceQualityVLMChecker:
         result = {
             "checked": False,
             "image_path": image_path,
-            "passed": False,
+            "passed": None,
             "status": "missing_image",
             "sharpness": None,
             "threshold": self._laplacian_threshold,
@@ -957,7 +1042,7 @@ class FaceQualityVLMChecker:
         result = {
             "checked": False,
             "image_path": image_path,
-            "passed": False,
+            "passed": None,
             "status": "missing_image",
             "is_clear": None,
             "model": self._model_path,
@@ -973,10 +1058,14 @@ class FaceQualityVLMChecker:
             )
             output_text, max_new_tokens = self._generate_vlm_response(resolve_repo_path(image_path), prompt)
             data, parse_status = self._parse_json_response(output_text)
-            is_clear = self._bool_value(data.get("is_clear"), default=False)
+            is_clear = (
+                self._bool_value(data.get("is_clear"), default=False)
+                if parse_status == "success"
+                else None
+            )
             result.update({
                 "checked": parse_status == "success",
-                "passed": parse_status == "success" and is_clear,
+                "passed": is_clear if parse_status == "success" else None,
                 "status": "ok" if parse_status == "success" else parse_status,
                 "is_clear": is_clear,
                 "confidence": data.get("confidence"),
@@ -1353,6 +1442,7 @@ class EmotionExtractor:
             return {
                 "expression": expression
             }
+
         try:
             return self._analyze(img_path)
         except Exception as exc:
@@ -2266,6 +2356,19 @@ IDENTITY_SUBDIR = "identity_matching"   # video 与 person_clusters 之间的中
 
 def list_person_dirs(person_clusters_dir: str) -> List[str]:
     """列出 person_clusters_dir 下所有 person 子目录名（即 person_id），按名称排序保证多卡一致。"""
+    registry_path = os.path.join(os.path.dirname(person_clusters_dir), "persons.jsonl")
+    if os.path.isfile(registry_path):
+        person_ids = []
+        with open(registry_path, "r", encoding="utf-8") as registry:
+            for line in registry:
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                person_id = str(record.get("person_id") or "").strip()
+                if person_id:
+                    person_ids.append(person_id)
+        return sorted(set(person_ids))
     names = []
     if not os.path.isdir(person_clusters_dir):
         return names
@@ -2690,10 +2793,19 @@ class IndexAddPipeline:
             grouped: Dict[str, List[dict]] = {}
             if not is_update:
                 identity_records = [resolve_path_fields(record) for record in read_jsonl(identity_jsonl)]
+                unit_recovery_records = recovery_records
+                if not unit_recovery_records:
+                    video_dir = os.path.dirname(src_uuid_dir)
+                    local_recovery_jsonl = os.path.join(video_dir, "one_shot_process", "output.jsonl")
+                    if os.path.isfile(local_recovery_jsonl):
+                        unit_recovery_records = [
+                            resolve_path_fields(record)
+                            for record in read_jsonl(local_recovery_jsonl)
+                        ]
                 grouped = load_all_cluster_members(
                     src_person_clusters,
                     identity_records,
-                    recovery_records,
+                    unit_recovery_records,
                     person_ids=set(persons),
                 )
 
