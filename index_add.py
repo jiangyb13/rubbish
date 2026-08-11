@@ -28,7 +28,6 @@ try:
         resolve_repo_path as _resolve_repo_path,
         to_repo_relative_path,
     )
-    from .pipeline_workspace import initialize_manifest, units_from_config, update_stage_manifest, write_person_cluster_units
 except ImportError:
     from path_utils import (
         resolve_path_fields,
@@ -38,6 +37,7 @@ except ImportError:
 
 # ---- constants ----
 CORE_IMAGE_TYPES = ("face_orig", "face_white", "full_orig", "full_white")
+FACE_IMAGE_TYPES = ("face_orig", "face_white")
 DERIVED_IMAGE_TYPES = (
     "face_angle_left",
     "face_angle_front",
@@ -159,8 +159,7 @@ def load_all_cluster_members(
     if not recovery_lookup or not os.path.isdir(person_clusters_dir):
         return grouped
 
-    cluster_names = sorted(person_ids) if person_ids is not None else list_person_dirs(person_clusters_dir)
-    for name in cluster_names:
+    for name in sorted(os.listdir(person_clusters_dir)):
         cluster_dir = os.path.join(person_clusters_dir, name)
         meta_path = os.path.join(cluster_dir, "cluster_meta.json")
         if not os.path.isdir(cluster_dir) or not os.path.isfile(meta_path):
@@ -338,7 +337,7 @@ def _quality_passed(entry: dict) -> bool:
         for item in quality.values():
             if isinstance(item, dict) and item.get("passed") is False:
                 return False
-    return bool(entry.get("quality_label", True))
+    return True
 
 
 def _set_quality_item(entry: dict, name: str, value: dict) -> None:
@@ -647,46 +646,6 @@ def scan_cluster_images(
     indexes = {image_type: {} for image_type in IMAGE_TYPES}
     metadata = {image_type: {} for image_type in IMAGE_TYPES}
 
-    # Canonical v4 path: Stage 3 records every generated image explicitly.
-    # Prefer it over directory traversal and filename reverse parsing.
-    frame_manifest_path = os.path.join(cluster_dir, "frame_manifest.jsonl")
-    if os.path.isfile(frame_manifest_path):
-        with open(frame_manifest_path, "r", encoding="utf-8") as manifest:
-            for line_number, line in enumerate(manifest, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError as exc:
-                    raise ValueError(
-                        f"Invalid frame manifest {frame_manifest_path}:{line_number}: {exc}"
-                    ) from exc
-                key = (
-                    str(row.get("shot_key") or ""),
-                    str(row.get("obj_id")),
-                    int(row.get("frame_idx", 0)),
-                )
-                images = row.get("images") or {}
-                derived = row.get("derived") or {}
-                for image_type, image_path in images.items():
-                    if image_type not in indexes or not image_path:
-                        continue
-                    indexes[image_type][key] = resolve_repo_path(image_path)
-                    if image_type.startswith("face_angle_"):
-                        metadata[image_type][key] = {
-                            "derived_image_type": "face_angle_library",
-                            "angle_bucket": image_type.rsplit("_", 1)[-1],
-                        }
-                    elif image_type in ("face_diversity_topk", "dino_diversity_topk"):
-                        item = derived.get(image_type) or {}
-                        metadata[image_type][key] = {
-                            "derived_image_type": image_type,
-                            "rank": item.get("rank"),
-                            "stage3_diversity_metadata": item or None,
-                        }
-        return indexes, metadata
-
     for image_type in CORE_IMAGE_TYPES:
         directory = os.path.join(cluster_dir, image_type)
         if not os.path.isdir(directory):
@@ -780,6 +739,30 @@ def cluster_frame_keys(
     return sorted(keys, key=lambda item: item[2])
 
 
+_VLM_BACKEND_CACHE: Dict[Tuple[str, str], Tuple[Any, Any, Any]] = {}
+
+
+def load_qwen3_vlm_backend(model_path: str, device: str) -> Tuple[Any, Any, Any]:
+    resolved_model_path = resolve_repo_path(model_path)
+    key = (resolved_model_path, str(device))
+    cached = _VLM_BACKEND_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    import torch
+    from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
+
+    model = Qwen3VLForConditionalGeneration.from_pretrained(
+        resolved_model_path,
+        torch_dtype="auto",
+        device_map=device,
+    )
+    processor = AutoProcessor.from_pretrained(resolved_model_path)
+    cached = (model, processor, torch)
+    _VLM_BACKEND_CACHE[key] = cached
+    return cached
+
+
 def empty_output(person_id: str, cluster_dir: str, enabled_features: List[str]) -> dict:
     return {
         "person_id": person_id,
@@ -797,6 +780,225 @@ def empty_output(person_id: str, cluster_dir: str, enabled_features: List[str]) 
         },
     }
 
+
+
+# ---- VLM quality checkers ----
+class FaceQualityVLMChecker:
+    def __init__(
+        self,
+        model_path: str = "pretrained_models/Qwen3-VL-8B-Instruct",
+        device: str = "cuda:0",
+        max_new_tokens: int = 512,
+        laplacian_threshold: float = 10.0,
+        check_occlusion: bool = True,
+        check_clarity: bool = True,
+        check_clarity_vlm: bool = True,
+    ):
+        self._model_path = model_path
+        self._device = device
+        self._max_new_tokens = int(max_new_tokens)
+        self._laplacian_threshold = float(laplacian_threshold)
+        self._check_occlusion = bool(check_occlusion)
+        self._check_clarity = bool(check_clarity)
+        self._check_clarity_vlm = bool(check_clarity_vlm)
+        self._vlm_model = None
+        self._vlm_processor = None
+        self._torch = None
+
+    @property
+    def quality_names(self) -> Tuple[str, ...]:
+        names = []
+        if self._check_occlusion:
+            names.append("face_occlusion")
+        if self._check_clarity:
+            names.append("image_clarity_laplacian")
+            if self._check_clarity_vlm:
+                names.append("image_clarity_vlm")
+        return tuple(names)
+
+    def _load_vlm_backend(self) -> None:
+        if self._vlm_model is not None and self._vlm_processor is not None:
+            return
+        self._vlm_model, self._vlm_processor, self._torch = load_qwen3_vlm_backend(
+            self._model_path,
+            self._device,
+        )
+
+    @staticmethod
+    def _parse_json_response(text: str) -> Tuple[dict, str]:
+        raw = (text or "").strip()
+        json_text = raw
+        fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL | re.IGNORECASE)
+        if fence_match:
+            json_text = fence_match.group(1).strip()
+        elif "{" in raw and "}" in raw:
+            json_text = raw[raw.find("{"):raw.rfind("}") + 1]
+        try:
+            data = json.loads(json_text)
+            return (data if isinstance(data, dict) else {}), "success"
+        except json.JSONDecodeError:
+            return {}, "parse_error"
+
+    @staticmethod
+    def _bool_value(value: Any, default: bool = False) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            return value.strip().lower() in {"true", "yes", "1", "y", "pass", "passed"}
+        return default
+
+    def _generate_vlm_response(self, image_path: str, prompt: str) -> Tuple[str, int]:
+        self._load_vlm_backend()
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image_path},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+        inputs = self._vlm_processor.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_dict=True,
+            return_tensors="pt",
+        )
+        inputs = inputs.to(self._vlm_model.device)
+        max_new_tokens = max(128, int(self._max_new_tokens))
+        with self._torch.no_grad():
+            generated_ids = self._vlm_model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+            )
+        generated_ids_trimmed = [
+            out_ids[len(in_ids):]
+            for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+        ]
+        output_text = self._vlm_processor.batch_decode(
+            generated_ids_trimmed,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        )[0]
+        return output_text, max_new_tokens
+
+    def face_occlusion_quality(self, image_path: Optional[str]) -> dict:
+        result = {
+            "checked": False,
+            "image_path": image_path,
+            "passed": False,
+            "status": "missing_image",
+            "face_occluded": None,
+            "model": self._model_path,
+        }
+        if not image_path or not os.path.isfile(resolve_repo_path(image_path)):
+            return result
+        try:
+            prompt = (
+                "You are checking face quality for a portrait dataset. Determine whether the visible face is occluded "
+                "by objects, hands, hair, masks, text, extreme cropping, or any obstruction that hides important facial features. "
+                "Return pure JSON only: {\"face_occluded\": true or false, \"confidence\": 0.0 to 1.0, \"reason\": \"within 20 words\"}."
+            )
+            output_text, max_new_tokens = self._generate_vlm_response(resolve_repo_path(image_path), prompt)
+            data, parse_status = self._parse_json_response(output_text)
+            face_occluded = self._bool_value(data.get("face_occluded"), default=True)
+            result.update({
+                "checked": parse_status == "success",
+                "passed": parse_status == "success" and not face_occluded,
+                "status": "ok" if parse_status == "success" else parse_status,
+                "face_occluded": face_occluded,
+                "confidence": data.get("confidence"),
+                "reason": str(data.get("reason", "")).strip(),
+                "parse_status": parse_status,
+                "max_new_tokens": max_new_tokens,
+                "raw_response": output_text,
+            })
+            return result
+        except Exception as exc:
+            result.update({"status": "error", "error_msg": str(exc)})
+            return result
+
+    def laplacian_clarity_quality(self, image_path: Optional[str]) -> dict:
+        result = {
+            "checked": False,
+            "image_path": image_path,
+            "passed": False,
+            "status": "missing_image",
+            "sharpness": None,
+            "threshold": self._laplacian_threshold,
+        }
+        if not image_path or not os.path.isfile(resolve_repo_path(image_path)):
+            return result
+        try:
+            import cv2
+
+            img = cv2.imread(resolve_repo_path(image_path), cv2.IMREAD_COLOR)
+            if img is None:
+                result["status"] = "read_failed"
+                return result
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+            result.update({
+                "checked": True,
+                "passed": sharpness >= self._laplacian_threshold,
+                "status": "ok",
+                "sharpness": sharpness,
+            })
+            return result
+        except Exception as exc:
+            result.update({"status": "error", "error_msg": str(exc)})
+            return result
+
+    def vlm_clarity_quality(self, image_path: Optional[str]) -> dict:
+        result = {
+            "checked": False,
+            "image_path": image_path,
+            "passed": False,
+            "status": "missing_image",
+            "is_clear": None,
+            "model": self._model_path,
+        }
+        if not image_path or not os.path.isfile(resolve_repo_path(image_path)):
+            return result
+        try:
+            prompt = (
+                "You are checking image clarity for a face dataset. Decide whether the face image is clear enough for identity, "
+                "expression, and pose supervision. Mark unclear if it is blurry, motion-blurred, defocused, very low resolution, "
+                "or has compression artifacts that obscure facial details. Return pure JSON only: "
+                "{\"is_clear\": true or false, \"confidence\": 0.0 to 1.0, \"reason\": \"within 20 words\"}."
+            )
+            output_text, max_new_tokens = self._generate_vlm_response(resolve_repo_path(image_path), prompt)
+            data, parse_status = self._parse_json_response(output_text)
+            is_clear = self._bool_value(data.get("is_clear"), default=False)
+            result.update({
+                "checked": parse_status == "success",
+                "passed": parse_status == "success" and is_clear,
+                "status": "ok" if parse_status == "success" else parse_status,
+                "is_clear": is_clear,
+                "confidence": data.get("confidence"),
+                "reason": str(data.get("reason", "")).strip(),
+                "parse_status": parse_status,
+                "max_new_tokens": max_new_tokens,
+                "raw_response": output_text,
+            })
+            return result
+        except Exception as exc:
+            result.update({"status": "error", "error_msg": str(exc)})
+            return result
+
+    def check(self, image_path: Optional[str]) -> Dict[str, dict]:
+        quality = {}
+        if self._check_occlusion:
+            quality["face_occlusion"] = self.face_occlusion_quality(image_path)
+        if self._check_clarity:
+            quality["image_clarity_laplacian"] = self.laplacian_clarity_quality(image_path)
+            if self._check_clarity_vlm:
+                quality["image_clarity_vlm"] = self.vlm_clarity_quality(image_path)
+        return quality
 
 # ---- feature extractors ----
 class EmotionExtractor:
@@ -875,17 +1077,10 @@ class EmotionExtractor:
     def _load_vlm_backend(self) -> None:
         if self._vlm_model is not None and self._vlm_processor is not None:
             return
-        import torch
-        from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
-
-        model_path = resolve_repo_path(self._vlm_model_path)
-        self._vlm_model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_path,
-            torch_dtype="auto",
-            device_map=self._vlm_device,
+        self._vlm_model, self._vlm_processor, self._torch = load_qwen3_vlm_backend(
+            self._vlm_model_path,
+            self._vlm_device,
         )
-        self._vlm_processor = AutoProcessor.from_pretrained(model_path)
-        self._torch = torch
 
     def _parse_vlm_response(self, text: str, expected_emotion: str = "") -> dict:
         raw = (text or "").strip()
@@ -1158,7 +1353,6 @@ class EmotionExtractor:
             return {
                 "expression": expression
             }
-
         try:
             return self._analyze(img_path)
         except Exception as exc:
@@ -1361,6 +1555,31 @@ def build_face_boundary_quality_checker(config, force: bool = False) -> Optional
     )
 
 
+def build_face_quality_vlm_checker(
+    config,
+    check_occlusion: Optional[bool] = None,
+    check_clarity: Optional[bool] = None,
+    check_clarity_vlm: Optional[bool] = None,
+) -> Optional[FaceQualityVLMChecker]:
+    if check_occlusion is None:
+        check_occlusion = bool(getattr(config, "enable_face_occlusion_quality_check", False))
+    if check_clarity is None:
+        check_clarity = bool(getattr(config, "enable_image_clarity_quality_check", False))
+    if check_clarity_vlm is None:
+        check_clarity_vlm = bool(getattr(config, "enable_image_clarity_vlm_check", True))
+    if not check_occlusion and not check_clarity:
+        return None
+    return FaceQualityVLMChecker(
+        model_path=getattr(config, "quality_vlm_model_path", getattr(config, "emotion_vlm_model_path", "pretrained_models/Qwen3-VL-8B-Instruct")),
+        device=getattr(config, "quality_vlm_device", getattr(config, "emotion_vlm_device", "cuda:0")),
+        max_new_tokens=getattr(config, "quality_vlm_max_new_tokens", getattr(config, "emotion_vlm_max_new_tokens", 512)),
+        laplacian_threshold=getattr(config, "clarity_laplacian_threshold", 10.0),
+        check_occlusion=bool(check_occlusion),
+        check_clarity=bool(check_clarity),
+        check_clarity_vlm=bool(check_clarity_vlm),
+    )
+
+
 def build_feature_extractors(config) -> Dict[str, Callable[[dict], dict]]:
     extractors = {}
     if config.enable_emotion:
@@ -1390,6 +1609,7 @@ def build_person_index(
     enable_mask_hole_quality_check: bool = True,
     mask_hole_threshold: int = 0,
     face_boundary_quality_checker: Optional[FaceBoundaryQualityChecker] = None,
+    face_quality_vlm_checker: Optional[FaceQualityVLMChecker] = None,
 ) -> dict:
     enabled_features = []
     if include_pose:
@@ -1398,6 +1618,11 @@ def build_person_index(
         enabled_features.append("mask_hole_quality")
     if face_boundary_quality_checker is not None:
         enabled_features.append("face_boundary_quality")
+    if face_quality_vlm_checker is not None:
+        if face_quality_vlm_checker._check_occlusion:
+            enabled_features.append("face_occlusion_quality")
+        if face_quality_vlm_checker._check_clarity:
+            enabled_features.append("image_clarity_quality")
     enabled_features.extend(feature_extractors.keys())
 
     output = empty_output(person_id, cluster_dir, enabled_features)
@@ -1438,6 +1663,11 @@ def build_person_index(
                     )
                     face_boundary_quality_by_type[orig_type] = group_quality
                     face_boundary_quality_by_type[white_type] = group_quality
+            face_quality_vlm = {}
+            if face_quality_vlm_checker is not None:
+                face_quality_vlm = face_quality_vlm_checker.check(
+                    related_images.get("face_orig") or related_images.get("face_white")
+                )
             context = {
                 "person_id": person_id,
                 "uid": uid,
@@ -1489,6 +1719,9 @@ def build_person_index(
                 face_boundary_quality = face_boundary_quality_by_type.get(image_type)
                 if face_boundary_quality is not None:
                     for quality_name, quality_value in face_boundary_quality.items():
+                        _set_quality_item(attrs, quality_name, quality_value)
+                if face_quality_vlm and image_type in FACE_IMAGE_TYPES:
+                    for quality_name, quality_value in face_quality_vlm.items():
                         _set_quality_item(attrs, quality_name, quality_value)
                 if include_pose:
                     pose_attrs = {
@@ -1800,6 +2033,40 @@ def update_group_face_boundary_quality(
     return updated
 
 
+def update_group_face_quality_vlm(
+    entries: List[dict],
+    checker: FaceQualityVLMChecker,
+    overwrite_existing_quality: bool = True,
+) -> int:
+    target_entries = [
+        entry for entry in entries
+        if isinstance(entry, dict) and entry.get("image_type") in FACE_IMAGE_TYPES
+    ]
+    if not target_entries:
+        return 0
+    quality_names = checker.quality_names
+    if not overwrite_existing_quality and all(
+        all(_has_quality_item(entry, name) for name in quality_names)
+        for entry in target_entries
+    ):
+        return 0
+    entries_by_type = {entry.get("image_type"): entry for entry in target_entries if entry.get("image_type")}
+    source_entry = entries_by_type.get("face_orig") or entries_by_type.get("face_white")
+    if source_entry is None:
+        return 0
+    quality = checker.check(_entry_image_path(source_entry))
+    updated = 0
+    for entry in target_entries:
+        wrote_entry = False
+        for quality_name, quality_value in quality.items():
+            if overwrite_existing_quality or not _has_quality_item(entry, quality_name):
+                _set_quality_item(entry, quality_name, quality_value)
+                wrote_entry = True
+        if wrote_entry:
+            updated += 1
+    return updated
+
+
 def build_update_feature_extractors(feature_names: List[str], config: Any) -> Dict[str, Any]:
     feature_names = {str(name).strip().lower() for name in feature_names if str(name).strip()}
     extractors: Dict[str, Any] = {}
@@ -1821,6 +2088,15 @@ def build_update_feature_extractors(feature_names: List[str], config: Any) -> Di
         checker = build_face_boundary_quality_checker(config, force=True)
         if checker is not None:
             extractors["face_boundary_quality"] = checker
+    if "face_occlusion_quality" in feature_names or "image_clarity_quality" in feature_names:
+        checker = build_face_quality_vlm_checker(
+            config,
+            check_occlusion="face_occlusion_quality" in feature_names,
+            check_clarity="image_clarity_quality" in feature_names,
+            check_clarity_vlm=bool(getattr(config, "enable_image_clarity_vlm_check", True)),
+        )
+        if checker is not None:
+            extractors["face_quality_vlm"] = checker
     return extractors
 
 
@@ -1833,7 +2109,7 @@ def update_existing_index_features(
     recovery_lookup: Optional[Dict[Tuple[str, str], dict]] = None,
 ) -> Tuple[int, int, int]:
     feature_names = [str(name).strip().lower() for name in feature_names if str(name).strip()]
-    valid_features = {"emotion", "emotion_vlm", "body_pose", "mask_hole_quality", "face_boundary_quality"}
+    valid_features = {"emotion", "emotion_vlm", "body_pose", "mask_hole_quality", "face_boundary_quality", "face_occlusion_quality", "image_clarity_quality"}
     unknown_features = sorted(set(feature_names) - valid_features)
     if unknown_features:
         raise ValueError(f"Unknown update_features: {', '.join(unknown_features)}")
@@ -1857,6 +2133,7 @@ def update_existing_index_features(
     emotion_extractor = update_extractors.get("emotion")
     body_pose_extractor = update_extractors.get("body_pose")
     face_boundary_checker = update_extractors.get("face_boundary_quality")
+    face_quality_vlm_checker = update_extractors.get("face_quality_vlm")
 
     updated_frames = skipped_frames = updated_entries = 0
     progress = tqdm(
@@ -1929,6 +2206,20 @@ def update_existing_index_features(
                     reuse_existing_bbox=not bool(getattr(config, "face_quality_recompute_bbox", False)),
                     overwrite_existing_quality=bool(getattr(config, "quality_update_overwrite", True)),
                 )
+        if "face_occlusion_quality" in feature_names or "image_clarity_quality" in feature_names:
+            if face_quality_vlm_checker is None:
+                face_quality_vlm_checker = build_face_quality_vlm_checker(
+                    config,
+                    check_occlusion="face_occlusion_quality" in feature_names,
+                    check_clarity="image_clarity_quality" in feature_names,
+                    check_clarity_vlm=bool(getattr(config, "enable_image_clarity_vlm_check", True)),
+                )
+            if face_quality_vlm_checker is not None:
+                quality_updated_entries += update_group_face_quality_vlm(
+                    group["entries"],
+                    checker=face_quality_vlm_checker,
+                    overwrite_existing_quality=bool(getattr(config, "quality_update_overwrite", True)),
+                )
 
         if not frame_attrs and not quality_updated_entries:
             skipped_frames += 1
@@ -1975,19 +2266,6 @@ IDENTITY_SUBDIR = "identity_matching"   # video 与 person_clusters 之间的中
 
 def list_person_dirs(person_clusters_dir: str) -> List[str]:
     """列出 person_clusters_dir 下所有 person 子目录名（即 person_id），按名称排序保证多卡一致。"""
-    registry_path = os.path.join(os.path.dirname(person_clusters_dir), "persons.jsonl")
-    if os.path.isfile(registry_path):
-        person_ids = []
-        with open(registry_path, "r", encoding="utf-8") as registry:
-            for line in registry:
-                try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                person_id = str(record.get("person_id") or "").strip()
-                if person_id:
-                    person_ids.append(person_id)
-        return sorted(set(person_ids))
     names = []
     if not os.path.isdir(person_clusters_dir):
         return names
@@ -2058,6 +2336,128 @@ def unit_dirs(
     return input_cluster_dir, target_dir
 
 
+WORKSPACE_REL_PATHS = {
+    "manifest": "pipeline_manifest.json",
+    "identity_dir": "identity_matching",
+    "identity_jsonl": "identity_matching/output.jsonl",
+    "person_clusters_dir": "identity_matching/person_clusters",
+    "person_registry_jsonl": "identity_matching/persons.jsonl",
+}
+
+
+def _safe_video_id(value: str) -> str:
+    text = re.sub(r"[^0-9A-Za-z._-]+", "_", str(value or "").strip())
+    return text.strip("._") or "video"
+
+
+def _workspace_path(video_dir: str, key: str) -> str:
+    return os.path.join(video_dir, WORKSPACE_REL_PATHS[key])
+
+
+def _workspace_person_clusters_dir(video_dir: str) -> str:
+    flat_dir = os.path.join(video_dir, "person_clusters")
+    if os.path.isdir(flat_dir):
+        return flat_dir
+    return _workspace_path(video_dir, "person_clusters_dir")
+
+
+def _load_task_units(input_jsonl: str, output_root: str) -> List[Dict[str, str]]:
+    units = []
+    seen = set()
+    with open(resolve_repo_path(input_jsonl), "r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid task JSONL at line {line_number}: {exc}") from exc
+            video_path = os.path.abspath(os.path.expanduser(str(record.get("video_path") or "")))
+            if not video_path:
+                raise ValueError(f"Missing video_path at line {line_number}")
+            video_id = _safe_video_id(record.get("video_id") or Path(video_path).stem)
+            if video_id in seen:
+                raise ValueError(f"Duplicate video_id in task JSONL: {video_id}")
+            seen.add(video_id)
+            video_dir = record.get("video_dir")
+            if video_dir:
+                video_dir = os.path.abspath(os.path.expanduser(str(video_dir)))
+            else:
+                video_dir = os.path.abspath(os.path.join(resolve_repo_path(output_root), video_id))
+            units.append({"video_id": video_id, "video_path": video_path, "video_dir": video_dir})
+    return units
+
+
+def _workspace_units_from_config(config: Any) -> List[Dict[str, str]]:
+    phase = int(getattr(config, "phase", 0))
+    total = int(getattr(config, "total", 1))
+    if total <= 0:
+        raise ValueError("total must be positive")
+    if not 0 <= phase < total:
+        raise ValueError(f"phase must be in [0, {total}), got {phase}")
+    if getattr(config, "video_dir", None):
+        video_dir = os.path.abspath(os.path.expanduser(str(config.video_dir)))
+        manifest_path = _workspace_path(video_dir, "manifest")
+        manifest = {}
+        if os.path.isfile(manifest_path):
+            with open(manifest_path, "r", encoding="utf-8") as handle:
+                manifest = json.load(handle)
+        video_path = getattr(config, "video_path", None) or manifest.get("source_video_path") or ""
+        video_id = _safe_video_id(getattr(config, "video_id", None) or manifest.get("video_id") or os.path.basename(video_dir))
+        units = [{"video_id": video_id, "video_path": os.path.abspath(os.path.expanduser(str(video_path))) if video_path else "", "video_dir": video_dir}]
+    else:
+        if not getattr(config, "pipeline_input_jsonl", None):
+            raise ValueError("Set --pipeline_input_jsonl for batch mode or --video_dir for standalone workspace mode.")
+        units = _load_task_units(config.pipeline_input_jsonl, getattr(config, "output_root", "outputs"))
+    st, en = compute_shard_range(len(units), phase, total)
+    return units[st:en]
+
+
+def _ensure_workspace_manifest(unit: Dict[str, str]) -> Dict[str, Any]:
+    video_dir = unit["video_dir"]
+    os.makedirs(video_dir, exist_ok=True)
+    for key in ("identity_dir", "person_clusters_dir"):
+        os.makedirs(_workspace_path(video_dir, key), exist_ok=True)
+    manifest_path = _workspace_path(video_dir, "manifest")
+    if os.path.isfile(manifest_path):
+        with open(manifest_path, "r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    else:
+        manifest = {
+            "schema_version": 1,
+            "video_id": unit.get("video_id"),
+            "video_dir": video_dir,
+            "source_video_path": unit.get("video_path"),
+            "stages": {},
+        }
+    manifest.setdefault("video_id", unit.get("video_id"))
+    manifest.setdefault("video_dir", video_dir)
+    if unit.get("video_path"):
+        manifest.setdefault("source_video_path", unit.get("video_path"))
+    manifest.setdefault("stages", {})
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, ensure_ascii=False, indent=2)
+    return manifest
+
+
+def _update_workspace_stage(unit: Dict[str, str], stage: str, status: str, outputs: Optional[Dict[str, Any]] = None) -> None:
+    manifest = _ensure_workspace_manifest(unit)
+    stage_data = {"status": status}
+    if outputs:
+        stage_data.update(outputs)
+    manifest.setdefault("stages", {})[stage] = stage_data
+    with open(_workspace_path(unit["video_dir"], "manifest"), "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, ensure_ascii=False, indent=2)
+
+
+def _write_workspace_person_cluster_units(path: str, units: Iterable[Dict[str, str]]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        for unit in units:
+            handle.write(f"{_workspace_person_clusters_dir(unit['video_dir'])}|{unit['video_id']}||{unit['video_id']}\n")
+
+
 def compute_shard_range(total: int, rank: int, total_rank: int) -> Tuple[int, int]:
     """
     把长度为 total 的列表按 rank 连续切片，返回本 rank 负责的 [st, en)。
@@ -2079,30 +2479,6 @@ class IndexAddPipeline:
         self.config = config
 
     def run(self) -> Tuple[int, int, int, int, int]:
-        # units = units_from_config(self.config)
-        # print(f"[index_add] phase={self.config.phase}/{self.config.total} assigned={len(units)}")
-        # runtime_dir = os.path.join(os.path.abspath(self.config.output_root), "_pipeline_runtime")
-        # os.makedirs(runtime_dir, exist_ok=True)
-        # unit_file = os.path.join(runtime_dir, f"stage4_phase_{self.config.phase}.txt")
-        # write_person_cluster_units(unit_file, units)
-        # for unit in units:
-        #     update_stage_manifest(unit, "index_add", "running")
-        # self.config.unit_list_file = unit_file
-        # self.config.unit_list_input_base_dir = None
-        # self.config.output_dir = None
-        # self.config.member_recovery_jsonl = None
-        # self.config.rank = 0
-        # self.config.total_rank = 0
-        result = self._run_current()
-        # for unit in units:
-        #     workspace = initialize_manifest(unit)
-        #     update_stage_manifest(unit, "index_add", "complete", {
-        #         "person_registry_jsonl": os.path.relpath(workspace.person_registry_jsonl, workspace.video_dir),
-        #         "index_filename": self.config.output_filename,
-        #     })
-        return result
-
-    def _run_current(self) -> Tuple[int, int, int, int, int]:
         """
         Returns:
             total_units, written, skipped, total_frames, total_images
@@ -2112,6 +2488,13 @@ class IndexAddPipeline:
 
         if config.unit_list_file:
             return self._run_unit_list(config)
+
+        workspace_mode = bool(getattr(config, "video_dir", None) or getattr(config, "pipeline_input_jsonl", None))
+        if workspace_mode and not bool(getattr(config, "global_mode", False)):
+            return self._run_workspace(config)
+        if bool(getattr(config, "global_mode", False)):
+            config.rank = int(getattr(config, "phase", config.rank))
+            config.total_rank = int(getattr(config, "total", config.total_rank))
 
         # ---- 1. 解析路径 ----
         identity_root = resolve_repo_path(config.path)
@@ -2168,6 +2551,43 @@ class IndexAddPipeline:
         return self._run_build(
             config, identity_root, output_dir, my_units, identity_name, recovery_jsonl, all_units, skipped,
         )
+
+    def _run_workspace(self, config) -> Tuple[int, int, int, int, int]:
+        units = _workspace_units_from_config(config)
+        tqdm.write(f"[index_add] phase={config.phase}/{config.total} assigned={len(units)}")
+        if not units:
+            return 0, 0, 0, 0, 0
+        runtime_dir = os.path.join(resolve_repo_path(getattr(config, "output_root", "outputs")), "_pipeline_runtime")
+        os.makedirs(runtime_dir, exist_ok=True)
+        unit_file = os.path.join(runtime_dir, f"stage4_phase_{int(config.phase)}.txt")
+        _write_workspace_person_cluster_units(unit_file, units)
+        for unit in units:
+            _update_workspace_stage(unit, "index_add", "running")
+        original = {
+            "unit_list_file": config.unit_list_file,
+            "unit_list_input_base_dir": config.unit_list_input_base_dir,
+            "output_dir": config.output_dir,
+            "member_recovery_jsonl": config.member_recovery_jsonl,
+            "rank": config.rank,
+            "total_rank": config.total_rank,
+        }
+        try:
+            config.unit_list_file = unit_file
+            config.unit_list_input_base_dir = None
+            config.output_dir = None
+            config.member_recovery_jsonl = None
+            config.rank = 0
+            config.total_rank = 0
+            result = self._run_unit_list(config)
+        finally:
+            for key, value in original.items():
+                setattr(config, key, value)
+        for unit in units:
+            _update_workspace_stage(unit, "index_add", "complete", {
+                "person_clusters_dir": os.path.relpath(_workspace_person_clusters_dir(unit["video_dir"]), unit["video_dir"]),
+                "index_filename": config.output_filename,
+            })
+        return result
 
     def _read_unit_list(self, path: str) -> List[Tuple[str, str, str, str]]:
         units = []
@@ -2231,6 +2651,7 @@ class IndexAddPipeline:
         include_pose = not config.disable_pose
         feature_extractors = {} if is_update else build_feature_extractors(config)
         face_boundary_quality_checker = None if is_update else build_face_boundary_quality_checker(config)
+        face_quality_vlm_checker = None if is_update else build_face_quality_vlm_checker(config)
         update_extractors = build_update_feature_extractors(update_features, config) if is_update else {}
 
         src_units = self._read_unit_list(unit_list_file)
@@ -2269,19 +2690,10 @@ class IndexAddPipeline:
             grouped: Dict[str, List[dict]] = {}
             if not is_update:
                 identity_records = [resolve_path_fields(record) for record in read_jsonl(identity_jsonl)]
-                unit_recovery_records = recovery_records
-                if not unit_recovery_records:
-                    video_dir = os.path.dirname(src_uuid_dir)
-                    local_recovery_jsonl = os.path.join(video_dir, "one_shot_process", "output.jsonl")
-                    if os.path.isfile(local_recovery_jsonl):
-                        unit_recovery_records = [
-                            resolve_path_fields(record)
-                            for record in read_jsonl(local_recovery_jsonl)
-                        ]
                 grouped = load_all_cluster_members(
                     src_person_clusters,
                     identity_records,
-                    unit_recovery_records,
+                    recovery_records,
                     person_ids=set(persons),
                 )
 
@@ -2329,6 +2741,7 @@ class IndexAddPipeline:
                     enable_mask_hole_quality_check=config.enable_mask_hole_quality_check,
                     mask_hole_threshold=config.mask_hole_threshold,
                     face_boundary_quality_checker=face_boundary_quality_checker,
+                    face_quality_vlm_checker=face_quality_vlm_checker,
                 )
                 with open(output_path, "w", encoding="utf-8") as file:
                     json.dump(
@@ -2364,6 +2777,7 @@ class IndexAddPipeline:
         include_pose = not config.disable_pose
         feature_extractors = build_feature_extractors(config)
         face_boundary_quality_checker = build_face_boundary_quality_checker(config)
+        face_quality_vlm_checker = build_face_quality_vlm_checker(config)
 
         # recovery 为单一全局文件，只读一次，供所有 video 共用（用于补回 cluster_meta 里
         # 但不在 identity jsonl 中的成员）
@@ -2419,6 +2833,7 @@ class IndexAddPipeline:
                     enable_mask_hole_quality_check=config.enable_mask_hole_quality_check,
                     mask_hole_threshold=config.mask_hole_threshold,
                     face_boundary_quality_checker=face_boundary_quality_checker,
+                    face_quality_vlm_checker=face_quality_vlm_checker,
                 )
                 with open(output_path, "w", encoding="utf-8") as file:
                     json.dump(
