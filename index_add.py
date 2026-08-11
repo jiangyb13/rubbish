@@ -2520,8 +2520,6 @@ def _workspace_units_from_config(config: Any) -> List[Dict[str, str]]:
 def _ensure_workspace_manifest(unit: Dict[str, str]) -> Dict[str, Any]:
     video_dir = unit["video_dir"]
     os.makedirs(video_dir, exist_ok=True)
-    for key in ("identity_dir", "person_clusters_dir"):
-        os.makedirs(_workspace_path(video_dir, key), exist_ok=True)
     manifest_path = _workspace_path(video_dir, "manifest")
     if os.path.isfile(manifest_path):
         with open(manifest_path, "r", encoding="utf-8") as handle:
