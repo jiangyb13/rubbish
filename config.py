@@ -2,13 +2,37 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import os
 import json
-import cv2
-import torch
+try:
+    import cv2
+except ImportError:  # Path/layout tooling does not require OpenCV.
+    cv2 = None
+try:
+    import torch
+except ImportError:  # Allow task/layout validation before the ML env is loaded.
+    class _CudaFallback:
+        @staticmethod
+        def is_available():
+            return False
 
+    class _TorchFallback:
+        cuda = _CudaFallback()
+
+    torch = _TorchFallback()
+
+# Canonical paths relative to each ``outputs/<video_id>`` workspace. The batch
+# pipeline only needs the Stage-1 task JSONL and output_root; all inter-stage
+# inputs/outputs are derived from these defaults.
 PIPELINE_PATH_DEFAULTS = {
     "manifest": "pipeline_manifest.json",
+    "shot_dir": "shot_detection",
+    "shot_video_dir": "shot_detection/shots",
+    "shot_jsonl": "shot_detection/output.jsonl",
+    "one_shot_dir": "one_shot_process",
+    "one_shot_jsonl": "one_shot_process/output.jsonl",
     "identity_dir": "identity_matching",
     "identity_jsonl": "identity_matching/output.jsonl",
+    "identity_simple_jsonl": "identity_matching/output_simple.jsonl",
+    "identity_global_json": "identity_matching/global_data.json",
     "person_clusters_dir": "identity_matching/person_clusters",
     "person_registry_jsonl": "identity_matching/persons.jsonl",
     "training_dir": "training_pairs",
@@ -20,6 +44,11 @@ PIPELINE_PATH_DEFAULTS = {
 
 @dataclass
 class ShotDetectionConfig:
+    pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
+    output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
+    video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
+    video_path: Optional[str] = field(default=None, metadata={"help": "Source video for standalone Stage 1."})
+    video_id: Optional[str] = field(default=None, metadata={"help": "Standalone video id."})
     task_name: str = field(
         default="shot_detection",
         metadata={"help": "Name of the processing task, used for logging and output organization."
@@ -103,11 +132,16 @@ class ShotDetectionConfig:
 
     def __post_init__(self):
         self.output_dir = os.path.abspath(self.output_dir)
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(os.path.dirname(os.path.abspath(self.output_jsonl)), exist_ok=True)
+        # os.makedirs(self.output_dir, exist_ok=True)
+        # os.makedirs(os.path.dirname(os.path.abspath(self.output_jsonl)), exist_ok=True)
 
 @dataclass
 class OneShotProcessConfig:
+    pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
+    output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
+    video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
+    video_path: Optional[str] = field(default=None, metadata={"help": "Optional standalone source video override."})
+    video_id: Optional[str] = field(default=None, metadata={"help": "Optional standalone video id."})
     task_name: str = field(
         default="one_shot_process",
         metadata={"help": "Name of the processing task, used for logging and output organization."
@@ -360,6 +394,13 @@ class IdentityMatchingConfig:
         default="identity_matching",
         metadata={"help": "Name of the processing task."},
     )
+    pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
+    output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
+    video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
+    video_path: Optional[str] = field(default=None, metadata={"help": "Optional standalone source video override."})
+    video_id: Optional[str] = field(default=None, metadata={"help": "Optional standalone video id."})
+    phase: int = field(default=0, metadata={"help": "Continuous shard rank."})
+    total: int = field(default=1, metadata={"help": "Continuous shard worker count."})
 
     # ---- Input / Output ----
     input_jsonl: str = field(
@@ -489,7 +530,7 @@ class IdentityMatchingConfig:
         os.makedirs(os.path.dirname(self.output_jsonl), exist_ok=True)
         os.makedirs(os.path.dirname(self.output_jsonl_simple), exist_ok=True)
         os.makedirs(os.path.dirname(self.output_global_json), exist_ok=True)
-        os.makedirs(os.path.dirname(self.output_global_json), exist_ok=True)
+        os.makedirs(os.path.dirname(self.person_cluster_output_dir), exist_ok=True)
 
 @dataclass
 class IndexAddConfig:
@@ -587,7 +628,7 @@ class IndexAddConfig:
         metadata={"help": "Add 4D-Humans body orientation and YOLO body extent attributes to each frame's image entries."}
     )
     body_pose_checkpoint: str = field(
-        default="./pretrained_models/4D-Humans/train/multiruns/hmr2/0/checkpoints/epoch=35-step=1000000.ckpt",
+        default="pretrained_models/4D-Humans/logs/train/multiruns/hmr2/0/checkpoints/epoch=35-step=1000000.ckpt",
         metadata={"help": "HMR2 checkpoint path used for 4D-Humans body orientation."}
     )
     body_pose_yolo_checkpoint: str = field(
@@ -615,15 +656,15 @@ class IndexAddConfig:
         metadata={"help": "In incremental quality updates, overwrite existing quality items. If False, only missing quality items are computed."}
     )
     enable_face_boundary_quality_check: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Compatibility switch: enable both Stage4 face bbox boundary and face mask coverage quality checks."}
     )
     enable_face_bbox_boundary_quality_check: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Use InsightFace in Stage4 to reject face crops whose expanded face bbox touches image boundary."}
     )
     enable_face_mask_coverage_quality_check: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Use InsightFace face bbox to reject crops whose original face bbox contains SAM background/white pixels."}
     )
     face_boundary_expand_ratio: float = field(
@@ -705,7 +746,6 @@ class IndexAddConfig:
 @dataclass
 class TrainingPairsConfig:
     """Configuration for building training-pair JSONL from after-pipeline indexes."""
-
     pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
     output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
     video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
@@ -783,6 +823,14 @@ class TrainingPairsConfig:
         default=5,
         metadata={"help": "Number of body-pose reference images."},
     )
+    allow_variable_ref_count: bool = field(
+        default=False,
+        metadata={"help": "Allow each ref group to contain fewer than the requested ref count, as long as it reaches min_ref_count."},
+    )
+    min_ref_count: int = field(
+        default=5,
+        metadata={"help": "Minimum number of refs required per group when allow_variable_ref_count is enabled."},
+    )
     bucket_candidate_topk: int = field(
         default=8,
         metadata={"help": "Per-bucket diverse candidate pool size before random sampling."},
@@ -813,11 +861,15 @@ class TrainingPairsConfig:
     )
     enable_dino_ref_diversity: bool = field(
         default=False,
-        metadata={"help": "Use DINO feature similarity, instead of face similarity, to make refs inside each group more visually diverse."},
+        metadata={"help": "Use both DINO and face similarity to make refs inside each group more visually diverse."},
     )
     dino_max_pairwise_cosine: float = field(
         default=0.95,
         metadata={"help": "When DINO ref diversity is enabled, reject a generated pair if any ref group has max pairwise DINO cosine above this value."},
+    )
+    dino_max_mean_pairwise_cosine: Optional[float] = field(
+        default=None,
+        metadata={"help": "Optional mean pairwise DINO cosine threshold. If set, reject a generated pair when any ref group's mean pairwise DINO cosine is above this value."},
     )
     bucket_top_t: int = field(
         default=50,
