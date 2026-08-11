@@ -5,7 +5,7 @@ import random
 import re
 from collections import Counter, defaultdict
 from dataclasses import asdict, replace
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -13,7 +13,130 @@ from tqdm import tqdm
 
 from .config import TrainingPairsConfig
 from .path_utils import resolve_repo_path, to_repo_relative_path
-from .pipeline_workspace import initialize_manifest, units_from_config, update_stage_manifest
+
+
+WORKSPACE_REL_PATHS = {
+    "manifest": "pipeline_manifest.json",
+    "person_clusters_dir": "identity_matching/person_clusters",
+    "training_dir": "training_pairs",
+    "pairs_jsonl": "training_pairs/pairs.jsonl",
+    "rejected_pairs_jsonl": "training_pairs/rejected_pairs.jsonl",
+    "training_stats_json": "training_pairs/stats.json",
+    "first_frame_dir": "training_pairs/first_frames",
+}
+
+
+def _safe_video_id(value: str) -> str:
+    text = re.sub(r"[^0-9A-Za-z._-]+", "_", str(value or "").strip())
+    return text.strip("._") or "video"
+
+
+def _workspace_path(video_dir: str, key: str) -> str:
+    return os.path.join(video_dir, WORKSPACE_REL_PATHS[key])
+
+
+def _workspace_person_clusters_dir(video_dir: str) -> str:
+    flat_dir = os.path.join(video_dir, "person_clusters")
+    if os.path.isdir(flat_dir):
+        return flat_dir
+    return _workspace_path(video_dir, "person_clusters_dir")
+
+
+def _shard_range(total: int, rank: int, world_size: int) -> Tuple[int, int]:
+    if world_size <= 0:
+        raise ValueError("total must be positive")
+    if not 0 <= rank < world_size:
+        raise ValueError(f"phase must be in [0, {world_size}), got {rank}")
+    base, remainder = divmod(total, world_size)
+    start = rank * base + min(rank, remainder)
+    end = start + base + (1 if rank < remainder else 0)
+    return start, end
+
+
+def _load_task_units(input_jsonl: str, output_root: str) -> List[Dict[str, str]]:
+    units = []
+    seen = set()
+    with open(resolve_repo_path(input_jsonl), "r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid task JSONL at line {line_number}: {exc}") from exc
+            video_path = os.path.abspath(os.path.expanduser(str(record.get("video_path") or "")))
+            if not video_path:
+                raise ValueError(f"Missing video_path at line {line_number}")
+            video_id = _safe_video_id(record.get("video_id") or os.path.splitext(os.path.basename(video_path))[0])
+            if video_id in seen:
+                raise ValueError(f"Duplicate video_id in task JSONL: {video_id}")
+            seen.add(video_id)
+            video_dir = record.get("video_dir")
+            if video_dir:
+                video_dir = os.path.abspath(os.path.expanduser(str(video_dir)))
+            else:
+                video_dir = os.path.abspath(os.path.join(resolve_repo_path(output_root), video_id))
+            units.append({"video_id": video_id, "video_path": video_path, "video_dir": video_dir})
+    return units
+
+
+def _workspace_units_from_config(config: Any) -> List[Dict[str, str]]:
+    phase = int(getattr(config, "phase", 0))
+    total = int(getattr(config, "total", 1))
+    if getattr(config, "video_dir", None):
+        video_dir = os.path.abspath(os.path.expanduser(str(config.video_dir)))
+        manifest_path = _workspace_path(video_dir, "manifest")
+        manifest = {}
+        if os.path.isfile(manifest_path):
+            with open(manifest_path, "r", encoding="utf-8") as handle:
+                manifest = json.load(handle)
+        video_path = getattr(config, "video_path", None) or manifest.get("source_video_path") or ""
+        video_id = _safe_video_id(getattr(config, "video_id", None) or manifest.get("video_id") or os.path.basename(video_dir))
+        units = [{"video_id": video_id, "video_path": os.path.abspath(os.path.expanduser(str(video_path))) if video_path else "", "video_dir": video_dir}]
+    else:
+        if not getattr(config, "pipeline_input_jsonl", None):
+            raise ValueError("Set --pipeline_input_jsonl for batch mode or --video_dir for standalone workspace mode.")
+        units = _load_task_units(config.pipeline_input_jsonl, getattr(config, "output_root", "outputs"))
+    st, en = _shard_range(len(units), phase, total)
+    return units[st:en]
+
+
+def _ensure_workspace_manifest(unit: Dict[str, str]) -> Dict[str, Any]:
+    video_dir = unit["video_dir"]
+    os.makedirs(_workspace_path(video_dir, "training_dir"), exist_ok=True)
+    os.makedirs(_workspace_path(video_dir, "first_frame_dir"), exist_ok=True)
+    manifest_path = _workspace_path(video_dir, "manifest")
+    if os.path.isfile(manifest_path):
+        with open(manifest_path, "r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    else:
+        os.makedirs(video_dir, exist_ok=True)
+        manifest = {
+            "schema_version": 1,
+            "video_id": unit.get("video_id"),
+            "video_dir": video_dir,
+            "source_video_path": unit.get("video_path"),
+            "stages": {},
+        }
+    manifest.setdefault("video_id", unit.get("video_id"))
+    manifest.setdefault("video_dir", video_dir)
+    if unit.get("video_path"):
+        manifest.setdefault("source_video_path", unit.get("video_path"))
+    manifest.setdefault("stages", {})
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, ensure_ascii=False, indent=2)
+    return manifest
+
+
+def _update_workspace_stage(unit: Dict[str, str], stage: str, status: str, outputs: Optional[Dict[str, Any]] = None) -> None:
+    manifest = _ensure_workspace_manifest(unit)
+    stage_data = {"status": status}
+    if outputs:
+        stage_data.update(outputs)
+    manifest.setdefault("stages", {})[stage] = stage_data
+    with open(_workspace_path(unit["video_dir"], "manifest"), "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, ensure_ascii=False, indent=2)
 
 
 SHOT_RE = re.compile(r"^(?P<prefix>.+)_shot_(?P<number>\d+)$")
@@ -35,6 +158,7 @@ class TrainingPairGenerator:
     def __init__(self, config: TrainingPairsConfig):
         self.config = config
         self.feature_cache: Dict[str, Optional[np.ndarray]] = {}
+        self.dino_feature_cache: Dict[str, Optional[np.ndarray]] = {}
         self.first_frame_cache: Dict[str, Optional[str]] = {}
 
     # @staticmethod
@@ -126,13 +250,31 @@ class TrainingPairGenerator:
                     "face_feature",
                     f"{int(item['frame_idx'])}.npy",
                 )
-            else:
+
+        cluster_dir = os.path.abspath(self.config.person_clusters_dir)
+        outputs_root = os.path.dirname(os.path.dirname(cluster_dir))
+        return os.path.join(
+            outputs_root,
+            "one_shot_process",
+            str(item["shot_key"]),
+            f"id_{item['obj_id']}",
+            "features",
+            "face_feature",
+            f"{int(item['frame_idx'])}.npy",
+        )
+
+    def _dino_feature_path(self, item: dict) -> str:
+        if self.config.one_shot_process_dir:
+            video, part = self._video_part_from_cluster_dir()
+            if video and part:
                 return os.path.join(
                     self.config.one_shot_process_dir,
+                    video,
+                    part,
                     str(item["shot_key"]),
                     f"id_{item['obj_id']}",
                     "features",
-                    "face_feature",
+                    "dino_feature",
                     f"{int(item['frame_idx'])}.npy",
                 )
 
@@ -144,7 +286,7 @@ class TrainingPairGenerator:
             str(item["shot_key"]),
             f"id_{item['obj_id']}",
             "features",
-            "face_feature",
+            "dino_feature",
             f"{int(item['frame_idx'])}.npy",
         )
 
@@ -163,6 +305,21 @@ class TrainingPairGenerator:
             self.feature_cache[path] = None
         return self.feature_cache[path]
 
+    def _load_dino_feature(self, path: str) -> Optional[np.ndarray]:
+        path = resolve_repo_path(path)
+        if path in self.dino_feature_cache:
+            return self.dino_feature_cache[path]
+        try:
+            feat = np.asarray(np.load(path), dtype=np.float32).reshape(-1)
+            norm = float(np.linalg.norm(feat))
+            if feat.size == 0 or norm <= 1e-12:
+                self.dino_feature_cache[path] = None
+            else:
+                self.dino_feature_cache[path] = feat / norm
+        except Exception:
+            self.dino_feature_cache[path] = None
+        return self.dino_feature_cache[path]
+
     @staticmethod
     def _cosine(a: dict, b: dict) -> float:
         return float(np.dot(a["feature"], b["feature"]))
@@ -175,6 +332,20 @@ class TrainingPairGenerator:
             return 1.0
         return self._cosine(a, b)
 
+    @staticmethod
+    def _dino_cosine(a: dict, b: dict) -> float:
+        return float(np.dot(a["dino_feature"], b["dino_feature"]))
+
+    def _dino_similarity(self, a: dict, b: dict) -> float:
+        if a.get("dino_feature") is None or b.get("dino_feature") is None:
+            return 1.0
+        return self._dino_cosine(a, b)
+
+    def _selection_similarity(self, a: dict, b: dict) -> float:
+        if bool(getattr(self.config, "enable_dino_ref_diversity", False)):
+            return self._dino_similarity(a, b)
+        return self._similarity(a, b)
+
     def _combo_pairwise_stats(self, selected: List[dict]) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
         selected = [item for item in selected if item.get("feature") is not None]
         if len(selected) < 2:
@@ -185,6 +356,26 @@ class TrainingPairGenerator:
         for i in range(len(selected)):
             for j in range(i + 1, len(selected)):
                 value = self._similarity(selected[i], selected[j])
+                values.append(value)
+                if max_value is None or value > max_value:
+                    max_value = value
+                    max_pair = {
+                        "similarity": float(value),
+                        "left": self._pair_item_summary(selected[i]),
+                        "right": self._pair_item_summary(selected[j]),
+                    }
+        return float(np.mean(values)), float(max_value), max_pair
+
+    def _combo_dino_pairwise_stats(self, selected: List[dict]) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
+        selected = [item for item in selected if item.get("dino_feature") is not None]
+        if len(selected) < 2:
+            return None, None, None
+        values = []
+        max_pair = None
+        max_value = None
+        for i in range(len(selected)):
+            for j in range(i + 1, len(selected)):
+                value = self._dino_similarity(selected[i], selected[j])
                 values.append(value)
                 if max_value is None or value > max_value:
                     max_value = value
@@ -287,10 +478,24 @@ class TrainingPairGenerator:
             return entry if isinstance(entry, dict) else None
 
         def related_quality_label(attrs: dict, image_type: str) -> bool:
+            if bool(getattr(self.config, "ignore_ref_quality", False)):
+                return True
             entry = related_entry(attrs, image_type)
-            if isinstance(entry, dict):
-                return bool(entry.get("quality_label", True))
-            return True
+            if not isinstance(entry, dict):
+                return True
+            if bool(getattr(self.config, "ignore_mask_hole_ref_quality", False)):
+                quality = entry.get("quality") if isinstance(entry.get("quality"), dict) else {}
+                checked_any = False
+                for key, item in quality.items():
+                    if key == "mask_hole":
+                        continue
+                    if not isinstance(item, dict):
+                        continue
+                    checked_any = True
+                    if item.get("passed") is False:
+                        return False
+                return True if checked_any or "mask_hole" in quality else bool(entry.get("quality_label", True))
+            return bool(entry.get("quality_label", True))
 
         def related_quality(attrs: dict, image_type: str) -> dict:
             entry = related_entry(attrs, image_type)
@@ -320,6 +525,10 @@ class TrainingPairGenerator:
             feature = self._load_feature(feature_path)
             if feature is None:
                 skipped["missing_feature"] += 1
+            dino_feature_path = self._dino_feature_path({"shot_key": shot_key, "obj_id": obj_id, "frame_idx": frame_idx})
+            dino_feature = self._load_dino_feature(dino_feature_path)
+            if bool(getattr(self.config, "enable_dino_ref_diversity", False)) and dino_feature is None:
+                skipped["missing_dino_feature"] += 1
 
             prefix, shot_no = self._parse_shot(shot_key)
             pose = attrs.get("pose") or {}
@@ -366,6 +575,8 @@ class TrainingPairGenerator:
                 "full_white_path": self._full_white_image_path(attrs),
                 "feature_path": to_repo_relative_path(feature_path),
                 "feature": feature,
+                "dino_feature_path": to_repo_relative_path(dino_feature_path),
+                "dino_feature": dino_feature,
                 "pitch": float((pose or {}).get("pitch", 0.0)),
                 "yaw": float((pose or {}).get("yaw", 0.0)),
                 "roll": float((pose or {}).get("roll", 0.0)),
@@ -482,7 +693,7 @@ class TrainingPairGenerator:
         best_cos = float("inf")
         for i in range(len(with_features)):
             for j in range(i + 1, len(with_features)):
-                cos = self._similarity(with_features[i], with_features[j])
+                cos = self._selection_similarity(with_features[i], with_features[j])
                 if cos < best_cos:
                     best_cos = cos
                     best_pair = (i, j)
@@ -495,7 +706,7 @@ class TrainingPairGenerator:
             best_idx = 0
             best_score = float("inf")
             for idx, candidate in enumerate(remaining):
-                max_cos = max(self._similarity(candidate, item) for item in selected)
+                max_cos = max(self._selection_similarity(candidate, item) for item in selected)
                 if max_cos < best_score:
                     best_score = max_cos
                     best_idx = idx
@@ -571,7 +782,7 @@ class TrainingPairGenerator:
                     continue
                 if not self._passes_shot_gap(candidate, selected):
                     continue
-                score = max((self._similarity(candidate, item) for item in selected), default=-1.0)
+                score = max((self._selection_similarity(candidate, item) for item in selected), default=-1.0)
                 if score < best_score:
                     best_score = score
                     best_candidate = candidate
@@ -647,9 +858,13 @@ class TrainingPairGenerator:
             pitch = float(item["pitch"])
             if abs(yaw) <= 20.0 and abs(pitch - 30.0) <= 10.0:
                 buckets["front"].append(dict(item, bucket="front"))
-            if pitch < 20.0:
+            up_min = float(getattr(self.config, "angle_front_up_min_pitch", -10.0))
+            up_max = float(getattr(self.config, "angle_front_up_max_pitch", 20.0))
+            down_min = float(getattr(self.config, "angle_front_down_min_pitch", 40.0))
+            down_max = float(getattr(self.config, "angle_front_down_max_pitch", 70.0))
+            if up_min <= pitch < up_max:
                 buckets["front_up"].append(dict(item, bucket="front_up"))
-            if pitch > 40.0:
+            if down_min < pitch <= down_max:
                 buckets["front_down"].append(dict(item, bucket="front_down"))
             if yaw <= -30.0:
                 buckets["left"].append(dict(item, bucket="left"))
@@ -737,6 +952,7 @@ class TrainingPairGenerator:
             "obj_id": item.get("obj_id"),
             "frame_idx": item.get("frame_idx"),
             "feature_path": item.get("feature_path"),
+            "dino_feature_path": item.get("dino_feature_path"),
             "bucket": item.get("bucket"),
             "bucket_source": item.get("bucket_source"),
             "body_label": item.get("body_label"),
@@ -799,24 +1015,6 @@ class TrainingPairGenerator:
     def _person_dirs(self) -> List[str]:
         person_dirs = []
         wanted = set(self.config.person_ids or [])
-        # registry_path = os.path.join(os.path.dirname(self.config.person_clusters_dir), "persons.jsonl")
-        registry_path = os.path.join(self.config.person_clusters_dir, "persons.jsonl")
-
-        if os.path.isfile(registry_path):
-            with open(registry_path, "r", encoding="utf-8") as registry:
-                for line in registry:
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    person_id = str(record.get("person_id") or "").strip()
-                    if not person_id or (wanted and person_id not in wanted):
-                        continue
-                    cluster_dir = record.get("cluster_dir")
-                    path = resolve_repo_path(cluster_dir) if cluster_dir else os.path.join(self.config.person_clusters_dir, person_id)
-                    if os.path.isdir(path):
-                        person_dirs.append(path)
-            return person_dirs
         for name in sorted(os.listdir(self.config.person_clusters_dir)):
             path = os.path.join(self.config.person_clusters_dir, name)
             if not os.path.isdir(path) or not name.startswith("person_"):
@@ -890,6 +1088,39 @@ class TrainingPairGenerator:
                 units.append((person_clusters_dir, video, part, uuid))
         return units
 
+    def _rejected_output_path(self) -> str:
+        return self.config.rejected_jsonl or os.path.join(
+            os.path.dirname(os.path.abspath(self.config.output_jsonl)),
+            "rejected_pairs.jsonl",
+        )
+
+    @staticmethod
+    def _reject_ref_meta(items: List[dict]) -> List[dict]:
+        return [TrainingPairGenerator._strip_feature(item) for item in items]
+
+    def _reject_record(
+        self,
+        person_id: str,
+        target: dict,
+        reason: str,
+        detail: Optional[dict] = None,
+        angle_refs: Optional[List[dict]] = None,
+        emo_refs: Optional[List[dict]] = None,
+        body_refs: Optional[List[dict]] = None,
+    ) -> dict:
+        return {
+            "person_id": person_id,
+            "source_uid": target.get("uid"),
+            "source_shot_key": target.get("shot_key"),
+            "source_frame_idx": target.get("frame_idx"),
+            "target_video": to_repo_relative_path(target.get("source_shot_path")),
+            "reject_reason": reason,
+            "detail": detail or {},
+            "angle_ref_meta": self._reject_ref_meta(angle_refs or []),
+            "emo_ref_meta": self._reject_ref_meta(emo_refs or []),
+            "body_pose_ref_meta": self._reject_ref_meta(body_refs or []),
+        }
+
     def _unit_output_root(self, src_person_clusters: str, output_base_dir: str, input_base_dir: Optional[str]) -> str:
         src_person_clusters = resolve_repo_path(src_person_clusters)
         parent_dir = os.path.dirname(src_person_clusters)
@@ -950,6 +1181,7 @@ class TrainingPairGenerator:
                 self.config,
                 person_clusters_dir=src_person_clusters,
                 output_jsonl=os.path.join(output_root, output_name),
+                rejected_jsonl=os.path.join(output_root, os.path.basename(self._rejected_output_path())),
                 stats_json=os.path.join(stats_root, stats_name),
                 first_frame_dir=first_frame_root,
                 unit_list_file=None,
@@ -961,46 +1193,48 @@ class TrainingPairGenerator:
         return total_persons, total_rows
 
     def run(self) -> Tuple[int, int]:
-        # units = units_from_config(self.config)
-        base_config = self.config
-        total_persons = total_rows = 0
-        # print(f"[generate_training_pairs] phase={base_config.phase}/{base_config.total} assigned={len(units)}")
-        # for unit in units:
-        #     workspace = initialize_manifest(unit)
-        #     update_stage_manifest(unit, "generate_training_pairs", "running")
-        #     self.config = replace(
-        #         base_config,
-        #         person_clusters_dir=workspace.person_clusters_dir,
-        #         output_jsonl=workspace.pairs_jsonl,
-        #         stats_json=workspace.training_stats_json,
-        #         first_frame_dir=workspace.first_frame_dir,
-        #         unit_list_file=None,
-        #         unit_list_input_base_dir=None,
-        #     )
-        #     self.feature_cache = {}
-        #     self.first_frame_cache = {}
-        #     persons, rows = self._run_current()
-        #     total_persons += persons
-        #     total_rows += rows
-        #     update_stage_manifest(unit, "generate_training_pairs", "complete", {
-        #         "output_jsonl": os.path.relpath(workspace.pairs_jsonl, workspace.video_dir),
-        #         "stats_json": os.path.relpath(workspace.training_stats_json, workspace.video_dir),
-        #         "total_persons": persons,
-        #         "rows_written": rows,
-        #     })
-
-        self.feature_cache = {}
-        self.first_frame_cache = {}
-        persons, rows = self._run_current()
-        total_persons += persons
-        total_rows += rows
-        self.config = base_config
-        return total_persons, total_rows
-
-    def _run_current(self) -> Tuple[int, int]:
         if self.config.unit_list_file:
             return self._run_unit_list()
+        workspace_mode = bool(getattr(self.config, "video_dir", None) or getattr(self.config, "pipeline_input_jsonl", None))
+        if workspace_mode and not bool(getattr(self.config, "global_mode", False)):
+            return self._run_workspace()
         return self._run_person_clusters()
+
+    def _run_workspace(self) -> Tuple[int, int]:
+        base_config = self.config
+        units = _workspace_units_from_config(base_config)
+        total_persons = 0
+        total_rows = 0
+        print(f"[generate_training_pairs] phase={base_config.phase}/{base_config.total} assigned={len(units)}")
+        for unit in units:
+            _update_workspace_stage(unit, "generate_training_pairs", "running")
+            video_dir = unit["video_dir"]
+            child_config = replace(
+                base_config,
+                person_clusters_dir=_workspace_person_clusters_dir(video_dir),
+                output_jsonl=_workspace_path(video_dir, "pairs_jsonl"),
+                rejected_jsonl=_workspace_path(video_dir, "rejected_pairs_jsonl"),
+                stats_json=_workspace_path(video_dir, "training_stats_json"),
+                first_frame_dir=_workspace_path(video_dir, "first_frame_dir"),
+                unit_list_file=None,
+                unit_list_input_base_dir=None,
+            )
+            self.config = child_config
+            self.feature_cache = {}
+            self.dino_feature_cache = {}
+            self.first_frame_cache = {}
+            persons, rows = self._run_person_clusters()
+            total_persons += persons
+            total_rows += rows
+            _update_workspace_stage(unit, "generate_training_pairs", "complete", {
+                "output_jsonl": os.path.relpath(child_config.output_jsonl, video_dir),
+                "rejected_jsonl": os.path.relpath(child_config.rejected_jsonl, video_dir),
+                "stats_json": os.path.relpath(child_config.stats_json, video_dir),
+                "total_persons": persons,
+                "rows_written": rows,
+            })
+        self.config = base_config
+        return total_persons, total_rows
 
     def _run_person_clusters(self) -> Tuple[int, int]:
         person_dirs = self._person_dirs()
@@ -1013,7 +1247,7 @@ class TrainingPairGenerator:
             "first_frame_error": 0,
         }
 
-        with open(self.config.output_jsonl, "w", encoding="utf-8") as fout:
+        with open(self.config.output_jsonl, "w", encoding="utf-8") as fout, open(self._rejected_output_path(), "w", encoding="utf-8") as freject:
             for person_dir in tqdm(person_dirs, desc="Generating training pairs", unit="person"):
                 person_id = os.path.basename(person_dir)
                 index_path = os.path.join(person_dir, self.config.index_filename)
@@ -1035,6 +1269,9 @@ class TrainingPairGenerator:
                     "target_video_count": len(target_items),
                     "skipped": skipped,
                     "per_target": per_target_stats,
+                    "dino_diversity_rejected": 0,
+                    "insufficient_refs_rejected": 0,
+                    "rejected_jsonl": to_repo_relative_path(self._rejected_output_path()),
                 }
 
                 for target in target_items:
@@ -1071,11 +1308,68 @@ class TrainingPairGenerator:
                         len(emo_refs) < int(self.config.emo_ref_count) or
                         len(body_refs) < int(self.config.body_pose_ref_count)
                     ):
+                        stats["persons"][person_id]["insufficient_refs_rejected"] += 1
+                        freject.write(json.dumps(self._reject_record(
+                            person_id,
+                            target,
+                            "insufficient_refs",
+                            {
+                                "angle_selected": len(angle_refs),
+                                "angle_required": int(self.config.angle_ref_count),
+                                "emotion_selected": len(emo_refs),
+                                "emotion_required": int(self.config.emo_ref_count),
+                                "body_pose_selected": len(body_refs),
+                                "body_pose_required": int(self.config.body_pose_ref_count),
+                                "selection_meta": {
+                                    "angle": angle_selection_meta,
+                                    "emotion": emo_selection_meta,
+                                    "body_pose": body_selection_meta,
+                                },
+                            },
+                            angle_refs,
+                            emo_refs,
+                            body_refs,
+                        ), ensure_ascii=False) + "\n")
                         continue
 
                     angle_mean, angle_max, angle_max_pair = self._combo_pairwise_stats(angle_refs)
                     emo_mean, emo_max, emo_max_pair = self._combo_pairwise_stats(emo_refs)
                     body_mean, body_max, body_max_pair = self._combo_pairwise_stats(body_refs)
+                    angle_dino_mean, angle_dino_max, angle_dino_max_pair = self._combo_dino_pairwise_stats(angle_refs)
+                    emo_dino_mean, emo_dino_max, emo_dino_max_pair = self._combo_dino_pairwise_stats(emo_refs)
+                    body_dino_mean, body_dino_max, body_dino_max_pair = self._combo_dino_pairwise_stats(body_refs)
+                    if bool(getattr(self.config, "enable_dino_ref_diversity", False)):
+                        dino_threshold = float(getattr(self.config, "dino_max_pairwise_cosine", 0.95))
+                        dino_groups = [angle_refs, emo_refs, body_refs]
+                        missing_group_dino = any(
+                            any(item.get("dino_feature") is None for item in group)
+                            for group in dino_groups
+                        )
+                        dino_max_values = [angle_dino_max, emo_dino_max, body_dino_max]
+                        if missing_group_dino or any(value is None or float(value) > dino_threshold for value in dino_max_values):
+                            stats["persons"][person_id]["dino_diversity_rejected"] += 1
+                            freject.write(json.dumps(self._reject_record(
+                                person_id,
+                                target,
+                                "dino_diversity",
+                                {
+                                    "missing_group_dino": bool(missing_group_dino),
+                                    "threshold": dino_threshold,
+                                    "angle_dino_mean_pairwise_cosine": angle_dino_mean,
+                                    "angle_dino_max_pairwise_cosine": angle_dino_max,
+                                    "angle_dino_max_pairwise_cosine_pair": angle_dino_max_pair,
+                                    "emo_dino_mean_pairwise_cosine": emo_dino_mean,
+                                    "emo_dino_max_pairwise_cosine": emo_dino_max,
+                                    "emo_dino_max_pairwise_cosine_pair": emo_dino_max_pair,
+                                    "body_pose_dino_mean_pairwise_cosine": body_dino_mean,
+                                    "body_pose_dino_max_pairwise_cosine": body_dino_max,
+                                    "body_pose_dino_max_pairwise_cosine_pair": body_dino_max_pair,
+                                },
+                                angle_refs,
+                                emo_refs,
+                                body_refs,
+                            ), ensure_ascii=False) + "\n")
+                            continue
 
                     def _rel(p):
                         return to_repo_relative_path(p) if p else None
@@ -1135,6 +1429,16 @@ class TrainingPairGenerator:
                             "body_pose_max_pairwise_cosine": body_max,
                             "body_pose_max_pairwise_cosine_pair": body_max_pair,
                             "body_pose_fallback_added_without_shot_gap": body_selection_meta.get("fallback_added_without_shot_gap"),
+                            "angle_dino_mean_pairwise_cosine": angle_dino_mean,
+                            "angle_dino_max_pairwise_cosine": angle_dino_max,
+                            "angle_dino_max_pairwise_cosine_pair": angle_dino_max_pair,
+                            "emo_dino_mean_pairwise_cosine": emo_dino_mean,
+                            "emo_dino_max_pairwise_cosine": emo_dino_max,
+                            "emo_dino_max_pairwise_cosine_pair": emo_dino_max_pair,
+                            "body_pose_dino_mean_pairwise_cosine": body_dino_mean,
+                            "body_pose_dino_max_pairwise_cosine": body_dino_max,
+                            "body_pose_dino_max_pairwise_cosine_pair": body_dino_max_pair,
+                            "dino_max_pairwise_cosine_threshold": float(getattr(self.config, "dino_max_pairwise_cosine", 0.95)),
                         },
                     }
                     fout.write(json.dumps(row, ensure_ascii=False) + "\n")
