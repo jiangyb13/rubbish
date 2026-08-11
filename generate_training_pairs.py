@@ -12,7 +12,13 @@ import numpy as np
 from tqdm import tqdm
 
 from .config import TrainingPairsConfig
-from .path_utils import resolve_repo_path, to_repo_relative_path
+try:
+    from .path_utils import resolve_repo_path, to_repo_relative_path
+except ImportError:
+    try:
+        from utils.path_utils import resolve_repo_path, to_repo_relative_path
+    except ImportError:
+        from path_utils import resolve_repo_path, to_repo_relative_path
 
 
 WORKSPACE_REL_PATHS = {
@@ -250,6 +256,14 @@ class TrainingPairGenerator:
                     "face_feature",
                     f"{int(item['frame_idx'])}.npy",
                 )
+            return os.path.join(
+                self.config.one_shot_process_dir,
+                str(item["shot_key"]),
+                f"id_{item['obj_id']}",
+                "features",
+                "face_feature",
+                f"{int(item['frame_idx'])}.npy",
+            )
 
         cluster_dir = os.path.abspath(self.config.person_clusters_dir)
         outputs_root = os.path.dirname(os.path.dirname(cluster_dir))
@@ -277,6 +291,14 @@ class TrainingPairGenerator:
                     "dino_feature",
                     f"{int(item['frame_idx'])}.npy",
                 )
+            return os.path.join(
+                self.config.one_shot_process_dir,
+                str(item["shot_key"]),
+                f"id_{item['obj_id']}",
+                "features",
+                "dino_feature",
+                f"{int(item['frame_idx'])}.npy",
+            )
 
         cluster_dir = os.path.abspath(self.config.person_clusters_dir)
         outputs_root = os.path.dirname(os.path.dirname(cluster_dir))
@@ -342,9 +364,11 @@ class TrainingPairGenerator:
         return self._dino_cosine(a, b)
 
     def _selection_similarity(self, a: dict, b: dict) -> float:
+        face_similarity = self._similarity(a, b)
         if bool(getattr(self.config, "enable_dino_ref_diversity", False)):
-            return self._dino_similarity(a, b)
-        return self._similarity(a, b)
+            dino_similarity = self._dino_similarity(a, b)
+            return max(face_similarity, dino_similarity)
+        return face_similarity
 
     def _combo_pairwise_stats(self, selected: List[dict]) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
         selected = [item for item in selected if item.get("feature") is not None]
@@ -1015,6 +1039,24 @@ class TrainingPairGenerator:
     def _person_dirs(self) -> List[str]:
         person_dirs = []
         wanted = set(self.config.person_ids or [])
+        registry_path = os.path.join(self.config.person_clusters_dir, "persons.jsonl")
+
+        if os.path.isfile(registry_path):
+            with open(registry_path, "r", encoding="utf-8") as registry:
+                for line in registry:
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    person_id = str(record.get("person_id") or "").strip()
+                    if not person_id or (wanted and person_id not in wanted):
+                        continue
+                    cluster_dir = record.get("cluster_dir")
+                    path = resolve_repo_path(cluster_dir) if cluster_dir else os.path.join(self.config.person_clusters_dir, person_id)
+                    if os.path.isdir(path):
+                        person_dirs.append(path)
+            return person_dirs
+
         for name in sorted(os.listdir(self.config.person_clusters_dir)):
             path = os.path.join(self.config.person_clusters_dir, name)
             if not os.path.isdir(path) or not name.startswith("person_"):
@@ -1303,33 +1345,33 @@ class TrainingPairGenerator:
                     emo_refs, emo_selection_meta = refs["emotion"]
                     body_refs, body_selection_meta = refs["body_pose"]
 
+                    allow_variable_ref_count = bool(getattr(self.config, "allow_variable_ref_count", False))
+                    min_ref_count = max(1, int(getattr(self.config, "min_ref_count", 5)))
+                    angle_required = min_ref_count if allow_variable_ref_count else int(self.config.angle_ref_count)
+                    emotion_required = min_ref_count if allow_variable_ref_count else int(self.config.emo_ref_count)
+                    body_pose_required = min_ref_count if allow_variable_ref_count else int(self.config.body_pose_ref_count)
                     if (
-                        len(angle_refs) < int(self.config.angle_ref_count) or
-                        len(emo_refs) < int(self.config.emo_ref_count) or
-                        len(body_refs) < int(self.config.body_pose_ref_count)
+                        len(angle_refs) < angle_required or
+                        len(emo_refs) < emotion_required or
+                        len(body_refs) < body_pose_required
                     ):
                         stats["persons"][person_id]["insufficient_refs_rejected"] += 1
-                        freject.write(json.dumps(self._reject_record(
-                            person_id,
-                            target,
-                            "insufficient_refs",
-                            {
-                                "angle_selected": len(angle_refs),
-                                "angle_required": int(self.config.angle_ref_count),
-                                "emotion_selected": len(emo_refs),
-                                "emotion_required": int(self.config.emo_ref_count),
-                                "body_pose_selected": len(body_refs),
-                                "body_pose_required": int(self.config.body_pose_ref_count),
-                                "selection_meta": {
-                                    "angle": angle_selection_meta,
-                                    "emotion": emo_selection_meta,
-                                    "body_pose": body_selection_meta,
-                                },
-                            },
-                            angle_refs,
-                            emo_refs,
-                            body_refs,
-                        ), ensure_ascii=False) + "\n")
+                        per_target_stats.append({
+                            "target_video": to_repo_relative_path(target_video),
+                            "source_shot_key": target.get("shot_key"),
+                            "status": "insufficient_refs",
+                            "allow_variable_ref_count": allow_variable_ref_count,
+                            "min_ref_count": min_ref_count,
+                            "angle_selected": len(angle_refs),
+                            "angle_required": angle_required,
+                            "angle_requested": int(self.config.angle_ref_count),
+                            "emotion_selected": len(emo_refs),
+                            "emotion_required": emotion_required,
+                            "emotion_requested": int(self.config.emo_ref_count),
+                            "body_pose_selected": len(body_refs),
+                            "body_pose_required": body_pose_required,
+                            "body_pose_requested": int(self.config.body_pose_ref_count),
+                        })
                         continue
 
                     angle_mean, angle_max, angle_max_pair = self._combo_pairwise_stats(angle_refs)
@@ -1340,13 +1382,31 @@ class TrainingPairGenerator:
                     body_dino_mean, body_dino_max, body_dino_max_pair = self._combo_dino_pairwise_stats(body_refs)
                     if bool(getattr(self.config, "enable_dino_ref_diversity", False)):
                         dino_threshold = float(getattr(self.config, "dino_max_pairwise_cosine", 0.95))
+                        dino_mean_threshold_value = getattr(self.config, "dino_max_mean_pairwise_cosine", None)
+                        dino_mean_threshold = (
+                            float(dino_mean_threshold_value)
+                            if dino_mean_threshold_value is not None
+                            else None
+                        )
                         dino_groups = [angle_refs, emo_refs, body_refs]
                         missing_group_dino = any(
                             any(item.get("dino_feature") is None for item in group)
                             for group in dino_groups
                         )
                         dino_max_values = [angle_dino_max, emo_dino_max, body_dino_max]
-                        if missing_group_dino or any(value is None or float(value) > dino_threshold for value in dino_max_values):
+                        dino_mean_values = [angle_dino_mean, emo_dino_mean, body_dino_mean]
+                        max_failed = any(
+                            value is not None and float(value) > dino_threshold
+                            for value in dino_max_values
+                        )
+                        mean_failed = (
+                            dino_mean_threshold is not None
+                            and any(
+                                value is not None and float(value) > dino_mean_threshold
+                                for value in dino_mean_values
+                            )
+                        )
+                        if missing_group_dino or max_failed or mean_failed:
                             stats["persons"][person_id]["dino_diversity_rejected"] += 1
                             freject.write(json.dumps(self._reject_record(
                                 person_id,
@@ -1354,7 +1414,10 @@ class TrainingPairGenerator:
                                 "dino_diversity",
                                 {
                                     "missing_group_dino": bool(missing_group_dino),
-                                    "threshold": dino_threshold,
+                                    "max_threshold": dino_threshold,
+                                    "mean_threshold": dino_mean_threshold,
+                                    "max_failed": bool(max_failed),
+                                    "mean_failed": bool(mean_failed),
                                     "angle_dino_mean_pairwise_cosine": angle_dino_mean,
                                     "angle_dino_max_pairwise_cosine": angle_dino_max,
                                     "angle_dino_max_pairwise_cosine_pair": angle_dino_max_pair,
@@ -1439,6 +1502,9 @@ class TrainingPairGenerator:
                             "body_pose_dino_max_pairwise_cosine": body_dino_max,
                             "body_pose_dino_max_pairwise_cosine_pair": body_dino_max_pair,
                             "dino_max_pairwise_cosine_threshold": float(getattr(self.config, "dino_max_pairwise_cosine", 0.95)),
+                            "dino_max_mean_pairwise_cosine_threshold": getattr(self.config, "dino_max_mean_pairwise_cosine", None),
+                            "allow_variable_ref_count": bool(getattr(self.config, "allow_variable_ref_count", False)),
+                            "min_ref_count": int(getattr(self.config, "min_ref_count", 5)),
                         },
                     }
                     fout.write(json.dumps(row, ensure_ascii=False) + "\n")
