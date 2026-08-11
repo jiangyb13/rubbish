@@ -17,3 +17,21 @@ TASK_NAME=generate_training_pairs python main.py \
   --angle_front_up_max_pitch 20 \
   --angle_front_down_min_pitch 40 \
   --angle_front_down_max_pitch 70
+
+
+{
+  "missing_group_dino": true,
+  "max_threshold": 1.0,
+  "mean_threshold": 0.85,
+  "max_failed": false,
+  "mean_failed": false,
+  "angle_dino_mean_pairwise_cosine": null,
+  "angle_dino_max_pairwise_cosine": null,
+  "angle_dino_max_pairwise_cosine_pair": null,
+  "emo_dino_mean_pairwise_cosine": null,
+  "emo_dino_max_pairwise_cosine": null,
+  "emo_dino_max_pairwise_cosine_pair": null,
+  "body_pose_dino_mean_pairwise_cosine": null,
+  "body_pose_dino_max_pairwise_cosine": null,
+  "body_pose_dino_max_pairwise_cosine_pair": null
+}
