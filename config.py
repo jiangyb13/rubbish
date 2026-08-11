@@ -2,39 +2,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import os
 import json
-<<<<<<< HEAD
-try:
-    import cv2
-except ImportError:  # Path/layout tooling does not require OpenCV.
-    cv2 = None
-try:
-    import torch
-except ImportError:  # Allow task/layout validation before the ML env is loaded.
-    class _CudaFallback:
-        @staticmethod
-        def is_available():
-            return False
-
-    class _TorchFallback:
-        cuda = _CudaFallback()
-
-    torch = _TorchFallback()
-
-# Canonical paths relative to each ``outputs/<video_id>`` workspace. The batch
-# pipeline only needs the Stage-1 task JSONL and output_root; all inter-stage
-# inputs/outputs are derived from these defaults.
-PIPELINE_PATH_DEFAULTS = {
-    "manifest": "pipeline_manifest.json",
-    "shot_dir": "shot_detection",
-    "shot_video_dir": "shot_detection/shots",
-    "shot_jsonl": "shot_detection/output.jsonl",
-    "one_shot_dir": "one_shot_process",
-    "one_shot_jsonl": "one_shot_process/output.jsonl",
-    "identity_dir": "identity_matching",
-    "identity_jsonl": "identity_matching/output.jsonl",
-    "identity_simple_jsonl": "identity_matching/output_simple.jsonl",
-    "identity_global_json": "identity_matching/global_data.json",
-=======
 import cv2
 import torch
 
@@ -42,29 +9,17 @@ PIPELINE_PATH_DEFAULTS = {
     "manifest": "pipeline_manifest.json",
     "identity_dir": "identity_matching",
     "identity_jsonl": "identity_matching/output.jsonl",
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     "person_clusters_dir": "identity_matching/person_clusters",
     "person_registry_jsonl": "identity_matching/persons.jsonl",
     "training_dir": "training_pairs",
     "pairs_jsonl": "training_pairs/pairs.jsonl",
-<<<<<<< HEAD
-=======
     "rejected_pairs_jsonl": "training_pairs/rejected_pairs.jsonl",
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     "training_stats_json": "training_pairs/stats.json",
     "first_frame_dir": "training_pairs/first_frames",
 }
 
 @dataclass
 class ShotDetectionConfig:
-<<<<<<< HEAD
-    pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
-    output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
-    video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
-    video_path: Optional[str] = field(default=None, metadata={"help": "Source video for standalone Stage 1."})
-    video_id: Optional[str] = field(default=None, metadata={"help": "Standalone video id."})
-=======
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     task_name: str = field(
         default="shot_detection",
         metadata={"help": "Name of the processing task, used for logging and output organization."
@@ -148,24 +103,11 @@ class ShotDetectionConfig:
 
     def __post_init__(self):
         self.output_dir = os.path.abspath(self.output_dir)
-<<<<<<< HEAD
-        # os.makedirs(self.output_dir, exist_ok=True)
-        # os.makedirs(os.path.dirname(os.path.abspath(self.output_jsonl)), exist_ok=True)
-
-@dataclass
-class OneShotProcessConfig:
-    pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
-    output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
-    video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
-    video_path: Optional[str] = field(default=None, metadata={"help": "Optional standalone source video override."})
-    video_id: Optional[str] = field(default=None, metadata={"help": "Optional standalone video id."})
-=======
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(os.path.dirname(os.path.abspath(self.output_jsonl)), exist_ok=True)
 
 @dataclass
 class OneShotProcessConfig:
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     task_name: str = field(
         default="one_shot_process",
         metadata={"help": "Name of the processing task, used for logging and output organization."
@@ -418,16 +360,6 @@ class IdentityMatchingConfig:
         default="identity_matching",
         metadata={"help": "Name of the processing task."},
     )
-<<<<<<< HEAD
-    pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
-    output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
-    video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
-    video_path: Optional[str] = field(default=None, metadata={"help": "Optional standalone source video override."})
-    video_id: Optional[str] = field(default=None, metadata={"help": "Optional standalone video id."})
-    phase: int = field(default=0, metadata={"help": "Continuous shard rank."})
-    total: int = field(default=1, metadata={"help": "Continuous shard worker count."})
-=======
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
 
     # ---- Input / Output ----
     input_jsonl: str = field(
@@ -557,11 +489,7 @@ class IdentityMatchingConfig:
         os.makedirs(os.path.dirname(self.output_jsonl), exist_ok=True)
         os.makedirs(os.path.dirname(self.output_jsonl_simple), exist_ok=True)
         os.makedirs(os.path.dirname(self.output_global_json), exist_ok=True)
-<<<<<<< HEAD
-        os.makedirs(os.path.dirname(self.person_cluster_output_dir), exist_ok=True)
-=======
         os.makedirs(os.path.dirname(self.output_global_json), exist_ok=True)
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
 
 @dataclass
 class IndexAddConfig:
@@ -573,10 +501,7 @@ class IndexAddConfig:
     video_id: Optional[str] = field(default=None, metadata={"help": "Optional standalone video id."})
     phase: int = field(default=0, metadata={"help": "Continuous shard rank."})
     total: int = field(default=1, metadata={"help": "Continuous shard worker count."})
-<<<<<<< HEAD
-=======
     global_mode: bool = field(default=False, metadata={"help": "Process the explicitly configured identity_matching directory instead of workspace mode."})
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     # identity_matching 输出根目录
     path: str = field(
         default="outputs/identity_matching",
@@ -638,11 +563,7 @@ class IndexAddConfig:
     )
     update_features: Optional[List[str]] = field(
         default=None,
-<<<<<<< HEAD
-        metadata={"help": "Incrementally update existing after_pipeline_index.json files for selected features only. Supported: emotion, emotion_vlm, body_pose, mask_hole_quality, face_boundary_quality."}
-=======
         metadata={"help": "Incrementally update existing after_pipeline_index.json files for selected features only. Supported: emotion, emotion_vlm, body_pose, mask_hole_quality, face_boundary_quality, face_occlusion_quality, image_clarity_quality."}
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     )
     update_emotion_vlm_only: bool = field(
         default=False,
@@ -666,11 +587,7 @@ class IndexAddConfig:
         metadata={"help": "Add 4D-Humans body orientation and YOLO body extent attributes to each frame's image entries."}
     )
     body_pose_checkpoint: str = field(
-<<<<<<< HEAD
-        default="pretrained_models/4D-Humans/logs/train/multiruns/hmr2/0/checkpoints/epoch=35-step=1000000.ckpt",
-=======
         default="./pretrained_models/4D-Humans/train/multiruns/hmr2/0/checkpoints/epoch=35-step=1000000.ckpt",
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
         metadata={"help": "HMR2 checkpoint path used for 4D-Humans body orientation."}
     )
     body_pose_yolo_checkpoint: str = field(
@@ -698,17 +615,6 @@ class IndexAddConfig:
         metadata={"help": "In incremental quality updates, overwrite existing quality items. If False, only missing quality items are computed."}
     )
     enable_face_boundary_quality_check: bool = field(
-<<<<<<< HEAD
-        default=True,
-        metadata={"help": "Compatibility switch: enable both Stage4 face bbox boundary and face mask coverage quality checks."}
-    )
-    enable_face_bbox_boundary_quality_check: bool = field(
-        default=True,
-        metadata={"help": "Use InsightFace in Stage4 to reject face crops whose expanded face bbox touches image boundary."}
-    )
-    enable_face_mask_coverage_quality_check: bool = field(
-        default=True,
-=======
         default=False,
         metadata={"help": "Compatibility switch: enable both Stage4 face bbox boundary and face mask coverage quality checks."}
     )
@@ -718,7 +624,6 @@ class IndexAddConfig:
     )
     enable_face_mask_coverage_quality_check: bool = field(
         default=False,
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
         metadata={"help": "Use InsightFace face bbox to reject crops whose original face bbox contains SAM background/white pixels."}
     )
     face_boundary_expand_ratio: float = field(
@@ -753,8 +658,6 @@ class IndexAddConfig:
         default=False,
         metadata={"help": "In incremental face_boundary_quality updates, recompute face bboxes even when existing quality bbox is available."}
     )
-<<<<<<< HEAD
-=======
     enable_face_occlusion_quality_check: bool = field(
         default=False,
         metadata={"help": "Use Qwen3-VL in Stage4 to reject images where the face is occluded."}
@@ -783,7 +686,6 @@ class IndexAddConfig:
         default=10.0,
         metadata={"help": "Minimum Laplacian variance required for Stage4 image clarity quality."}
     )
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     # 是否覆盖已有索引文件
     overwrite: bool = field(
         default=False,
@@ -803,10 +705,7 @@ class IndexAddConfig:
 @dataclass
 class TrainingPairsConfig:
     """Configuration for building training-pair JSONL from after-pipeline indexes."""
-<<<<<<< HEAD
-=======
 
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     pipeline_input_jsonl: Optional[str] = field(default=None, metadata={"help": "Canonical Stage-1 task JSONL."})
     output_root: str = field(default="outputs", metadata={"help": "Root containing per-video workspaces."})
     video_dir: Optional[str] = field(default=None, metadata={"help": "Standalone outputs/<video_id> workspace."})
@@ -814,10 +713,7 @@ class TrainingPairsConfig:
     video_id: Optional[str] = field(default=None, metadata={"help": "Optional standalone video id."})
     phase: int = field(default=0, metadata={"help": "Continuous shard rank."})
     total: int = field(default=1, metadata={"help": "Continuous shard worker count."})
-<<<<<<< HEAD
-=======
     global_mode: bool = field(default=False, metadata={"help": "Generate pairs directly from the explicitly configured person_clusters directory instead of workspace mode."})
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
 
     person_clusters_dir: str = field(
         default="outputs_demo/identity_matching/person_clusters",
@@ -827,13 +723,10 @@ class TrainingPairsConfig:
         default="outputs_demo/training_pairs/pairs.jsonl",
         metadata={"help": "Output JSONL path for generated training pairs."},
     )
-<<<<<<< HEAD
-=======
     rejected_jsonl: Optional[str] = field(
         default=None,
         metadata={"help": "Optional JSONL path for rejected training-pair candidates. Defaults to rejected_pairs.jsonl beside output_jsonl."},
     )
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     stats_json: str = field(
         default="outputs_demo/training_pairs/stats.json",
         metadata={"help": "Output JSON path for generation statistics."},
@@ -894,8 +787,6 @@ class TrainingPairsConfig:
         default=0,
         metadata={"help": "Same video prefix requires abs(shot_no_a - shot_no_b) > this value."},
     )
-<<<<<<< HEAD
-=======
     angle_front_up_min_pitch: float = field(
         default=-10.0,
         metadata={"help": "Minimum pitch for front_up angle bucket. Prevents over-upward head poses."},
@@ -920,7 +811,6 @@ class TrainingPairsConfig:
         default=0.95,
         metadata={"help": "When DINO ref diversity is enabled, reject a generated pair if any ref group has max pairwise DINO cosine above this value."},
     )
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
     bucket_top_t: int = field(
         default=50,
         metadata={"help": "Max candidates kept per angle/emotion bucket before beam search."},
@@ -953,21 +843,15 @@ class TrainingPairsConfig:
     def __post_init__(self):
         self.person_clusters_dir = os.path.abspath(self.person_clusters_dir)
         self.output_jsonl = os.path.abspath(self.output_jsonl)
-<<<<<<< HEAD
-=======
         if self.rejected_jsonl:
             self.rejected_jsonl = os.path.abspath(self.rejected_jsonl)
         else:
             self.rejected_jsonl = os.path.join(os.path.dirname(self.output_jsonl), "rejected_pairs.jsonl")
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
         self.stats_json = os.path.abspath(self.stats_json)
         self.first_frame_dir = os.path.abspath(self.first_frame_dir)
         if self.one_shot_process_dir:
             self.one_shot_process_dir = os.path.abspath(self.one_shot_process_dir)
         os.makedirs(os.path.dirname(self.output_jsonl), exist_ok=True)
-<<<<<<< HEAD
-=======
         os.makedirs(os.path.dirname(self.rejected_jsonl), exist_ok=True)
->>>>>>> e09129de6dee22d828566e7fd831a76941605dcd
         os.makedirs(os.path.dirname(self.stats_json), exist_ok=True)
         os.makedirs(self.first_frame_dir, exist_ok=True)
