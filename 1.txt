@@ -1,72 +1,73 @@
 {
-  "missing_group_dino": false,
-  "max_threshold": 1.0,
-  "mean_threshold": 0.85,
-  "max_failed": false,
-  "mean_failed": true,
-  "angle_dino_mean_pairwise_cosine": 0.724477905035019,
-  "angle_dino_max_pairwise_cosine": 0.865942120552063,
-  "angle_dino_max_pairwise_cosine_pair": {
-    "similarity": 0.865942120552063,
+  "angle_mean_pairwise_cosine": 1.0,
+  "angle_max_pairwise_cosine": 1.0,
+  "angle_max_pairwise_cosine_pair": {
+    "similarity": 1.0,
     "left": {
-      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_605_id0_frame0004.jpg",
+      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_605_id0_frame0005.jpg",
       "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_605",
       "obj_id": "0",
-      "frame_idx": 4,
+      "frame_idx": 5,
       "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_605.mp4",
       "bucket": "front",
       "bucket_source": null
     },
     "right": {
-      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_505_id0_frame0001.jpg",
-      "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_505",
+      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_1807_id0_frame0002.jpg",
+      "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_1807",
       "obj_id": "0",
-      "frame_idx": 1,
-      "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_505.mp4",
-      "bucket": "right",
+      "frame_idx": 2,
+      "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_1807.mp4",
+      "bucket": "front_down",
       "bucket_source": null
     }
   },
-  "emo_dino_mean_pairwise_cosine": 0.8758146107196808,
-  "emo_dino_max_pairwise_cosine": 0.9114943146705627,
-  "emo_dino_max_pairwise_cosine_pair": {
-    "similarity": 0.9114943146705627,
+  "angle_fallback_added_without_shot_gap": 0,
+  "emo_mean_pairwise_cosine": 1.0,
+  "emo_max_pairwise_cosine": 1.0,
+  "emo_max_pairwise_cosine_pair": {
+    "similarity": 1.0,
     "left": {
-      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_514_id0_frame0004.jpg",
-      "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_514",
+      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_475_id0_frame0000.jpg",
+      "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_475",
       "obj_id": "0",
-      "frame_idx": 4,
-      "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_514.mp4",
-      "bucket": "angry",
+      "frame_idx": 0,
+      "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_475.mp4",
+      "bucket": "happy",
       "bucket_source": null
     },
     "right": {
-      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_605_id0_frame0003.jpg",
+      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/face_orig/244fbfee-b542-43b1-b385-003495577c30_shot_605_id0_frame0002.jpg",
       "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_605",
       "obj_id": "0",
-      "frame_idx": 3,
+      "frame_idx": 2,
       "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_605.mp4",
-      "bucket": "contempt",
+      "bucket": "sad",
       "bucket_source": null
     }
   },
-  "body_pose_dino_mean_pairwise_cosine": 0.761723268032074,
-  "body_pose_dino_max_pairwise_cosine": 0.8775067925453186,
-  "body_pose_dino_max_pairwise_cosine_pair": {
-    "similarity": 0.8775067925453186,
+  "emo_fallback_added_without_shot_gap": 0,
+  "body_pose_mean_pairwise_cosine": 1.0,
+  "body_pose_max_pairwise_cosine": 1.0,
+  "body_pose_max_pairwise_cosine_pair": {
+    "similarity": 1.0,
     "left": {
-      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/full_orig/244fbfee-b542-43b1-b385-003495577c30_shot_605_id0_frame0005.jpg",
+      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/full_orig/244fbfee-b542-43b1-b385-003495577c30_shot_605_id0_frame0003.jpg",
       "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_605",
       "obj_id": "0",
-      "frame_idx": 5,
+      "frame_idx": 3,
       "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_605.mp4",
       "bucket": "front__half_body",
       "bucket_source": "body_label_body_part"
     },
     "right": {
-      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/full_orig/244fbfee-b542-43b1-b385-003495577c30_shot_1112_id0_frame0001.jpg",
-      "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_1112",
+      "path": "/cache/identity_matching/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/person_clusters/person_0000/full_orig/244fbfee-b542-43b1-b385-003495577c30_shot_1807_id0_frame0001.jpg",
+      "shot_key": "244fbfee-b542-43b1-b385-003495577c30_shot_1807",
       "obj_id": "0",
       "frame_idx": 1,
-      "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-0
-...
+      "source_shot_path": "/cache/shot_detection/video_720p_15min_0/part_0012/244fbfee-b542-43b1-b385-003495577c30/244fbfee-b542-43b1-b385-003495577c30_shot_1807.mp4",
+      "bucket": "left__half_body",
+      "bucket_source": "body_label_body_part"
+    }
+  },
+  "body_pose_fallback_added_without_shot_gap": 
