@@ -1,118 +1,181 @@
-import os
-import sys
-import torch
-import pandas as pd
-import json
 import argparse
+import json
+import os
+
+import numpy as np
+import pandas as pd
 from PIL import Image
+import torch
 from tqdm import tqdm
-from modeling.longclip_b.model import longclip
 
-# --- 1. 初始化 CLIP 模型 ---
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"正在加载 LongCLIP 模型至 {device}...")
-model, preprocess = longclip.load("/home/ma-user/work/wx1468559/Bagel-Reca/pretrained_models/LongCLIP-B/longclip-B.pt", device=device)
+from inference import initialize_full_model
 
-def calc_clip_score(image_path, prompt):
-    """计算相似度分数"""
-    try:
-        if not os.path.exists(image_path):
-            return -1.0
-        image = Image.open(image_path).convert("RGB")
-        text_inputs = longclip.tokenize([prompt]).to(device)
-        image_tensor = preprocess(image).unsqueeze(0).to(device)
 
-        with torch.no_grad():
-            image_embeds = model.encode_image(image_tensor)
-            text_embeds = model.encode_text(text_inputs)
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Merge two JSONL result sets using BAGEL understanding CE."
+    )
+    parser.add_argument("--file_a", default="merged_best_results_union4.jsonl")
+    parser.add_argument(
+        "--file_b",
+        default=(
+            "/home/ma-user/work/wx1468559/geneval/Bagel/"
+            "outputs_bagel_set1seed_dual_h.jsonl"
+        ),
+    )
+    parser.add_argument("--output_file", default="merged_best_results_union4.jsonl")
+    parser.add_argument(
+        "--model_path",
+        default="./pretrained_models/BAGEL-7B-MoT",
+    )
+    parser.add_argument("--ce_max_tokens", type=int, default=192)
+    parser.add_argument("--vit_max_side", type=int, default=168)
+    return parser.parse_args()
 
-        image_norm = image_embeds / image_embeds.norm(dim=-1, keepdim=True)
-        text_norm = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
-        return (image_norm @ text_norm.T).item()
-    except Exception as e:
-        print(f"  [错误] 无法计算分数 {image_path}: {e}")
-        return -1.0
 
-# --- 2. 参数设置 ---
-parser = argparse.ArgumentParser(description="根据 CLIP 分数择优并合并 A 和 B 的并集。")
-parser.add_argument("--file_a", type=str, default="merged_best_results_union4.jsonl")
-parser.add_argument("--file_b", type=str, default="/home/ma-user/work/wx1468559/geneval/Bagel/outputs_bagel_set1seed_dual_h.jsonl")
-parser.add_argument("--output_file", type=str, default="merged_best_results_union4.jsonl", help="输出文件路径")
-args = parser.parse_args()
-
-# --- 3. 数据加载与预处理 ---
 def load_and_prepare(filepath):
-    df = pd.read_json(filepath, orient="records", lines=True)
-    # 将 metadata 转为 string 方便后续作为 merge/join 的 Key 进行对比
-    df['meta_key'] = df['metadata'].apply(lambda x: json.dumps(x, sort_keys=True) if isinstance(x, dict) else x)
-    # 提取文件名作为 ID
-    df['sample_id'] = df['filename'].apply(os.path.basename)
-    return df
+    dataframe = pd.read_json(filepath, orient="records", lines=True)
+    dataframe["meta_key"] = dataframe["metadata"].apply(
+        lambda value: (
+            json.dumps(value, sort_keys=True) if isinstance(value, dict) else value
+        )
+    )
+    dataframe["sample_id"] = dataframe["filename"].apply(os.path.basename)
+    return dataframe
 
-print("正在读取 A 和 B 的结果文件...")
-df_a = load_and_prepare(args.file_a)
-df_b = load_and_prepare(args.file_b)
 
-# --- 4. 求并集并处理冲突 ---
-# 使用 meta_key 和 sample_id 求并集
-all_keys = pd.concat([df_a[['meta_key', 'sample_id']], df_b[['meta_key', 'sample_id']]]).drop_duplicates()
+class BagelCEScorer:
+    def __init__(self, model_path, ce_max_tokens, vit_max_side):
+        (
+            self.model,
+            self.vae_model,
+            self.tokenizer,
+            self.new_token_ids,
+            _,
+            self.vit_transform,
+        ) = initialize_full_model(model_path)
+        self.vae_model = self.vae_model.to("cpu")
+        self.ce_max_tokens = ce_max_tokens
+        self.vit_max_side = vit_max_side
+        self.cache = {}
+        for parameter in self.model.parameters():
+            parameter.requires_grad_(False)
 
-final_results = []
-stats = {"a_only": 0, "b_only": 0, "a_better": 0, "b_better": 0}
+    @staticmethod
+    def image_to_tensor(image):
+        array = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
+        return (
+            torch.from_numpy(array)
+            .permute(2, 0, 1)
+            .unsqueeze(0)
+            .contiguous()
+            .to(torch.bfloat16)
+        )
 
-for _, key_row in tqdm(all_keys.iterrows(), total=len(all_keys), desc="并集择优处理"):
-    m_key = key_row['meta_key']
-    s_id = key_row['sample_id']
-    
-    # 查找该 key 在 A 和 B 中是否存在
-    match_a = df_a[(df_a['meta_key'] == m_key) & (df_a['sample_id'] == s_id)]
-    match_b = df_b[(df_b['meta_key'] == m_key) & (df_b['sample_id'] == s_id)]
-    
-    in_a = not match_a.empty
-    in_b = not match_b.empty
-    
-    if in_a and not in_b:
-        # 只在 A 中有
-        selected_row = match_a.iloc[0].to_dict()
-        stats["a_only"] += 1
-    elif in_b and not in_a:
-        # 只在 B 中有
-        selected_row = match_b.iloc[0].to_dict()
-        stats["b_only"] += 1
-    else:
-        # A 和 B 都有，择优
-        row_a = match_a.iloc[0]
-        row_b = match_b.iloc[0]
-        
-        # 获取 prompt
-        prompt = json.loads(m_key)['prompt']
-        
-        score_a = calc_clip_score(row_a['filename'], prompt)
-        score_b = calc_clip_score(row_b['filename'], prompt)
-        
-        if score_a >= score_b:
-            selected_row = row_a.to_dict()
-            stats["a_better"] += 1
+    def score(self, image_path, prompt):
+        cache_key = (image_path, prompt)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        if not os.path.exists(image_path):
+            print(f"  [warning] Image does not exist: {image_path}")
+            return float("inf")
+
+        try:
+            with Image.open(image_path) as image:
+                width, height = image.size
+                image_tensor = self.image_to_tensor(image)
+            with torch.no_grad():
+                loss, _ = self.model.UnderstandingCELoss(
+                    x_t_0=None,
+                    target_text=prompt,
+                    vae_model=self.vae_model,
+                    image_shape=(height, width),
+                    image_transform=self.vit_transform,
+                    tokenizer=self.tokenizer,
+                    new_token_ids=self.new_token_ids,
+                    ce_max_tokens=self.ce_max_tokens,
+                    ce_vit_max_side=self.vit_max_side,
+                    umm_dropbp_layers=(),
+                    decoded_image=image_tensor,
+                )
+            score = loss.float().item()
+            self.cache[cache_key] = score
+            return score
+        except Exception as error:
+            print(f"  [error] Failed to score {image_path}: {error}")
+            return float("inf")
+
+
+def main():
+    args = parse_args()
+    print("Loading BAGEL understanding model...")
+    scorer = BagelCEScorer(
+        args.model_path,
+        args.ce_max_tokens,
+        args.vit_max_side,
+    )
+
+    print("Reading result files A and B...")
+    df_a = load_and_prepare(args.file_a)
+    df_b = load_and_prepare(args.file_b)
+    all_keys = pd.concat(
+        [df_a[["meta_key", "sample_id"]], df_b[["meta_key", "sample_id"]]]
+    ).drop_duplicates()
+
+    final_results = []
+    stats = {"a_only": 0, "b_only": 0, "a_better": 0, "b_better": 0}
+    for _, key_row in tqdm(
+        all_keys.iterrows(),
+        total=len(all_keys),
+        desc="Selecting by BAGEL CE",
+    ):
+        meta_key = key_row["meta_key"]
+        sample_id = key_row["sample_id"]
+        match_a = df_a[
+            (df_a["meta_key"] == meta_key) & (df_a["sample_id"] == sample_id)
+        ]
+        match_b = df_b[
+            (df_b["meta_key"] == meta_key) & (df_b["sample_id"] == sample_id)
+        ]
+
+        if not match_a.empty and match_b.empty:
+            selected_row = match_a.iloc[0].to_dict()
+            stats["a_only"] += 1
+        elif match_a.empty and not match_b.empty:
+            selected_row = match_b.iloc[0].to_dict()
+            stats["b_only"] += 1
         else:
-            selected_row = row_b.to_dict()
-            stats["b_better"] += 1
+            row_a = match_a.iloc[0]
+            row_b = match_b.iloc[0]
+            metadata = json.loads(meta_key) if isinstance(meta_key, str) else meta_key
+            prompt = metadata["prompt"]
+            ce_a = scorer.score(row_a["filename"], prompt)
+            ce_b = scorer.score(row_b["filename"], prompt)
+            if ce_a <= ce_b:
+                selected_row = row_a.to_dict()
+                stats["a_better"] += 1
+            else:
+                selected_row = row_b.to_dict()
+                stats["b_better"] += 1
 
-    # 清理临时字段并添加
-    selected_row.pop('meta_key', None)
-    selected_row.pop('sample_id', None)
-    final_results.append(selected_row)
+        selected_row.pop("meta_key", None)
+        selected_row.pop("sample_id", None)
+        final_results.append(selected_row)
 
-# --- 5. 保存结果 ---
-with open(args.output_file, 'w', encoding='utf-8') as f:
-    for entry in final_results:
-        f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    with open(args.output_file, "w", encoding="utf-8") as output_file:
+        for entry in final_results:
+            output_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-print("\n" + "="*50)
-print(f"并集处理完成！")
-print(f"总样本数: {len(final_results)}")
-print(f"- 仅存在于 A: {stats['a_only']}")
-print(f"- 仅存在于 B: {stats['b_only']}")
-print(f"- A/B 共存且 A 优: {stats['a_better']}")
-print(f"- A/B 共存且 B 优: {stats['b_better']}")
-print(f"输出文件: {args.output_file}")
-print("="*50)
+    print("\n" + "=" * 50)
+    print("Union merge complete")
+    print(f"Total samples: {len(final_results)}")
+    print(f"A only: {stats['a_only']}")
+    print(f"B only: {stats['b_only']}")
+    print(f"A selected by lower CE: {stats['a_better']}")
+    print(f"B selected by lower CE: {stats['b_better']}")
+    print(f"Output: {args.output_file}")
+    print("=" * 50)
+
+
+if __name__ == "__main__":
+    main()
