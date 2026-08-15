@@ -1,264 +1,31 @@
-import argparse
-import json
-import os
+==================================================
+(bagel) develop-iqp2ih40-5f986b85dc-jszph# python any.py 
 
-import numpy as np
-import pandas as pd
+GenEval selector comparison
+A                    overall=0.78718, image_acc=77.85% (1722/2212)
+B                    overall=0.77641, image_acc=76.85% (1700/2212), gain_vs_A=-1.08 points
+BAGEL CE             overall=0.78936, image_acc=78.12% (1728/2212), gain_vs_A=+0.22 points
+LongCLIP             overall=0.79199, image_acc=78.35% (1733/2212), gain_vs_A=+0.48 points
+Consensus -> A       overall=0.79358, image_acc=78.53% (1737/2212), gain_vs_A=+0.64 points
 
+Selector overlap on metric-changing samples
+  both_correct           77
+  clip_only_correct      33
+  ce_only_correct        28
+  both_wrong             38
+  same_choice           115
+  different_choice       61
+  oracle union          138/176 (78.41%)
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Analyze and combine BAGEL CE and LongCLIP GenEval selections."
-    )
-    parser.add_argument("--file_a", required=True)
-    parser.add_argument("--file_b", required=True)
-    parser.add_argument("--ce_file", required=True)
-    parser.add_argument("--clip_file", required=True)
-    parser.add_argument(
-        "--consensus_output",
-        default="consensus_selected.jsonl",
-        help="CE/CLIP agreement selection with fallback to A.",
-    )
-    parser.add_argument(
-        "--analysis_file",
-        default="selector_analysis.json",
-    )
-    parser.add_argument(
-        "--cases_file",
-        default="selector_disagreement_cases.jsonl",
-    )
-    return parser.parse_args()
+Per-tag disagreement accuracy
+  two_object       n=15  CE=60.00% CLIP=66.67% union=80.00%
+  position         n=35  CE=60.00% CLIP=62.86% union=77.14%
+  counting         n=43  CE=58.14% CLIP=69.77% union=76.74%
+  color_attr       n=58  CE=60.34% CLIP=55.17% union=79.31%
+  colors           n=22  CE=59.09% CLIP=63.64% union=81.82%
+  single_object    n=3   CE=66.67% CLIP=66.67% union=66.67%
 
-
-def load_results(path):
-    dataframe = pd.read_json(path, orient="records", lines=True)
-    dataframe["meta_key"] = dataframe["metadata"].apply(
-        lambda value: json.dumps(value, sort_keys=True)
-        if isinstance(value, dict)
-        else value
-    )
-    dataframe["sample_id"] = dataframe["filename"].apply(os.path.basename)
-    if "tag" not in dataframe:
-        dataframe["tag"] = dataframe["metadata"].apply(
-            lambda value: value.get("tag") if isinstance(value, dict) else None
-        )
-    return dataframe
-
-
-def make_index(dataframe, name):
-    keys = list(zip(dataframe["meta_key"], dataframe["sample_id"]))
-    if len(keys) != len(set(keys)):
-        raise ValueError(f"{name} contains duplicate sample keys")
-    return {key: row for key, (_, row) in zip(keys, dataframe.iterrows())}
-
-
-def summarize(dataframe):
-    task_scores = {
-        str(tag): float(group["correct"].astype(bool).mean())
-        for tag, group in dataframe.groupby("tag", sort=False)
-    }
-    return {
-        "correct": int(dataframe["correct"].astype(bool).sum()),
-        "total": int(len(dataframe)),
-        "image_accuracy": float(dataframe["correct"].astype(bool).mean()),
-        "task_scores": task_scores,
-        "overall": float(np.mean(list(task_scores.values()))),
-    }
-
-
-def selected_source(selected_row, row_a, row_b, name):
-    selected_path = os.path.normpath(str(selected_row["filename"]))
-    path_a = os.path.normpath(str(row_a["filename"]))
-    path_b = os.path.normpath(str(row_b["filename"]))
-    if selected_path == path_a:
-        return "a"
-    if selected_path == path_b:
-        return "b"
-    raise ValueError(
-        f"{name} selected path is neither A nor B: {selected_row['filename']}"
-    )
-
-
-def clean_row(row):
-    result = row.to_dict()
-    result.pop("meta_key", None)
-    result.pop("sample_id", None)
-    return result
-
-
-def json_default(value):
-    if isinstance(value, np.generic):
-        return value.item()
-    raise TypeError(f"Cannot serialize {type(value).__name__}")
-
-
-def print_summary(name, result, baseline=None):
-    line = (
-        f"{name:<20} overall={result['overall']:.5f}, "
-        f"image_acc={result['image_accuracy']:.2%} "
-        f"({result['correct']}/{result['total']})"
-    )
-    if baseline is not None:
-        gain = result["overall"] - baseline["overall"]
-        line += f", gain_vs_A={gain * 100:+.2f} points"
-    print(line)
-
-
-def main():
-    args = parse_args()
-    frames = {
-        "a": load_results(args.file_a),
-        "b": load_results(args.file_b),
-        "ce": load_results(args.ce_file),
-        "clip": load_results(args.clip_file),
-    }
-    indexes = {name: make_index(frame, name) for name, frame in frames.items()}
-    key_sets = {name: set(index) for name, index in indexes.items()}
-    expected_keys = key_sets["a"]
-    for name, keys in key_sets.items():
-        if keys != expected_keys:
-            raise ValueError(
-                f"{name} sample keys differ from A: "
-                f"missing={len(expected_keys - keys)}, extra={len(keys - expected_keys)}"
-            )
-
-    ordered_keys = list(zip(frames["a"]["meta_key"], frames["a"]["sample_id"]))
-    consensus_rows = []
-    cases = []
-    overlap = {
-        "both_correct": 0,
-        "clip_only_correct": 0,
-        "ce_only_correct": 0,
-        "both_wrong": 0,
-        "same_choice": 0,
-        "different_choice": 0,
-    }
-    tag_stats = {}
-
-    for key in ordered_keys:
-        row_a = indexes["a"][key]
-        row_b = indexes["b"][key]
-        row_ce = indexes["ce"][key]
-        row_clip = indexes["clip"][key]
-        correct_a = bool(row_a["correct"])
-        correct_b = bool(row_b["correct"])
-
-        if correct_a == correct_b:
-            consensus_rows.append(clean_row(row_a))
-            continue
-
-        ce_source = selected_source(row_ce, row_a, row_b, "CE")
-        clip_source = selected_source(row_clip, row_a, row_b, "LongCLIP")
-        ce_correct = bool(row_ce["correct"])
-        clip_correct = bool(row_clip["correct"])
-        tag = str(row_a["tag"])
-        per_tag = tag_stats.setdefault(
-            tag,
-            {"total": 0, "ce_correct": 0, "clip_correct": 0, "oracle_correct": 0},
-        )
-        per_tag["total"] += 1
-        per_tag["ce_correct"] += int(ce_correct)
-        per_tag["clip_correct"] += int(clip_correct)
-        per_tag["oracle_correct"] += int(ce_correct or clip_correct)
-
-        if ce_source == clip_source:
-            overlap["same_choice"] += 1
-            consensus_source = ce_source
-        else:
-            overlap["different_choice"] += 1
-            consensus_source = "a"
-
-        if ce_correct and clip_correct:
-            overlap["both_correct"] += 1
-            outcome = "both_correct"
-        elif clip_correct:
-            overlap["clip_only_correct"] += 1
-            outcome = "clip_only_correct"
-        elif ce_correct:
-            overlap["ce_only_correct"] += 1
-            outcome = "ce_only_correct"
-        else:
-            overlap["both_wrong"] += 1
-            outcome = "both_wrong"
-
-        consensus_row = row_a if consensus_source == "a" else row_b
-        consensus_rows.append(clean_row(consensus_row))
-        metadata = row_a["metadata"]
-        if isinstance(metadata, str):
-            metadata = json.loads(metadata)
-        cases.append(
-            {
-                "tag": tag,
-                "prompt": metadata.get("prompt"),
-                "a_filename": row_a["filename"],
-                "a_correct": correct_a,
-                "b_filename": row_b["filename"],
-                "b_correct": correct_b,
-                "ce_choice": ce_source,
-                "clip_choice": clip_source,
-                "consensus_choice": consensus_source,
-                "outcome": outcome,
-            }
-        )
-
-    with open(args.consensus_output, "w", encoding="utf-8") as output_file:
-        for row in consensus_rows:
-            output_file.write(
-                json.dumps(row, ensure_ascii=False, default=json_default) + "\n"
-            )
-    with open(args.cases_file, "w", encoding="utf-8") as cases_file:
-        for case in cases:
-            cases_file.write(json.dumps(case, ensure_ascii=False) + "\n")
-
-    summaries = {
-        "a": summarize(frames["a"]),
-        "b": summarize(frames["b"]),
-        "ce": summarize(frames["ce"]),
-        "clip": summarize(frames["clip"]),
-        "consensus": summarize(load_results(args.consensus_output)),
-    }
-    oracle_correct = overlap["both_correct"] + overlap["clip_only_correct"] + overlap["ce_only_correct"]
-    disagreement_total = len(cases)
-    oracle_accuracy = (
-        oracle_correct / disagreement_total if disagreement_total else 0.0
-    )
-    analysis = {
-        "summaries": summaries,
-        "disagreement_total": disagreement_total,
-        "overlap": overlap,
-        "oracle_union_correct": oracle_correct,
-        "oracle_union_accuracy": oracle_accuracy,
-        "tag_disagreements": tag_stats,
-    }
-    with open(args.analysis_file, "w", encoding="utf-8") as output_file:
-        json.dump(analysis, output_file, indent=2, ensure_ascii=False)
-
-    print("\nGenEval selector comparison")
-    print_summary("A", summaries["a"])
-    print_summary("B", summaries["b"], summaries["a"])
-    print_summary("BAGEL CE", summaries["ce"], summaries["a"])
-    print_summary("LongCLIP", summaries["clip"], summaries["a"])
-    print_summary("Consensus -> A", summaries["consensus"], summaries["a"])
-    print("\nSelector overlap on metric-changing samples")
-    for key, value in overlap.items():
-        print(f"  {key:<20} {value:>4}")
-    print(
-        f"  oracle union         {oracle_correct:>4}/{disagreement_total} "
-        f"({oracle_accuracy:.2%})"
-    )
-    print("\nPer-tag disagreement accuracy")
-    for tag, values in tag_stats.items():
-        total = values["total"]
-        print(
-            f"  {tag:<16} n={total:<3} "
-            f"CE={values['ce_correct'] / total:.2%} "
-            f"CLIP={values['clip_correct'] / total:.2%} "
-            f"union={values['oracle_correct'] / total:.2%}"
-        )
-    print(f"\nConsensus output: {args.consensus_output}")
-    print(f"Cases: {args.cases_file}")
-    print(f"Analysis: {args.analysis_file}")
-
-
-if __name__ == "__main__":
-    main()
+Consensus output: consensus_selected.jsonl
+Cases: selector_disagreement_cases.jsonl
+Analysis: selector_analysis.json
+(bagel) develop-iqp2ih40-5f986b85dc-jszph# 
