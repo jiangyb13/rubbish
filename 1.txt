@@ -1,294 +1,282 @@
-import argparse
-import json
-import os
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:   3%|████                                                                                                                  | 77/2212 [00:03<01:16, 27.77it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:   4%|████▍                                                                                                                 | 84/2212 [00:04<01:21, 26.18it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:   5%|█████▉                                                                                                               | 113/2212 [00:04<00:45, 46.45it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:   7%|████████                                                                                                             | 153/2212 [00:04<00:29, 70.89it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:   7%|████████▌                                                                                                            | 161/2212 [00:05<00:35, 57.87it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:   8%|████████▊                                                                                                            | 167/2212 [00:05<00:43, 46.60it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  10%|███████████▋                                                                                                         | 221/2212 [00:05<00:23, 84.62it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  11%|████████████▋                                                                                                        | 240/2212 [00:06<00:25, 77.66it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  11%|█████████████                                                                                                        | 248/2212 [00:06<00:31, 62.07it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  12%|█████████████▍                                                                                                       | 255/2212 [00:06<00:38, 50.73it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  12%|██████████████▌                                                                                                      | 275/2212 [00:06<00:35, 54.35it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  13%|██████████████▊                                                                                                      | 281/2212 [00:07<00:43, 43.97it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  13%|███████████████▏                                                                                                     | 286/2212 [00:08<01:28, 21.88it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  14%|███████████████▊                                                                                                     | 299/2212 [00:08<01:13, 26.00it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  14%|████████████████                                                                                                     | 303/2212 [00:08<01:23, 22.88it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  15%|█████████████████                                                                                                    | 322/2212 [00:09<00:58, 32.26it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  15%|█████████████████▏                                                                                                   | 326/2212 [00:09<01:26, 21.68it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  15%|█████████████████▍                                                                                                   | 329/2212 [00:10<01:39, 18.94it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  15%|█████████████████▌                                                                                                   | 332/2212 [00:10<01:52, 16.73it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  18%|█████████████████████▏                                                                                               | 400/2212 [00:10<00:26, 69.15it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  19%|█████████████████████▉                                                                                               | 414/2212 [00:11<00:28, 62.46it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  19%|██████████████████████▎                                                                                              | 421/2212 [00:11<00:35, 51.04it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  20%|███████████████████████▋                                                                                             | 449/2212 [00:11<00:28, 61.64it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  21%|████████████████████████▊                                                                                            | 469/2212 [00:11<00:28, 62.11it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  22%|█████████████████████████▏                                                                                           | 476/2212 [00:12<00:53, 32.41it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  22%|█████████████████████████▌                                                                                           | 483/2212 [00:13<00:56, 30.43it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  22%|█████████████████████████▊                                                                                           | 487/2212 [00:13<01:05, 26.43it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  22%|█████████████████████████▉                                                                                           | 491/2212 [00:13<01:14, 23.21it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  23%|██████████████████████████▎                                                                                          | 498/2212 [00:14<01:14, 23.04it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  23%|██████████████████████████▌                                                                                          | 503/2212 [00:14<01:20, 21.23it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  23%|███████████████████████████                                                                                          | 512/2212 [00:14<01:12, 23.34it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  23%|███████████████████████████▍                                                                                         | 519/2212 [00:15<01:14, 22.80it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  24%|███████████████████████████▌                                                                                         | 522/2212 [00:15<01:29, 18.79it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  24%|███████████████████████████▊                                                                                         | 525/2212 [00:15<01:44, 16.18it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  24%|███████████████████████████▉                                                                                         | 528/2212 [00:15<01:57, 14.37it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  24%|████████████████████████████▎                                                                                        | 536/2212 [00:16<01:34, 17.70it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  27%|███████████████████████████████▌                                                                                     | 597/2212 [00:16<00:22, 70.28it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  27%|████████████████████████████████                                                                                     | 606/2212 [00:16<00:27, 58.46it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  28%|█████████████████████████████████                                                                                    | 625/2212 [00:17<00:26, 59.23it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  30%|███████████████████████████████████▎                                                                                 | 668/2212 [00:17<00:18, 82.29it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  31%|███████████████████████████████████▊                                                                                 | 677/2212 [00:17<00:22, 67.10it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  31%|████████████████████████████████████▎                                                                                | 686/2212 [00:18<00:27, 55.68it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  31%|████████████████████████████████████▌                                                                                | 692/2212 [00:18<00:43, 34.90it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  32%|█████████████████████████████████████▉                                                                               | 717/2212 [00:19<00:32, 46.09it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  33%|██████████████████████████████████████▏                                                                              | 723/2212 [00:19<00:38, 39.05it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  34%|███████████████████████████████████████▏                                                                             | 742/2212 [00:19<00:32, 44.85it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  34%|███████████████████████████████████████▌                                                                             | 747/2212 [00:19<00:39, 37.25it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  34%|████████████████████████████████████████▎                                                                            | 761/2212 [00:20<00:36, 39.47it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  35%|████████████████████████████████████████▌                                                                            | 766/2212 [00:20<00:43, 33.13it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  36%|█████████████████████████████████████████▉                                                                           | 793/2212 [00:20<00:28, 49.59it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  37%|███████████████████████████████████████████▋                                                                         | 826/2212 [00:21<00:20, 66.83it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  38%|████████████████████████████████████████████                                                                         | 833/2212 [00:21<00:25, 53.96it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  38%|████████████████████████████████████████████▍                                                                        | 841/2212 [00:21<00:30, 45.25it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  38%|████████████████████████████████████████████▋                                                                        | 846/2212 [00:22<00:48, 28.02it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  39%|█████████████████████████████████████████████▌                                                                       | 862/2212 [00:22<00:39, 33.97it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  40%|██████████████████████████████████████████████▏                                                                      | 874/2212 [00:23<00:38, 35.13it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  40%|███████████████████████████████████████████████▏                                                                     | 892/2212 [00:23<00:32, 41.09it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  41%|████████████████████████████████████████████████▌                                                                    | 917/2212 [00:23<00:25, 51.52it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  42%|████████████████████████████████████████████████▊                                                                    | 924/2212 [00:24<00:29, 43.55it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  42%|█████████████████████████████████████████████████▏                                                                   | 929/2212 [00:24<00:36, 35.44it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  43%|█████████████████████████████████████████████████▊                                                                   | 941/2212 [00:24<00:35, 36.07it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  43%|█████████████████████████████████████████████████▉                                                                   | 945/2212 [00:24<00:43, 29.38it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  43%|██████████████████████████████████████████████████▏                                                                  | 948/2212 [00:25<00:53, 23.69it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  43%|██████████████████████████████████████████████████▎                                                                  | 951/2212 [00:25<01:21, 15.43it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  44%|███████████████████████████████████████████████████▎                                                                 | 969/2212 [00:26<00:47, 26.25it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  44%|███████████████████████████████████████████████████▌                                                                 | 976/2212 [00:26<00:49, 25.20it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  45%|████████████████████████████████████████████████████▊                                                               | 1006/2212 [00:26<00:27, 44.60it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  46%|█████████████████████████████████████████████████████                                                               | 1011/2212 [00:27<00:32, 36.53it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  47%|██████████████████████████████████████████████████████▎                                                             | 1035/2212 [00:27<00:24, 48.49it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  47%|██████████████████████████████████████████████████████▋                                                             | 1043/2212 [00:27<00:27, 41.93it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  47%|██████████████████████████████████████████████████████▉                                                             | 1048/2212 [00:28<00:34, 34.11it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  48%|███████████████████████████████████████████████████████▏                                                            | 1053/2212 [00:28<00:40, 28.75it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  48%|███████████████████████████████████████████████████████▍                                                            | 1057/2212 [00:28<00:48, 23.76it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  48%|███████████████████████████████████████████████████████▉                                                            | 1066/2212 [00:28<00:45, 25.14it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  50%|█████████████████████████████████████████████████████████▌                                                          | 1097/2212 [00:29<00:23, 46.61it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  50%|█████████████████████████████████████████████████████████▊                                                          | 1102/2212 [00:29<00:37, 29.56it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  50%|██████████████████████████████████████████████████████████▏                                                         | 1109/2212 [00:30<00:39, 27.76it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  50%|██████████████████████████████████████████████████████████▎                                                         | 1113/2212 [00:30<00:46, 23.86it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  51%|██████████████████████████████████████████████████████████▉                                                         | 1123/2212 [00:30<00:41, 26.14it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  51%|███████████████████████████████████████████████████████████▌                                                        | 1136/2212 [00:31<00:35, 30.63it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  52%|███████████████████████████████████████████████████████████▊                                                        | 1140/2212 [00:31<00:43, 24.71it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  52%|███████████████████████████████████████████████████████████▉                                                        | 1143/2212 [00:31<00:52, 20.35it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  52%|████████████████████████████████████████████████████████████▏                                                       | 1148/2212 [00:32<00:56, 18.97it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  53%|█████████████████████████████████████████████████████████████                                                       | 1164/2212 [00:32<00:37, 27.94it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  55%|████████████████████████████████████████████████████████████████▎                                                   | 1226/2212 [00:32<00:13, 74.87it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  56%|████████████████████████████████████████████████████████████████▊                                                   | 1236/2212 [00:33<00:15, 61.33it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 1253/2212 [00:33<00:16, 57.54it/s]ce vit input: 168x168, tokens: 144
 
-import numpy as np
-import pandas as pd
-from PIL import Image
-import torch
-from tqdm import tqdm
+Selecting by BAGEL CE:  99%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋ | 2186/2212 [00:55<00:00, 29.15it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍| 2201/2212 [00:55<00:00, 33.85it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋| 2205/2212 [00:56<00:00, 28.33it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2212/2212 [00:56<00:00, 39.14it/s]
 
-from inference import initialize_full_model
+==================================================
+Final GenEval comparison
+A: overall=0.77641, image_acc=76.85% (1700/2212)
+  two_object=95.71%  position=49.00%  single_object=99.06%  counting=74.38%  color_attr=61.00%  colors=86.70%
+B: overall=0.78718, image_acc=77.85% (1722/2212)
+  two_object=94.95%  position=46.25%  single_object=100.00%  counting=77.81%  color_attr=65.00%  colors=88.30%
+CE selected: overall=0.78936, image_acc=78.12% (1728/2212)
+  two_object=95.71%  position=48.50%  single_object=99.69%  counting=77.19%  color_attr=64.50%  colors=88.03%
+Gain vs A: +0.01295 (+1.29 points)
+Gain vs B: +0.00217 (+0.22 points)
+CE disagreement accuracy: 59.66% (105/176)
+A selected: 2112
+B selected: 100
+Output: merged_best_results_union4.jsonl
+Metrics: merged_best_results_union4.jsonl.metrics.json
+==================================================
+(bagel) develop-iqp2ih40-5f986b85dc-jszph# python calc_ce.py
+/home/ma-user/work/wx1468559/Bagel-Reca/modeling/longclip_b/model/longclip.py:6: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+Reading result files A and B...
 
+Original GenEval results
+A: overall=0.78718, image_acc=77.85% (1722/2212)
+  two_object=94.95%  position=46.25%  single_object=100.00%  counting=77.81%  color_attr=65.00%  colors=88.30%
+B: overall=0.77641, image_acc=76.85% (1700/2212)
+  two_object=95.71%  position=49.00%  single_object=99.06%  counting=74.38%  color_attr=61.00%  colors=86.70%
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Merge two JSONL result sets using BAGEL understanding CE."
-    )
-    parser.add_argument("--file_a", default="merged_best_results_union4.jsonl")
-    parser.add_argument(
-        "--file_b",
-        default=(
-            "/home/ma-user/work/wx1468559/geneval/Bagel/"
-            "outputs_bagel_set1seed_dual_h.jsonl"
-        ),
-    )
-    parser.add_argument("--output_file", default="merged_best_results_union4.jsonl")
-    parser.add_argument(
-        "--model_path",
-        default="./pretrained_models/BAGEL-7B-MoT",
-    )
-    parser.add_argument("--ce_max_tokens", type=int, default=192)
-    parser.add_argument("--vit_max_side", type=int, default=168)
-    parser.add_argument(
-        "--metrics_file",
-        default=None,
-        help="Metrics JSON path (default: <output_file>.metrics.json)",
-    )
-    return parser.parse_args()
+Correctness agreement: 2036/2212; CE decisions needed: 176
+Loading BAGEL understanding model...
+The safetensors archive passed at ./pretrained_models/BAGEL-7B-MoT/ema.safetensors does not contain metadata. Make sure to save your model with the `save_pretrained` method. Defaulting to 'pt' metadata.
+模型加载完成
 
+Selecting by BAGEL CE:  90%|████████████████████████████████████████████████████████████████████████████████████████████████████████▉           | 2000/2212 [00:49<00:03, 60.94it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  92%|██████████████████████████████████████████████████████████████████████████████████████████████████████████▉         | 2039/2212 [00:50<00:02, 78.12it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  94%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████▏      | 2081/2212 [00:50<00:01, 92.92it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  95%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████▋      | 2092/2212 [00:50<00:01, 77.20it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  96%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████     | 2117/2212 [00:51<00:01, 78.04it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  97%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋   | 2148/2212 [00:51<00:00, 84.55it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  98%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████   | 2157/2212 [00:52<00:01, 44.25it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  98%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍  | 2164/2212 [00:52<00:01, 40.14it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  98%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▊  | 2170/2212 [00:52<00:01, 35.24it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  99%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 2182/2212 [00:53<00:00, 36.32it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE:  99%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋ | 2187/2212 [00:53<00:00, 31.34it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍| 2201/2212 [00:53<00:00, 35.63it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋| 2205/2212 [00:54<00:00, 29.60it/s]ce vit input: 168x168, tokens: 144
+ce vit input: 168x168, tokens: 144
+Selecting by BAGEL CE: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2212/2212 [00:54<00:00, 40.73it/s]
 
-def load_and_prepare(filepath):
-    dataframe = pd.read_json(filepath, orient="records", lines=True)
-    dataframe["meta_key"] = dataframe["metadata"].apply(
-        lambda value: (
-            json.dumps(value, sort_keys=True) if isinstance(value, dict) else value
-        )
-    )
-    dataframe["sample_id"] = dataframe["filename"].apply(os.path.basename)
-    if "tag" not in dataframe:
-        dataframe["tag"] = dataframe["metadata"].apply(
-            lambda value: value.get("tag") if isinstance(value, dict) else None
-        )
-    required_columns = {"filename", "metadata", "tag", "correct"}
-    missing_columns = required_columns.difference(dataframe.columns)
-    if missing_columns:
-        raise ValueError(
-            f"{filepath} is missing required columns: {sorted(missing_columns)}"
-        )
-    return dataframe
-
-
-def make_index(dataframe, name):
-    keys = list(zip(dataframe["meta_key"], dataframe["sample_id"]))
-    duplicate_count = len(keys) - len(set(keys))
-    if duplicate_count:
-        raise ValueError(f"{name} contains {duplicate_count} duplicate sample keys")
-    return {key: row for key, (_, row) in zip(keys, dataframe.iterrows())}
-
-
-def summarize_geneval(dataframe):
-    task_scores = {
-        str(tag): float(task_df["correct"].astype(bool).mean())
-        for tag, task_df in dataframe.groupby("tag", sort=False)
-    }
-    return {
-        "num_images": int(len(dataframe)),
-        "num_prompts": int(dataframe["meta_key"].nunique()),
-        "correct_images": int(dataframe["correct"].astype(bool).sum()),
-        "image_accuracy": float(dataframe["correct"].astype(bool).mean()),
-        "task_scores": task_scores,
-        "overall": float(np.mean(list(task_scores.values()))),
-    }
-
-
-def print_summary(name, summary):
-    task_text = "  ".join(
-        f"{tag}={score:.2%}" for tag, score in summary["task_scores"].items()
-    )
-    print(
-        f"{name}: overall={summary['overall']:.5f}, "
-        f"image_acc={summary['image_accuracy']:.2%} "
-        f"({summary['correct_images']}/{summary['num_images']})"
-    )
-    print(f"  {task_text}")
-
-
-def json_default(value):
-    if isinstance(value, np.generic):
-        return value.item()
-    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
-
-
-class BagelCEScorer:
-    def __init__(self, model_path, ce_max_tokens, vit_max_side):
-        (
-            self.model,
-            self.vae_model,
-            self.tokenizer,
-            self.new_token_ids,
-            _,
-            self.vit_transform,
-        ) = initialize_full_model(model_path)
-        self.vae_model = self.vae_model.to("cpu")
-        self.ce_max_tokens = ce_max_tokens
-        self.vit_max_side = vit_max_side
-        self.cache = {}
-        vit_parameter = next(self.model.vit_model.parameters())
-        self.vit_device = vit_parameter.device
-        self.vit_dtype = vit_parameter.dtype
-        for parameter in self.model.parameters():
-            parameter.requires_grad_(False)
-
-    @staticmethod
-    def image_to_tensor(image):
-        array = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
-        return (
-            torch.from_numpy(array)
-            .permute(2, 0, 1)
-            .unsqueeze(0)
-            .contiguous()
-        )
-
-    def score(self, image_path, prompt):
-        cache_key = (image_path, prompt)
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"Image does not exist: {image_path}")
-
-        try:
-            with Image.open(image_path) as image:
-                width, height = image.size
-                image_tensor = self.image_to_tensor(image)
-            image_tensor = image_tensor.to(
-                device=self.vit_device,
-                dtype=self.vit_dtype,
-            )
-            with torch.no_grad():
-                loss, _ = self.model.UnderstandingCELoss(
-                    x_t_0=None,
-                    target_text=prompt,
-                    vae_model=self.vae_model,
-                    image_shape=(height, width),
-                    image_transform=self.vit_transform,
-                    tokenizer=self.tokenizer,
-                    new_token_ids=self.new_token_ids,
-                    ce_max_tokens=self.ce_max_tokens,
-                    ce_vit_max_side=self.vit_max_side,
-                    umm_dropbp_layers=(),
-                    decoded_image=image_tensor,
-                )
-            score = loss.float().item()
-            self.cache[cache_key] = score
-            return score
-        except Exception as error:
-            raise RuntimeError(f"Failed to score {image_path}: {error}") from error
-
-
-def main():
-    args = parse_args()
-    print("Reading result files A and B...")
-    df_a = load_and_prepare(args.file_a)
-    df_b = load_and_prepare(args.file_b)
-    index_a = make_index(df_a, "A")
-    index_b = make_index(df_b, "B")
-    keys_a = set(index_a)
-    keys_b = set(index_b)
-    if keys_a != keys_b:
-        raise ValueError(
-            "A and B must contain the same GenEval samples for a fair comparison: "
-            f"A-only={len(keys_a - keys_b)}, B-only={len(keys_b - keys_a)}"
-        )
-
-    summary_a = summarize_geneval(df_a)
-    summary_b = summarize_geneval(df_b)
-    print("\nOriginal GenEval results")
-    print_summary("A", summary_a)
-    print_summary("B", summary_b)
-
-    disagreement_count = sum(
-        bool(index_a[key]["correct"]) != bool(index_b[key]["correct"])
-        for key in keys_a
-    )
-    print(
-        f"\nCorrectness agreement: {len(keys_a) - disagreement_count}/{len(keys_a)}; "
-        f"CE decisions needed: {disagreement_count}"
-    )
-
-    scorer = None
-    if disagreement_count:
-        print("Loading BAGEL understanding model...")
-        scorer = BagelCEScorer(
-            args.model_path,
-            args.ce_max_tokens,
-            args.vit_max_side,
-        )
-
-    final_results = []
-    stats = {
-        "agreements_skipped": 0,
-        "ce_decisions": 0,
-        "a_selected": 0,
-        "b_selected": 0,
-        "ce_selected_correct": 0,
-    }
-    ordered_keys = list(zip(df_a["meta_key"], df_a["sample_id"]))
-    for key in tqdm(
-        ordered_keys,
-        total=len(ordered_keys),
-        desc="Selecting by BAGEL CE",
-    ):
-        row_a = index_a[key]
-        row_b = index_b[key]
-        correct_a = bool(row_a["correct"])
-        correct_b = bool(row_b["correct"])
-
-        if correct_a == correct_b:
-            # The choice cannot change any GenEval metric, so avoid two UMM forwards.
-            selected_row = row_a.to_dict()
-            stats["agreements_skipped"] += 1
-            stats["a_selected"] += 1
-        else:
-            meta_key = key[0]
-            metadata = json.loads(meta_key) if isinstance(meta_key, str) else meta_key
-            prompt = metadata["prompt"]
-            ce_a = scorer.score(row_a["filename"], prompt)
-            ce_b = scorer.score(row_b["filename"], prompt)
-            if ce_a <= ce_b:
-                selected_row = row_a.to_dict()
-                stats["a_selected"] += 1
-            else:
-                selected_row = row_b.to_dict()
-                stats["b_selected"] += 1
-            stats["ce_decisions"] += 1
-            stats["ce_selected_correct"] += int(bool(selected_row["correct"]))
-
-        selected_row.pop("meta_key", None)
-        selected_row.pop("sample_id", None)
-        final_results.append(selected_row)
-
-    with open(args.output_file, "w", encoding="utf-8") as output_file:
-        for entry in final_results:
-            output_file.write(
-                json.dumps(entry, ensure_ascii=False, default=json_default) + "\n"
-            )
-
-    selected_df = load_and_prepare(args.output_file)
-    summary_selected = summarize_geneval(selected_df)
-    gain_vs_a = summary_selected["overall"] - summary_a["overall"]
-    gain_vs_b = summary_selected["overall"] - summary_b["overall"]
-    metrics = {
-        "a": summary_a,
-        "b": summary_b,
-        "ce_selected": summary_selected,
-        "gain_vs_a": gain_vs_a,
-        "gain_vs_b": gain_vs_b,
-        "selection": stats,
-    }
-    metrics_path = args.metrics_file or f"{args.output_file}.metrics.json"
-    with open(metrics_path, "w", encoding="utf-8") as metrics_file:
-        json.dump(metrics, metrics_file, indent=2, ensure_ascii=False)
-
-    print("\n" + "=" * 50)
-    print("Final GenEval comparison")
-    print_summary("A", summary_a)
-    print_summary("B", summary_b)
-    print_summary("CE selected", summary_selected)
-    print(f"Gain vs A: {gain_vs_a:+.5f} ({gain_vs_a * 100:+.2f} points)")
-    print(f"Gain vs B: {gain_vs_b:+.5f} ({gain_vs_b * 100:+.2f} points)")
-    if stats["ce_decisions"]:
-        decision_accuracy = stats["ce_selected_correct"] / stats["ce_decisions"]
-        print(
-            f"CE disagreement accuracy: {decision_accuracy:.2%} "
-            f"({stats['ce_selected_correct']}/{stats['ce_decisions']})"
-        )
-    print(f"A selected: {stats['a_selected']}")
-    print(f"B selected: {stats['b_selected']}")
-    print(f"Output: {args.output_file}")
-    print(f"Metrics: {metrics_path}")
-    print("=" * 50)
-
-
-if __name__ == "__main__":
-    main()
+==================================================
+Final GenEval comparison
+A: overall=0.78718, image_acc=77.85% (1722/2212)
+  two_object=94.95%  position=46.25%  single_object=100.00%  counting=77.81%  color_attr=65.00%  colors=88.30%
+B: overall=0.77641, image_acc=76.85% (1700/2212)
+  two_object=95.71%  position=49.00%  single_object=99.06%  counting=74.38%  color_attr=61.00%  colors=86.70%
+CE selected: overall=0.78936, image_acc=78.12% (1728/2212)
+  two_object=95.71%  position=48.50%  single_object=99.69%  counting=77.19%  color_attr=64.50%  colors=88.03%
+Gain vs A: +0.00217 (+0.22 points)
+Gain vs B: +0.01295 (+1.29 points)
+CE disagreement accuracy: 59.66% (105/176)
+A selected: 2136
+B selected: 76
+Output: merged_best_results_union4.jsonl
+Metrics: merged_best_results_union4.jsonl.metrics.json
+==================================================
+(bagel) develop-iqp2ih40-5f986b85dc-jszph# 
