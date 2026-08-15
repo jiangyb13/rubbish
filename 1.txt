@@ -1,3 +1,4 @@
+
 import argparse
 import gc
 import json
@@ -16,12 +17,11 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Merge two JSONL result sets using BAGEL understanding CE."
     )
-    parser.add_argument("--file_a", default="merged_best_results_union4.jsonl")
+    parser.add_argument("--file_b", default="/home/ma-user/work/wx1468559/geneval/Bagel/outputs_bagel_set1seed_h.jsonl")
     parser.add_argument(
-        "--file_b",
+        "--file_a",
         default=(
-            "/home/ma-user/work/wx1468559/geneval/Bagel/"
-            "outputs_bagel_set1seed_dual_h.jsonl"
+            "/home/ma-user/work/wx1468559/geneval/Bagel/outputs_reca_set1seed_det_5_10_300_clip001_debug_edit3_new_h.jsonl"
         ),
     )
     parser.add_argument("--output_file", default="merged_best_results_union4.jsonl")
