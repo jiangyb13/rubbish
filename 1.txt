@@ -30,6 +30,11 @@ def parse_args():
     )
     parser.add_argument("--ce_max_tokens", type=int, default=192)
     parser.add_argument("--vit_max_side", type=int, default=168)
+    parser.add_argument(
+        "--metrics_file",
+        default=None,
+        help="Metrics JSON path (default: <output_file>.metrics.json)",
+    )
     return parser.parse_args()
 
 
@@ -41,7 +46,58 @@ def load_and_prepare(filepath):
         )
     )
     dataframe["sample_id"] = dataframe["filename"].apply(os.path.basename)
+    if "tag" not in dataframe:
+        dataframe["tag"] = dataframe["metadata"].apply(
+            lambda value: value.get("tag") if isinstance(value, dict) else None
+        )
+    required_columns = {"filename", "metadata", "tag", "correct"}
+    missing_columns = required_columns.difference(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            f"{filepath} is missing required columns: {sorted(missing_columns)}"
+        )
     return dataframe
+
+
+def make_index(dataframe, name):
+    keys = list(zip(dataframe["meta_key"], dataframe["sample_id"]))
+    duplicate_count = len(keys) - len(set(keys))
+    if duplicate_count:
+        raise ValueError(f"{name} contains {duplicate_count} duplicate sample keys")
+    return {key: row for key, (_, row) in zip(keys, dataframe.iterrows())}
+
+
+def summarize_geneval(dataframe):
+    task_scores = {
+        str(tag): float(task_df["correct"].astype(bool).mean())
+        for tag, task_df in dataframe.groupby("tag", sort=False)
+    }
+    return {
+        "num_images": int(len(dataframe)),
+        "num_prompts": int(dataframe["meta_key"].nunique()),
+        "correct_images": int(dataframe["correct"].astype(bool).sum()),
+        "image_accuracy": float(dataframe["correct"].astype(bool).mean()),
+        "task_scores": task_scores,
+        "overall": float(np.mean(list(task_scores.values()))),
+    }
+
+
+def print_summary(name, summary):
+    task_text = "  ".join(
+        f"{tag}={score:.2%}" for tag, score in summary["task_scores"].items()
+    )
+    print(
+        f"{name}: overall={summary['overall']:.5f}, "
+        f"image_acc={summary['image_accuracy']:.2%} "
+        f"({summary['correct_images']}/{summary['num_images']})"
+    )
+    print(f"  {task_text}")
+
+
+def json_default(value):
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 class BagelCEScorer:
@@ -79,8 +135,7 @@ class BagelCEScorer:
         if cache_key in self.cache:
             return self.cache[cache_key]
         if not os.path.exists(image_path):
-            print(f"  [warning] Image does not exist: {image_path}")
-            return float("inf")
+            raise FileNotFoundError(f"Image does not exist: {image_path}")
 
         try:
             with Image.open(image_path) as image:
@@ -108,61 +163,86 @@ class BagelCEScorer:
             self.cache[cache_key] = score
             return score
         except Exception as error:
-            print(f"  [error] Failed to score {image_path}: {error}")
-            return float("inf")
+            raise RuntimeError(f"Failed to score {image_path}: {error}") from error
 
 
 def main():
     args = parse_args()
-    print("Loading BAGEL understanding model...")
-    scorer = BagelCEScorer(
-        args.model_path,
-        args.ce_max_tokens,
-        args.vit_max_side,
-    )
-
     print("Reading result files A and B...")
     df_a = load_and_prepare(args.file_a)
     df_b = load_and_prepare(args.file_b)
-    all_keys = pd.concat(
-        [df_a[["meta_key", "sample_id"]], df_b[["meta_key", "sample_id"]]]
-    ).drop_duplicates()
+    index_a = make_index(df_a, "A")
+    index_b = make_index(df_b, "B")
+    keys_a = set(index_a)
+    keys_b = set(index_b)
+    if keys_a != keys_b:
+        raise ValueError(
+            "A and B must contain the same GenEval samples for a fair comparison: "
+            f"A-only={len(keys_a - keys_b)}, B-only={len(keys_b - keys_a)}"
+        )
+
+    summary_a = summarize_geneval(df_a)
+    summary_b = summarize_geneval(df_b)
+    print("\nOriginal GenEval results")
+    print_summary("A", summary_a)
+    print_summary("B", summary_b)
+
+    disagreement_count = sum(
+        bool(index_a[key]["correct"]) != bool(index_b[key]["correct"])
+        for key in keys_a
+    )
+    print(
+        f"\nCorrectness agreement: {len(keys_a) - disagreement_count}/{len(keys_a)}; "
+        f"CE decisions needed: {disagreement_count}"
+    )
+
+    scorer = None
+    if disagreement_count:
+        print("Loading BAGEL understanding model...")
+        scorer = BagelCEScorer(
+            args.model_path,
+            args.ce_max_tokens,
+            args.vit_max_side,
+        )
 
     final_results = []
-    stats = {"a_only": 0, "b_only": 0, "a_better": 0, "b_better": 0}
-    for _, key_row in tqdm(
-        all_keys.iterrows(),
-        total=len(all_keys),
+    stats = {
+        "agreements_skipped": 0,
+        "ce_decisions": 0,
+        "a_selected": 0,
+        "b_selected": 0,
+        "ce_selected_correct": 0,
+    }
+    ordered_keys = list(zip(df_a["meta_key"], df_a["sample_id"]))
+    for key in tqdm(
+        ordered_keys,
+        total=len(ordered_keys),
         desc="Selecting by BAGEL CE",
     ):
-        meta_key = key_row["meta_key"]
-        sample_id = key_row["sample_id"]
-        match_a = df_a[
-            (df_a["meta_key"] == meta_key) & (df_a["sample_id"] == sample_id)
-        ]
-        match_b = df_b[
-            (df_b["meta_key"] == meta_key) & (df_b["sample_id"] == sample_id)
-        ]
+        row_a = index_a[key]
+        row_b = index_b[key]
+        correct_a = bool(row_a["correct"])
+        correct_b = bool(row_b["correct"])
 
-        if not match_a.empty and match_b.empty:
-            selected_row = match_a.iloc[0].to_dict()
-            stats["a_only"] += 1
-        elif match_a.empty and not match_b.empty:
-            selected_row = match_b.iloc[0].to_dict()
-            stats["b_only"] += 1
+        if correct_a == correct_b:
+            # The choice cannot change any GenEval metric, so avoid two UMM forwards.
+            selected_row = row_a.to_dict()
+            stats["agreements_skipped"] += 1
+            stats["a_selected"] += 1
         else:
-            row_a = match_a.iloc[0]
-            row_b = match_b.iloc[0]
+            meta_key = key[0]
             metadata = json.loads(meta_key) if isinstance(meta_key, str) else meta_key
             prompt = metadata["prompt"]
             ce_a = scorer.score(row_a["filename"], prompt)
             ce_b = scorer.score(row_b["filename"], prompt)
             if ce_a <= ce_b:
                 selected_row = row_a.to_dict()
-                stats["a_better"] += 1
+                stats["a_selected"] += 1
             else:
                 selected_row = row_b.to_dict()
-                stats["b_better"] += 1
+                stats["b_selected"] += 1
+            stats["ce_decisions"] += 1
+            stats["ce_selected_correct"] += int(bool(selected_row["correct"]))
 
         selected_row.pop("meta_key", None)
         selected_row.pop("sample_id", None)
@@ -170,16 +250,43 @@ def main():
 
     with open(args.output_file, "w", encoding="utf-8") as output_file:
         for entry in final_results:
-            output_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            output_file.write(
+                json.dumps(entry, ensure_ascii=False, default=json_default) + "\n"
+            )
+
+    selected_df = load_and_prepare(args.output_file)
+    summary_selected = summarize_geneval(selected_df)
+    gain_vs_a = summary_selected["overall"] - summary_a["overall"]
+    gain_vs_b = summary_selected["overall"] - summary_b["overall"]
+    metrics = {
+        "a": summary_a,
+        "b": summary_b,
+        "ce_selected": summary_selected,
+        "gain_vs_a": gain_vs_a,
+        "gain_vs_b": gain_vs_b,
+        "selection": stats,
+    }
+    metrics_path = args.metrics_file or f"{args.output_file}.metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as metrics_file:
+        json.dump(metrics, metrics_file, indent=2, ensure_ascii=False)
 
     print("\n" + "=" * 50)
-    print("Union merge complete")
-    print(f"Total samples: {len(final_results)}")
-    print(f"A only: {stats['a_only']}")
-    print(f"B only: {stats['b_only']}")
-    print(f"A selected by lower CE: {stats['a_better']}")
-    print(f"B selected by lower CE: {stats['b_better']}")
+    print("Final GenEval comparison")
+    print_summary("A", summary_a)
+    print_summary("B", summary_b)
+    print_summary("CE selected", summary_selected)
+    print(f"Gain vs A: {gain_vs_a:+.5f} ({gain_vs_a * 100:+.2f} points)")
+    print(f"Gain vs B: {gain_vs_b:+.5f} ({gain_vs_b * 100:+.2f} points)")
+    if stats["ce_decisions"]:
+        decision_accuracy = stats["ce_selected_correct"] / stats["ce_decisions"]
+        print(
+            f"CE disagreement accuracy: {decision_accuracy:.2%} "
+            f"({stats['ce_selected_correct']}/{stats['ce_decisions']})"
+        )
+    print(f"A selected: {stats['a_selected']}")
+    print(f"B selected: {stats['b_selected']}")
     print(f"Output: {args.output_file}")
+    print(f"Metrics: {metrics_path}")
     print("=" * 50)
 
 
