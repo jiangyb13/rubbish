@@ -1,8 +1,8 @@
-CUDA_VISIBLE_DEVICES=0 nohup bash bash/multi_card/card0.sh > caption_0.log 2>&1 &
-CUDA_VISIBLE_DEVICES=1 nohup bash bash/multi_card/card1.sh > caption_1.log 2>&1 &
-CUDA_VISIBLE_DEVICES=2 nohup bash bash/multi_card/card2.sh > caption_2.log 2>&1 &
-CUDA_VISIBLE_DEVICES=3 nohup bash bash/multi_card/card3.sh > caption_3.log 2>&1 &
-CUDA_VISIBLE_DEVICES=4 nohup bash bash/multi_card/card4.sh > caption_4.log 2>&1 &
-CUDA_VISIBLE_DEVICES=5 nohup bash bash/multi_card/card5.sh > caption_5.log 2>&1 &
-CUDA_VISIBLE_DEVICES=6 nohup bash bash/multi_card/card6.sh > caption_6.log 2>&1 &
-CUDA_VISIBLE_DEVICES=7 nohup bash bash/multi_card/card7.sh > caption_7.log 2>&1 &
+CUDA_VISIBLE_DEVICES=0 nohup bash bash/multi_card/card0.sh > caption_0.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=1 nohup bash bash/multi_card/card1.sh > caption_1.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=2 nohup bash bash/multi_card/card2.sh > caption_2.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=3 nohup bash bash/multi_card/card3.sh > caption_3.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=4 nohup bash bash/multi_card/card4.sh > caption_4.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=5 nohup bash bash/multi_card/card5.sh > caption_5.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=6 nohup bash bash/multi_card/card6.sh > caption_6.log 2>&1 </dev/null &
+CUDA_VISIBLE_DEVICES=7 nohup bash bash/multi_card/card7.sh > caption_7.log 2>&1 </dev/null &
