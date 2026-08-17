@@ -1,8 +1,8 @@
-CUDA_VISIBLE_DEVICES=0 nohup bash bash/multi_card/card0.sh > caption_0.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=1 nohup bash bash/multi_card/card1.sh > caption_1.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=2 nohup bash bash/multi_card/card2.sh > caption_2.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=3 nohup bash bash/multi_card/card3.sh > caption_3.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=4 nohup bash bash/multi_card/card4.sh > caption_4.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=5 nohup bash bash/multi_card/card5.sh > caption_5.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=6 nohup bash bash/multi_card/card6.sh > caption_6.log 2>&1 </dev/null &
-CUDA_VISIBLE_DEVICES=7 nohup bash bash/multi_card/card7.sh > caption_7.log 2>&1 </dev/null &
+Reading result files A and B...
+Traceback (most recent call last):
+  File "/home/ma-user/work/wx1468559/Bagel-Reca/calc_ce.py", line 783, in <module>
+    main()
+  File "/home/ma-user/work/wx1468559/Bagel-Reca/calc_ce.py", line 585, in main
+    raise ValueError(
+ValueError: A and B must contain the same GenEval samples for a fair comparison: A-only=1072, B-only=0
+(bagel) develop-iqp2ih40-5f986b85dc-jszph# 
