@@ -1,8 +1,43 @@
-Reading result files A and B...
-Traceback (most recent call last):
-  File "/home/ma-user/work/wx1468559/Bagel-Reca/calc_ce.py", line 783, in <module>
-    main()
-  File "/home/ma-user/work/wx1468559/Bagel-Reca/calc_ce.py", line 585, in main
-    raise ValueError(
-ValueError: A and B must contain the same GenEval samples for a fair comparison: A-only=1072, B-only=0
-(bagel) develop-iqp2ih40-5f986b85dc-jszph# 
+==================================================
+Final GenEval comparison
+A: overall=0.78393, image_acc=77.53% (1715/2212)
+  two_object=95.45%  position=47.25%  single_object=99.06%  counting=78.75%  color_attr=65.00%  colors=84.84%
+B: overall=0.78921, image_acc=78.07% (1727/2212)
+  two_object=94.95%  position=48.75%  single_object=99.38%  counting=78.75%  color_attr=65.00%  colors=86.70%
+LongCLIP selected: overall=0.79366, image_acc=78.57% (1738/2212)
+  two_object=96.21%  position=49.50%  single_object=99.69%  counting=78.12%  color_attr=66.50%  colors=86.17%
+  Gain vs A: +0.00973 (+0.97 points)
+  Gain vs B: +0.00445 (+0.44 points)
+  Disagreement accuracy: 59.44% (107/180)
+  Output: merged_best_results_union4_clip.jsonl
+Caption CE selected: overall=0.79593, image_acc=78.75% (1742/2212)
+  two_object=96.46%  position=48.75%  single_object=99.38%  counting=80.31%  color_attr=66.75%  colors=85.90%
+  Gain vs A: +0.01200 (+1.20 points)
+  Gain vs B: +0.00672 (+0.67 points)
+  Disagreement accuracy: 61.67% (111/180)
+  Output: merged_best_results_union4_caption.jsonl
+Binary CE selected: overall=0.79848, image_acc=79.02% (1748/2212)
+  two_object=96.21%  position=49.75%  single_object=99.38%  counting=80.31%  color_attr=67.00%  colors=86.44%
+  Gain vs A: +0.01455 (+1.45 points)
+  Gain vs B: +0.00927 (+0.93 points)
+  Disagreement accuracy: 65.00% (117/180)
+  Output: merged_best_results_union4_binary.jsonl
+Dual-CE consensus: overall=0.79707, image_acc=78.84% (1744/2212)
+  two_object=96.21%  position=49.00%  single_object=99.38%  counting=81.25%  color_attr=66.50%  colors=85.90%
+  Gain vs A: +0.01314 (+1.31 points)
+  Gain vs B: +0.00786 (+0.79 points)
+  Disagreement accuracy: 62.78% (113/180)
+  Output: merged_best_results_union4.jsonl
+Normalized CE fusion: overall=0.79953, image_acc=79.16% (1751/2212)
+  two_object=96.72%  position=50.00%  single_object=99.38%  counting=79.69%  color_attr=67.50%  colors=86.44%
+  Gain vs A: +0.01560 (+1.56 points)
+  Gain vs B: +0.01032 (+1.03 points)
+  Disagreement accuracy: 66.67% (120/180)
+  Output: merged_best_results_union4_fused.jsonl
+Confidence-routed CE: overall=0.79953, image_acc=79.16% (1751/2212)
+  two_object=96.72%  position=50.00%  single_object=99.38%  counting=79.69%  color_attr=67.50%  colors=86.44%
+  Gain vs A: +0.01560 (+1.56 points)
+  Gain vs B: +0.01032 (+1.03 points)
+  Disagreement accuracy: 66.67% (120/180)
+  Output: merged_best_results_union4_confidence.jsonl
+Metrics: merged_best_results_union4.jsonl.metrics.json
