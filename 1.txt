@@ -1,43 +1,1105 @@
-==================================================
-Final GenEval comparison
-A: overall=0.78393, image_acc=77.53% (1715/2212)
-  two_object=95.45%  position=47.25%  single_object=99.06%  counting=78.75%  color_attr=65.00%  colors=84.84%
-B: overall=0.78921, image_acc=78.07% (1727/2212)
-  two_object=94.95%  position=48.75%  single_object=99.38%  counting=78.75%  color_attr=65.00%  colors=86.70%
-LongCLIP selected: overall=0.79366, image_acc=78.57% (1738/2212)
-  two_object=96.21%  position=49.50%  single_object=99.69%  counting=78.12%  color_attr=66.50%  colors=86.17%
-  Gain vs A: +0.00973 (+0.97 points)
-  Gain vs B: +0.00445 (+0.44 points)
-  Disagreement accuracy: 59.44% (107/180)
-  Output: merged_best_results_union4_clip.jsonl
-Caption CE selected: overall=0.79593, image_acc=78.75% (1742/2212)
-  two_object=96.46%  position=48.75%  single_object=99.38%  counting=80.31%  color_attr=66.75%  colors=85.90%
-  Gain vs A: +0.01200 (+1.20 points)
-  Gain vs B: +0.00672 (+0.67 points)
-  Disagreement accuracy: 61.67% (111/180)
-  Output: merged_best_results_union4_caption.jsonl
-Binary CE selected: overall=0.79848, image_acc=79.02% (1748/2212)
-  two_object=96.21%  position=49.75%  single_object=99.38%  counting=80.31%  color_attr=67.00%  colors=86.44%
-  Gain vs A: +0.01455 (+1.45 points)
-  Gain vs B: +0.00927 (+0.93 points)
-  Disagreement accuracy: 65.00% (117/180)
-  Output: merged_best_results_union4_binary.jsonl
-Dual-CE consensus: overall=0.79707, image_acc=78.84% (1744/2212)
-  two_object=96.21%  position=49.00%  single_object=99.38%  counting=81.25%  color_attr=66.50%  colors=85.90%
-  Gain vs A: +0.01314 (+1.31 points)
-  Gain vs B: +0.00786 (+0.79 points)
-  Disagreement accuracy: 62.78% (113/180)
-  Output: merged_best_results_union4.jsonl
-Normalized CE fusion: overall=0.79953, image_acc=79.16% (1751/2212)
-  two_object=96.72%  position=50.00%  single_object=99.38%  counting=79.69%  color_attr=67.50%  colors=86.44%
-  Gain vs A: +0.01560 (+1.56 points)
-  Gain vs B: +0.01032 (+1.03 points)
-  Disagreement accuracy: 66.67% (120/180)
-  Output: merged_best_results_union4_fused.jsonl
-Confidence-routed CE: overall=0.79953, image_acc=79.16% (1751/2212)
-  two_object=96.72%  position=50.00%  single_object=99.38%  counting=79.69%  color_attr=67.50%  colors=86.44%
-  Gain vs A: +0.01560 (+1.56 points)
-  Gain vs B: +0.01032 (+1.03 points)
-  Disagreement accuracy: 66.67% (120/180)
-  Output: merged_best_results_union4_confidence.jsonl
-Metrics: merged_best_results_union4.jsonl.metrics.json
+import argparse
+import gc
+import inspect
+import json
+import os
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+import torch
+from tqdm import tqdm
+
+from inference import initialize_full_model
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Merge two JSONL result sets using BAGEL understanding CE."
+    )
+    parser.add_argument(
+        "--file_a",
+        default=(
+            "/home/ma-user/work/wx1468559/geneval/Bagel/"
+            "outputs_reca_set1seed_det_5_10_300_clip001_debug_edit3_new_h.jsonl"
+        ),
+    )
+    parser.add_argument(
+        "--file_b",
+        default=(
+            "/home/ma-user/work/wx1468559/geneval/Bagel/"
+            "outputs_bagel_set1seed_h.jsonl"
+        ),
+    )
+    parser.add_argument("--output_file", default="merged_best_results_union4.jsonl")
+    parser.add_argument(
+        "--model_path",
+        default="./pretrained_models/BAGEL-7B-MoT",
+    )
+    parser.add_argument("--ce_max_tokens", type=int, default=192)
+    parser.add_argument("--vit_max_side", type=int, default=168)
+    parser.add_argument(
+        "--ce_score_mode",
+        choices=("binary_logodds", "caption", "dual_consensus", "triple"),
+        default="triple",
+        help=(
+            "binary_logodds compares one-token Yes/No CE; caption uses the "
+            "full-prompt reconstruction CE; dual_consensus computes both and "
+            "falls back to A when their choices disagree; triple additionally "
+            "scores a shared ideal caption and all label-free CE fusions."
+        ),
+    )
+    parser.add_argument(
+        "--ideal_prompts_file",
+        default=None,
+        help=(
+            "Optional JSONL mapping prompt to ideal_prompt. When omitted, BAGEL "
+            "generates one shared ideal caption per unique user prompt."
+        ),
+    )
+    parser.add_argument(
+        "--ideal_prompts_output",
+        default="generated_ideal_prompts.jsonl",
+        help="Sidecar JSONL used to save generated ideal captions.",
+    )
+    parser.add_argument(
+        "--ideal_prompt_key",
+        default="ideal_prompt",
+        help="Field name used for the saved understanding-derived ideal caption.",
+    )
+    parser.add_argument(
+        "--caption_output_file",
+        default=None,
+        help="Caption-CE JSONL in dual mode (default: <output stem>_caption.jsonl)",
+    )
+    parser.add_argument(
+        "--binary_output_file",
+        default=None,
+        help="Binary-CE JSONL in dual mode (default: <output stem>_binary.jsonl)",
+    )
+    parser.add_argument(
+        "--fusion_output_file",
+        default=None,
+        help="Normalized CE-fusion JSONL (default: <output stem>_fused.jsonl)",
+    )
+    parser.add_argument(
+        "--confidence_output_file",
+        default=None,
+        help="Confidence-routed CE JSONL (default: <output stem>_confidence.jsonl)",
+    )
+    parser.add_argument(
+        "--ideal_caption_output_file",
+        default=None,
+        help="Ideal-caption CE output (default: <output stem>_ideal_caption.jsonl)",
+    )
+    parser.add_argument(
+        "--ideal_binary_output_file",
+        default=None,
+        help="Ideal-caption + Binary CE output.",
+    )
+    parser.add_argument(
+        "--user_ideal_output_file",
+        default=None,
+        help="User-caption + Ideal-caption CE output.",
+    )
+    parser.add_argument(
+        "--all_ce_output_file",
+        default=None,
+        help="Equal-weight User-caption + Ideal-caption + Binary CE output.",
+    )
+    parser.add_argument(
+        "--binary_weight",
+        type=float,
+        default=0.5,
+        help="Binary-CE weight in normalized score fusion.",
+    )
+    parser.add_argument(
+        "--caption_margin_scale",
+        type=float,
+        default=None,
+        help="Optional Caption margin scale measured on an independent validation set.",
+    )
+    parser.add_argument(
+        "--binary_margin_scale",
+        type=float,
+        default=None,
+        help="Optional Binary margin scale measured on an independent validation set.",
+    )
+    parser.add_argument(
+        "--selector",
+        choices=("ce", "clip", "both"),
+        default="both",
+        help="Run BAGEL CE, LongCLIP, or both selectors.",
+    )
+    parser.add_argument(
+        "--longclip_path",
+        default="./pretrained_models/LongCLIP-B/longclip-B.pt",
+    )
+    parser.add_argument(
+        "--clip_output_file",
+        default=None,
+        help="LongCLIP-selected JSONL (default: <output_file stem>_clip.jsonl)",
+    )
+    parser.add_argument(
+        "--metrics_file",
+        default=None,
+        help="Metrics JSON path (default: <output_file>.metrics.json)",
+    )
+    return parser.parse_args()
+
+
+def load_and_prepare(filepath):
+    dataframe = pd.read_json(filepath, orient="records", lines=True)
+    dataframe["meta_key"] = dataframe["metadata"].apply(
+        lambda value: (
+            json.dumps(value, sort_keys=True) if isinstance(value, dict) else value
+        )
+    )
+    dataframe["sample_id"] = dataframe["filename"].apply(os.path.basename)
+    if "tag" not in dataframe:
+        dataframe["tag"] = dataframe["metadata"].apply(
+            lambda value: value.get("tag") if isinstance(value, dict) else None
+        )
+    required_columns = {"filename", "metadata", "tag", "correct"}
+    missing_columns = required_columns.difference(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            f"{filepath} is missing required columns: {sorted(missing_columns)}"
+        )
+    return dataframe
+
+
+def make_index(dataframe, name):
+    keys = list(zip(dataframe["meta_key"], dataframe["sample_id"]))
+    duplicate_count = len(keys) - len(set(keys))
+    if duplicate_count:
+        raise ValueError(f"{name} contains {duplicate_count} duplicate sample keys")
+    return {key: row for key, (_, row) in zip(keys, dataframe.iterrows())}
+
+
+def summarize_geneval(dataframe):
+    task_scores = {
+        str(tag): float(task_df["correct"].astype(bool).mean())
+        for tag, task_df in dataframe.groupby("tag", sort=False)
+    }
+    return {
+        "num_images": int(len(dataframe)),
+        "num_prompts": int(dataframe["meta_key"].nunique()),
+        "correct_images": int(dataframe["correct"].astype(bool).sum()),
+        "image_accuracy": float(dataframe["correct"].astype(bool).mean()),
+        "task_scores": task_scores,
+        "overall": float(np.mean(list(task_scores.values()))),
+    }
+
+
+def print_summary(name, summary):
+    task_text = "  ".join(
+        f"{tag}={score:.2%}" for tag, score in summary["task_scores"].items()
+    )
+    print(
+        f"{name}: overall={summary['overall']:.5f}, "
+        f"image_acc={summary['image_accuracy']:.2%} "
+        f"({summary['correct_images']}/{summary['num_images']})"
+    )
+    print(f"  {task_text}")
+
+
+def json_default(value):
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def load_ideal_prompt_cache(path, ideal_prompt_key):
+    cache = {}
+    if path is None:
+        return cache
+    with open(path, "r", encoding="utf-8") as input_file:
+        for line_number, line in enumerate(input_file, start=1):
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            metadata = record.get("metadata", {})
+            prompt = record.get("prompt")
+            if prompt is None and isinstance(metadata, dict):
+                prompt = metadata.get("prompt")
+            ideal_prompt = record.get(ideal_prompt_key)
+            if ideal_prompt is None and isinstance(metadata, dict):
+                ideal_prompt = metadata.get(ideal_prompt_key)
+            if not isinstance(prompt, str) or not isinstance(ideal_prompt, str):
+                raise ValueError(
+                    f"Invalid ideal prompt record at {path}:{line_number}; "
+                    f"expected prompt and {ideal_prompt_key} strings"
+                )
+            ideal_prompt = ideal_prompt.strip()
+            if not ideal_prompt:
+                raise ValueError(f"Empty ideal prompt at {path}:{line_number}")
+            if prompt in cache and cache[prompt] != ideal_prompt:
+                raise ValueError(f"Conflicting ideal captions for prompt: {prompt}")
+            cache[prompt] = ideal_prompt
+    return cache
+
+
+def save_ideal_prompt_cache(cache, path, ideal_prompt_key):
+    if path is None:
+        return
+    with open(path, "w", encoding="utf-8") as output_file:
+        for prompt, ideal_prompt in cache.items():
+            output_file.write(
+                json.dumps(
+                    {"prompt": prompt, ideal_prompt_key: ideal_prompt},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+
+class BagelCEScorer:
+    def __init__(
+        self,
+        model_path,
+        ce_max_tokens,
+        vit_max_side,
+        score_mode,
+        ideal_prompt_cache=None,
+    ):
+        (
+            self.model,
+            self.vae_model,
+            self.tokenizer,
+            self.new_token_ids,
+            _,
+            self.vit_transform,
+        ) = initialize_full_model(model_path)
+        self.vae_model = self.vae_model.to("cpu")
+        self.ce_max_tokens = ce_max_tokens
+        self.vit_max_side = vit_max_side
+        self.score_mode = score_mode
+        self.cache = {}
+        self.ideal_prompt_cache = dict(ideal_prompt_cache or {})
+        ce_parameters = inspect.signature(self.model.UnderstandingCELoss).parameters
+        self.supports_visual_context = (
+            "prepared_visual_context" in ce_parameters
+            and "return_visual_context" in ce_parameters
+        )
+        vit_parameter = next(self.model.vit_model.parameters())
+        self.vit_device = vit_parameter.device
+        self.vit_dtype = vit_parameter.dtype
+        for parameter in self.model.parameters():
+            parameter.requires_grad_(False)
+
+    def ideal_caption(self, prompt):
+        if prompt not in self.ideal_prompt_cache:
+            instruction = (
+                "Rewrite the following target text prompt as one concise, factual "
+                "description of the ideal final image. Preserve every explicit "
+                "object identity, exact count, color, attribute binding, and "
+                "spatial relation. Do not add objects, counts, relations, styles, "
+                "or visual details that are not supported by the target prompt. "
+                "Output only the description in one paragraph.\n"
+                f"Target prompt: {prompt}"
+            )
+            with torch.inference_mode():
+                ideal_prompt = self.model.chat(
+                    tokenizer=self.tokenizer,
+                    new_token_ids=self.new_token_ids,
+                    image_transform=self.vit_transform,
+                    images=[],
+                    prompt=instruction,
+                    max_length=self.ce_max_tokens,
+                    do_sample=False,
+                ).strip()
+            if not ideal_prompt:
+                raise RuntimeError(f"BAGEL produced an empty ideal caption for: {prompt}")
+            self.ideal_prompt_cache[prompt] = ideal_prompt
+            print(f"ideal caption: {ideal_prompt}")
+        return self.ideal_prompt_cache[prompt]
+
+    @staticmethod
+    def image_to_tensor(image):
+        array = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
+        return (
+            torch.from_numpy(array)
+            .permute(2, 0, 1)
+            .unsqueeze(0)
+            .contiguous()
+        )
+
+    def score(self, image_path, prompt):
+        ideal_prompt = self.ideal_caption(prompt) if self.score_mode == "triple" else None
+        cache_key = (image_path, prompt, ideal_prompt, self.score_mode)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image does not exist: {image_path}")
+
+        try:
+            with Image.open(image_path) as image:
+                width, height = image.size
+                image_tensor = self.image_to_tensor(image)
+            image_tensor = image_tensor.to(
+                device=self.vit_device,
+                dtype=self.vit_dtype,
+            )
+            common_kwargs = {
+                "x_t_0": None,
+                "vae_model": self.vae_model,
+                "image_shape": (height, width),
+                "image_transform": self.vit_transform,
+                "tokenizer": self.tokenizer,
+                "new_token_ids": self.new_token_ids,
+                "ce_vit_max_side": self.vit_max_side,
+                "umm_dropbp_layers": (),
+                "decoded_image": image_tensor,
+            }
+            with torch.no_grad():
+                caption_score = None
+                binary_score = None
+                ideal_caption_score = None
+                visual_context = None
+                if self.score_mode == "triple" and self.supports_visual_context:
+                    loss, _, visual_context = self.model.UnderstandingCELoss(
+                        target_text=prompt,
+                        ce_max_tokens=self.ce_max_tokens,
+                        return_visual_context=True,
+                        **common_kwargs,
+                    )
+                    caption_score = loss.float().item()
+                elif self.score_mode in ("caption", "dual_consensus", "triple"):
+                    loss, _ = self.model.UnderstandingCELoss(
+                        target_text=prompt,
+                        ce_max_tokens=self.ce_max_tokens,
+                        **common_kwargs,
+                    )
+                    caption_score = loss.float().item()
+                branch_kwargs = dict(common_kwargs)
+                if visual_context is not None:
+                    branch_kwargs["prepared_visual_context"] = visual_context
+                if self.score_mode == "triple":
+                    loss, _ = self.model.UnderstandingCELoss(
+                        target_text=ideal_prompt,
+                        ce_max_tokens=self.ce_max_tokens,
+                        **branch_kwargs,
+                    )
+                    ideal_caption_score = loss.float().item()
+                if self.score_mode in ("binary_logodds", "dual_consensus", "triple"):
+                    instruction = (
+                        "Act as a strict visual verifier. Inspect the image and "
+                        "decide whether it satisfies every explicit requirement "
+                        "in the target prompt. Check object identities, exact "
+                        "counts, colors, attribute bindings, and spatial "
+                        "relations. If any required detail is missing, wrong, "
+                        "ambiguous, or not visibly supported, answer No. "
+                        f"Target prompt: {prompt}\n"
+                        "Answer exactly Yes or No."
+                    )
+                    yes_loss, _ = self.model.UnderstandingCELoss(
+                        target_text="Yes",
+                        instruction=instruction,
+                        ce_max_tokens=1,
+                        **branch_kwargs,
+                    )
+                    no_loss, _ = self.model.UnderstandingCELoss(
+                        target_text="No",
+                        instruction=instruction,
+                        ce_max_tokens=1,
+                        **branch_kwargs,
+                    )
+                    # Lower is better: negative values favor Yes over No.
+                    binary_score = (yes_loss.float() - no_loss.float()).item()
+                if self.score_mode == "caption":
+                    score = caption_score
+                elif self.score_mode == "binary_logodds":
+                    score = binary_score
+                elif self.score_mode == "dual_consensus":
+                    score = {
+                        "caption": caption_score,
+                        "binary": binary_score,
+                    }
+                else:
+                    score = {
+                        "user_caption": caption_score,
+                        "ideal_caption": ideal_caption_score,
+                        "binary": binary_score,
+                    }
+            self.cache[cache_key] = score
+            return score
+        except Exception as error:
+            raise RuntimeError(f"Failed to score {image_path}: {error}") from error
+
+
+class LongCLIPScorer:
+    def __init__(self, model_path):
+        from modeling.longclip_b.model import longclip
+
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"LongCLIP checkpoint does not exist: {model_path}")
+        self.longclip = longclip
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model, self.preprocess = longclip.load(model_path, device=self.device)
+        self.model.eval()
+        self.cache = {}
+
+    def score(self, image_path, prompt):
+        cache_key = (image_path, prompt)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image does not exist: {image_path}")
+
+        try:
+            with Image.open(image_path) as image:
+                image_tensor = self.preprocess(image.convert("RGB")).unsqueeze(0)
+            image_tensor = image_tensor.to(self.device)
+            text_tensor = self.longclip.tokenize([prompt]).to(self.device)
+            with torch.inference_mode():
+                image_features = self.model.encode_image(image_tensor)
+                text_features = self.model.encode_text(text_tensor)
+                image_features = image_features / image_features.norm(
+                    dim=-1, keepdim=True
+                ).clamp_min(1e-12)
+                text_features = text_features / text_features.norm(
+                    dim=-1, keepdim=True
+                ).clamp_min(1e-12)
+                similarity = (image_features @ text_features.T).float().item()
+            self.cache[cache_key] = similarity
+            return similarity
+        except Exception as error:
+            raise RuntimeError(f"Failed to score {image_path}: {error}") from error
+
+
+def select_results(ordered_keys, index_a, index_b, scorer, prefer_lower, name):
+    final_results = []
+    stats = {
+        "agreements_skipped": 0,
+        "decisions": 0,
+        "a_selected": 0,
+        "b_selected": 0,
+        "selected_correct": 0,
+    }
+    for key in tqdm(ordered_keys, total=len(ordered_keys), desc=f"Selecting by {name}"):
+        row_a = index_a[key]
+        row_b = index_b[key]
+        correct_a = bool(row_a["correct"])
+        correct_b = bool(row_b["correct"])
+
+        if correct_a == correct_b:
+            # This choice cannot change GenEval, so avoid scoring both images.
+            selected_row = row_a.to_dict()
+            stats["agreements_skipped"] += 1
+            stats["a_selected"] += 1
+        else:
+            metadata = json.loads(key[0]) if isinstance(key[0], str) else key[0]
+            prompt = metadata["prompt"]
+            score_a = scorer.score(row_a["filename"], prompt)
+            score_b = scorer.score(row_b["filename"], prompt)
+            choose_a = score_a <= score_b if prefer_lower else score_a >= score_b
+            selected_row = (row_a if choose_a else row_b).to_dict()
+            stats["a_selected" if choose_a else "b_selected"] += 1
+            stats["decisions"] += 1
+            stats["selected_correct"] += int(bool(selected_row["correct"]))
+
+        selected_row.pop("meta_key", None)
+        selected_row.pop("sample_id", None)
+        final_results.append(selected_row)
+    return final_results, stats
+
+
+def new_selection_stats():
+    return {
+        "agreements_skipped": 0,
+        "decisions": 0,
+        "a_selected": 0,
+        "b_selected": 0,
+        "selected_correct": 0,
+    }
+
+
+def select_results_dual_ce(
+    ordered_keys,
+    index_a,
+    index_b,
+    scorer,
+    binary_weight,
+    caption_margin_scale=None,
+    binary_margin_scale=None,
+):
+    if not 0.0 <= binary_weight <= 1.0:
+        raise ValueError("binary_weight must be between 0 and 1")
+
+    rows = {
+        "caption": [],
+        "binary": [],
+        "dual": [],
+        "fused": [],
+        "confidence": [],
+    }
+    stats = {name: new_selection_stats() for name in rows}
+    stats["dual"].update(
+        {
+            "verifier_agreements": 0,
+            "verifier_disagreements": 0,
+        }
+    )
+
+    score_cache = {}
+    if (caption_margin_scale is None) != (binary_margin_scale is None):
+        raise ValueError(
+            "caption_margin_scale and binary_margin_scale must be provided together"
+        )
+    decision_keys = [
+        key
+        for key in ordered_keys
+        if bool(index_a[key]["correct"]) != bool(index_b[key]["correct"])
+    ]
+    for key in tqdm(
+        decision_keys,
+        total=len(decision_keys),
+        desc="Scoring dual BAGEL CE",
+    ):
+        row_a = index_a[key]
+        row_b = index_b[key]
+        metadata = json.loads(key[0]) if isinstance(key[0], str) else key[0]
+        prompt = metadata["prompt"]
+        scores_a = scorer.score(row_a["filename"], prompt)
+        scores_b = scorer.score(row_b["filename"], prompt)
+        caption_margin = scores_b["caption"] - scores_a["caption"]
+        binary_margin = scores_b["binary"] - scores_a["binary"]
+        score_cache[key] = {
+            "caption_a": scores_a["caption"],
+            "caption_b": scores_b["caption"],
+            "binary_a": scores_a["binary"],
+            "binary_b": scores_b["binary"],
+            "caption_margin": caption_margin,
+            "binary_margin": binary_margin,
+        }
+
+    eps = 1e-12
+    use_fixed_scales = caption_margin_scale is not None
+    if use_fixed_scales:
+        caption_margin_scale = max(float(caption_margin_scale), eps)
+        binary_margin_scale = max(float(binary_margin_scale), eps)
+        print(
+            "Dual-CE calibration: fixed validation scales, "
+            f"caption_scale={caption_margin_scale:.6g}, "
+            f"binary_scale={binary_margin_scale:.6g}, "
+            f"binary_weight={binary_weight:.3f}"
+        )
+    else:
+        print(
+            "Dual-CE calibration: label-free pair-relative margins, "
+            f"binary_weight={binary_weight:.3f}"
+        )
+
+    for key in tqdm(
+        ordered_keys,
+        total=len(ordered_keys),
+        desc="Fusing dual BAGEL CE",
+    ):
+        row_a = index_a[key]
+        row_b = index_b[key]
+        correct_a = bool(row_a["correct"])
+        correct_b = bool(row_b["correct"])
+
+        if correct_a == correct_b:
+            selected = {name: row_a for name in rows}
+            for name in rows:
+                stats[name]["agreements_skipped"] += 1
+                stats[name]["a_selected"] += 1
+        else:
+            caption_margin = score_cache[key]["caption_margin"]
+            binary_margin = score_cache[key]["binary_margin"]
+            if use_fixed_scales:
+                normalized_caption = caption_margin / caption_margin_scale
+                normalized_binary = binary_margin / binary_margin_scale
+            else:
+                caption_pair_scale = max(
+                    0.5
+                    * (
+                        abs(score_cache[key]["caption_a"])
+                        + abs(score_cache[key]["caption_b"])
+                    ),
+                    eps,
+                )
+                binary_pair_scale = max(
+                    0.5
+                    * (
+                        abs(score_cache[key]["binary_a"])
+                        + abs(score_cache[key]["binary_b"])
+                    ),
+                    eps,
+                )
+                normalized_caption = caption_margin / caption_pair_scale
+                normalized_binary = binary_margin / binary_pair_scale
+            caption_choose_a = caption_margin >= 0.0
+            binary_choose_a = binary_margin >= 0.0
+            dual_choose_a = (
+                caption_choose_a
+                if caption_choose_a == binary_choose_a
+                else True
+            )
+            fused_margin = (
+                (1.0 - binary_weight) * normalized_caption
+                + binary_weight * normalized_binary
+            )
+            fused_choose_a = fused_margin >= 0.0
+            if caption_choose_a == binary_choose_a:
+                confidence_choose_a = caption_choose_a
+            elif abs(normalized_caption) > abs(normalized_binary):
+                confidence_choose_a = caption_choose_a
+            elif abs(normalized_binary) > abs(normalized_caption):
+                confidence_choose_a = binary_choose_a
+            else:
+                confidence_choose_a = True
+            choices = {
+                "caption": caption_choose_a,
+                "binary": binary_choose_a,
+                "dual": dual_choose_a,
+                "fused": fused_choose_a,
+                "confidence": confidence_choose_a,
+            }
+            selected = {
+                name: row_a if choose_a else row_b
+                for name, choose_a in choices.items()
+            }
+            for name, choose_a in choices.items():
+                stats[name]["decisions"] += 1
+                stats[name]["a_selected" if choose_a else "b_selected"] += 1
+                stats[name]["selected_correct"] += int(
+                    bool(selected[name]["correct"])
+                )
+            if caption_choose_a == binary_choose_a:
+                stats["dual"]["verifier_agreements"] += 1
+            else:
+                stats["dual"]["verifier_disagreements"] += 1
+
+        for name, selected_row in selected.items():
+            clean_row = selected_row.to_dict()
+            clean_row.pop("meta_key", None)
+            clean_row.pop("sample_id", None)
+            rows[name].append(clean_row)
+
+    stats["fused"].update(
+        {
+            "caption_margin_scale": caption_margin_scale,
+            "binary_margin_scale": binary_margin_scale,
+            "binary_weight": binary_weight,
+            "normalization": "fixed_validation" if use_fixed_scales else "pair_relative",
+        }
+    )
+    stats["confidence"].update(
+        {
+            "caption_margin_scale": caption_margin_scale,
+            "binary_margin_scale": binary_margin_scale,
+            "normalization": "fixed_validation" if use_fixed_scales else "pair_relative",
+        }
+    )
+
+    return rows, stats
+
+
+def select_results_triple_ce(ordered_keys, index_a, index_b, scorer):
+    """Compare three CE views and every equal-weight label-free fusion."""
+    components = ("user_caption", "ideal_caption", "binary")
+    fusion_specs = {
+        "user_binary": ("user_caption", "binary"),
+        "ideal_binary": ("ideal_caption", "binary"),
+        "user_ideal": ("user_caption", "ideal_caption"),
+        "all_ce": components,
+    }
+    row_names = components + tuple(fusion_specs)
+    rows = {name: [] for name in row_names}
+    stats = {name: new_selection_stats() for name in row_names}
+    score_cache = {}
+    eps = 1e-12
+
+    decision_keys = [
+        key
+        for key in ordered_keys
+        if bool(index_a[key]["correct"]) != bool(index_b[key]["correct"])
+    ]
+    for key in tqdm(
+        decision_keys,
+        total=len(decision_keys),
+        desc="Scoring User/Ideal/Binary CE",
+    ):
+        row_a = index_a[key]
+        row_b = index_b[key]
+        metadata = json.loads(key[0]) if isinstance(key[0], str) else key[0]
+        prompt = metadata["prompt"]
+        scores_a = scorer.score(row_a["filename"], prompt)
+        scores_b = scorer.score(row_b["filename"], prompt)
+        normalized_margins = {}
+        raw_margins = {}
+        for component in components:
+            score_a = float(scores_a[component])
+            score_b = float(scores_b[component])
+            margin = score_b - score_a
+            pair_scale = max(0.5 * (abs(score_a) + abs(score_b)), eps)
+            raw_margins[component] = margin
+            normalized_margins[component] = margin / pair_scale
+        score_cache[key] = {
+            "raw": raw_margins,
+            "normalized": normalized_margins,
+        }
+
+    for key in tqdm(
+        ordered_keys,
+        total=len(ordered_keys),
+        desc="Fusing User/Ideal/Binary CE",
+    ):
+        row_a = index_a[key]
+        row_b = index_b[key]
+        if bool(row_a["correct"]) == bool(row_b["correct"]):
+            choices = {name: True for name in row_names}
+            for name in row_names:
+                stats[name]["agreements_skipped"] += 1
+        else:
+            raw_margins = score_cache[key]["raw"]
+            normalized_margins = score_cache[key]["normalized"]
+            choices = {
+                component: raw_margins[component] >= 0.0
+                for component in components
+            }
+            for name, selected_components in fusion_specs.items():
+                fused_margin = sum(
+                    normalized_margins[component]
+                    for component in selected_components
+                ) / len(selected_components)
+                choices[name] = fused_margin >= 0.0
+
+            for name, choose_a in choices.items():
+                stats[name]["decisions"] += 1
+                stats[name]["selected_correct"] += int(
+                    bool((row_a if choose_a else row_b)["correct"])
+                )
+
+        for name, choose_a in choices.items():
+            selected_row = row_a if choose_a else row_b
+            stats[name]["a_selected" if choose_a else "b_selected"] += 1
+            clean_row = selected_row.to_dict()
+            clean_row.pop("meta_key", None)
+            clean_row.pop("sample_id", None)
+            rows[name].append(clean_row)
+
+    for name, selected_components in fusion_specs.items():
+        stats[name]["components"] = list(selected_components)
+        stats[name]["normalization"] = "pair_relative"
+    return rows, stats
+
+
+def save_results(entries, path):
+    with open(path, "w", encoding="utf-8") as output_file:
+        for entry in entries:
+            output_file.write(
+                json.dumps(entry, ensure_ascii=False, default=json_default) + "\n"
+            )
+
+
+def default_clip_output_path(ce_output_path):
+    stem, extension = os.path.splitext(ce_output_path)
+    return f"{stem}_clip{extension or '.jsonl'}"
+
+
+def default_variant_output_path(output_path, variant):
+    stem, extension = os.path.splitext(output_path)
+    return f"{stem}_{variant}{extension or '.jsonl'}"
+
+
+def release_scorer(scorer):
+    del scorer
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return None
+
+
+def main():
+    args = parse_args()
+    print("Reading result files A and B...")
+    df_a = load_and_prepare(args.file_a)
+    df_b = load_and_prepare(args.file_b)
+    index_a = make_index(df_a, "A")
+    index_b = make_index(df_b, "B")
+    keys_a = set(index_a)
+    keys_b = set(index_b)
+    if keys_a != keys_b:
+        raise ValueError(
+            "A and B must contain the same GenEval samples for a fair comparison: "
+            f"A-only={len(keys_a - keys_b)}, B-only={len(keys_b - keys_a)}"
+        )
+
+    summary_a = summarize_geneval(df_a)
+    summary_b = summarize_geneval(df_b)
+    print("\nOriginal GenEval results")
+    print_summary("A", summary_a)
+    print_summary("B", summary_b)
+
+    disagreement_count = sum(
+        bool(index_a[key]["correct"]) != bool(index_b[key]["correct"])
+        for key in keys_a
+    )
+    print(
+        f"\nCorrectness agreement: {len(keys_a) - disagreement_count}/{len(keys_a)}; "
+        f"CE decisions needed: {disagreement_count}"
+    )
+
+    ordered_keys = list(zip(df_a["meta_key"], df_a["sample_id"]))
+    selector_results = {}
+
+    if args.selector in ("clip", "both"):
+        clip_output_path = args.clip_output_file or default_clip_output_path(
+            args.output_file
+        )
+        if disagreement_count:
+            print("Loading LongCLIP model...")
+            clip_scorer = LongCLIPScorer(args.longclip_path)
+            clip_rows, clip_stats = select_results(
+                ordered_keys,
+                index_a,
+                index_b,
+                clip_scorer,
+                prefer_lower=False,
+                name="LongCLIP",
+            )
+            clip_scorer = release_scorer(clip_scorer)
+        else:
+            clip_rows, clip_stats = select_results(
+                ordered_keys, index_a, index_b, None, False, "LongCLIP"
+            )
+        save_results(clip_rows, clip_output_path)
+        clip_summary = summarize_geneval(load_and_prepare(clip_output_path))
+        selector_results["clip_selected"] = {
+            "summary": clip_summary,
+            "gain_vs_a": clip_summary["overall"] - summary_a["overall"],
+            "gain_vs_b": clip_summary["overall"] - summary_b["overall"],
+            "selection": clip_stats,
+            "output": clip_output_path,
+        }
+
+    if args.selector in ("ce", "both"):
+        ideal_prompt_cache = load_ideal_prompt_cache(
+            args.ideal_prompts_file,
+            args.ideal_prompt_key,
+        )
+        resolved_ideal_prompt_cache = dict(ideal_prompt_cache)
+        if disagreement_count:
+            print("Loading BAGEL understanding model...")
+            ce_scorer = BagelCEScorer(
+                args.model_path,
+                args.ce_max_tokens,
+                args.vit_max_side,
+                args.ce_score_mode,
+                ideal_prompt_cache=ideal_prompt_cache,
+            )
+            if args.ce_score_mode == "dual_consensus":
+                dual_rows, dual_stats = select_results_dual_ce(
+                    ordered_keys,
+                    index_a,
+                    index_b,
+                    ce_scorer,
+                    args.binary_weight,
+                    args.caption_margin_scale,
+                    args.binary_margin_scale,
+                )
+            elif args.ce_score_mode == "triple":
+                triple_rows, triple_stats = select_results_triple_ce(
+                    ordered_keys,
+                    index_a,
+                    index_b,
+                    ce_scorer,
+                )
+            else:
+                ce_rows, ce_stats = select_results(
+                    ordered_keys,
+                    index_a,
+                    index_b,
+                    ce_scorer,
+                    prefer_lower=True,
+                    name="BAGEL CE",
+                )
+            resolved_ideal_prompt_cache = dict(ce_scorer.ideal_prompt_cache)
+            ce_scorer = release_scorer(ce_scorer)
+        else:
+            if args.ce_score_mode == "dual_consensus":
+                dual_rows, dual_stats = select_results_dual_ce(
+                    ordered_keys,
+                    index_a,
+                    index_b,
+                    None,
+                    args.binary_weight,
+                    args.caption_margin_scale,
+                    args.binary_margin_scale,
+                )
+            elif args.ce_score_mode == "triple":
+                triple_rows, triple_stats = select_results_triple_ce(
+                    ordered_keys,
+                    index_a,
+                    index_b,
+                    None,
+                )
+            else:
+                ce_rows, ce_stats = select_results(
+                    ordered_keys, index_a, index_b, None, True, "BAGEL CE"
+                )
+
+        if args.ce_score_mode == "triple":
+            save_ideal_prompt_cache(
+                resolved_ideal_prompt_cache,
+                args.ideal_prompts_output,
+                args.ideal_prompt_key,
+            )
+            triple_output_paths = {
+                "user_caption_ce_selected": (
+                    args.caption_output_file
+                    or default_variant_output_path(args.output_file, "user_caption")
+                ),
+                "ideal_caption_ce_selected": (
+                    args.ideal_caption_output_file
+                    or default_variant_output_path(args.output_file, "ideal_caption")
+                ),
+                "binary_ce_selected": (
+                    args.binary_output_file
+                    or default_variant_output_path(args.output_file, "binary")
+                ),
+                "user_binary_ce_selected": (
+                    args.fusion_output_file
+                    or default_variant_output_path(args.output_file, "user_binary")
+                ),
+                "ideal_binary_ce_selected": (
+                    args.ideal_binary_output_file
+                    or default_variant_output_path(args.output_file, "ideal_binary")
+                ),
+                "user_ideal_ce_selected": (
+                    args.user_ideal_output_file
+                    or default_variant_output_path(args.output_file, "user_ideal")
+                ),
+                "all_ce_selected": args.all_ce_output_file or args.output_file,
+            }
+            triple_row_names = {
+                "user_caption_ce_selected": "user_caption",
+                "ideal_caption_ce_selected": "ideal_caption",
+                "binary_ce_selected": "binary",
+                "user_binary_ce_selected": "user_binary",
+                "ideal_binary_ce_selected": "ideal_binary",
+                "user_ideal_ce_selected": "user_ideal",
+                "all_ce_selected": "all_ce",
+            }
+            for result_name, output_path in triple_output_paths.items():
+                row_name = triple_row_names[result_name]
+                save_results(triple_rows[row_name], output_path)
+                result_summary = summarize_geneval(load_and_prepare(output_path))
+                selector_results[result_name] = {
+                    "summary": result_summary,
+                    "gain_vs_a": result_summary["overall"] - summary_a["overall"],
+                    "gain_vs_b": result_summary["overall"] - summary_b["overall"],
+                    "selection": triple_stats[row_name],
+                    "output": output_path,
+                }
+        elif args.ce_score_mode == "dual_consensus":
+            caption_output_path = (
+                args.caption_output_file
+                or default_variant_output_path(args.output_file, "caption")
+            )
+            binary_output_path = (
+                args.binary_output_file
+                or default_variant_output_path(args.output_file, "binary")
+            )
+            fusion_output_path = (
+                args.fusion_output_file
+                or default_variant_output_path(args.output_file, "fused")
+            )
+            confidence_output_path = (
+                args.confidence_output_file
+                or default_variant_output_path(args.output_file, "confidence")
+            )
+            output_paths = {
+                "caption_ce_selected": caption_output_path,
+                "binary_ce_selected": binary_output_path,
+                "dual_ce_selected": args.output_file,
+                "fused_ce_selected": fusion_output_path,
+                "confidence_ce_selected": confidence_output_path,
+            }
+            row_names = {
+                "caption_ce_selected": "caption",
+                "binary_ce_selected": "binary",
+                "dual_ce_selected": "dual",
+                "fused_ce_selected": "fused",
+                "confidence_ce_selected": "confidence",
+            }
+            for result_name, output_path in output_paths.items():
+                row_name = row_names[result_name]
+                save_results(dual_rows[row_name], output_path)
+                result_summary = summarize_geneval(load_and_prepare(output_path))
+                selector_results[result_name] = {
+                    "summary": result_summary,
+                    "gain_vs_a": result_summary["overall"] - summary_a["overall"],
+                    "gain_vs_b": result_summary["overall"] - summary_b["overall"],
+                    "selection": dual_stats[row_name],
+                    "output": output_path,
+                }
+        else:
+            save_results(ce_rows, args.output_file)
+            ce_summary = summarize_geneval(load_and_prepare(args.output_file))
+            selector_results["ce_selected"] = {
+                "summary": ce_summary,
+                "gain_vs_a": ce_summary["overall"] - summary_a["overall"],
+                "gain_vs_b": ce_summary["overall"] - summary_b["overall"],
+                "selection": ce_stats,
+                "output": args.output_file,
+            }
+
+    metrics = {
+        "a": summary_a,
+        "b": summary_b,
+        "ce_score_mode": args.ce_score_mode,
+        **selector_results,
+    }
+    metrics_path = args.metrics_file or f"{args.output_file}.metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as metrics_file:
+        json.dump(metrics, metrics_file, indent=2, ensure_ascii=False)
+
+    print("\n" + "=" * 50)
+    print("Final GenEval comparison")
+    print_summary("A", summary_a)
+    print_summary("B", summary_b)
+    display_names = {
+        "clip_selected": "LongCLIP selected",
+        "ce_selected": "CE selected",
+        "caption_ce_selected": "Caption CE selected",
+        "user_caption_ce_selected": "User Caption CE selected",
+        "ideal_caption_ce_selected": "Ideal Caption CE selected",
+        "binary_ce_selected": "Binary CE selected",
+        "dual_ce_selected": "Dual-CE consensus",
+        "fused_ce_selected": "Normalized CE fusion",
+        "confidence_ce_selected": "Confidence-routed CE",
+        "user_binary_ce_selected": "User Caption + Binary CE",
+        "ideal_binary_ce_selected": "Ideal Caption + Binary CE",
+        "user_ideal_ce_selected": "User + Ideal Caption CE",
+        "all_ce_selected": "User + Ideal + Binary CE",
+    }
+    for result_name, result in selector_results.items():
+        display_name = display_names[result_name]
+        print_summary(display_name, result["summary"])
+        print(
+            f"  Gain vs A: {result['gain_vs_a']:+.5f} "
+            f"({result['gain_vs_a'] * 100:+.2f} points)"
+        )
+        print(
+            f"  Gain vs B: {result['gain_vs_b']:+.5f} "
+            f"({result['gain_vs_b'] * 100:+.2f} points)"
+        )
+        selection = result["selection"]
+        if selection["decisions"]:
+            decision_accuracy = selection["selected_correct"] / selection["decisions"]
+            print(
+                f"  Disagreement accuracy: {decision_accuracy:.2%} "
+                f"({selection['selected_correct']}/{selection['decisions']})"
+            )
+        print(f"  Output: {result['output']}")
+    print(f"Metrics: {metrics_path}")
+    print("=" * 50)
+
+
+if __name__ == "__main__":
+    main()
