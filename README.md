@@ -1,400 +1,578 @@
-: Traceback (most recent call last):
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank1]:     main()
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank1]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank1]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank1]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank1]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank1]:     return DistributedVAE(vae_config)
-[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank1]:     self.model = instantiate_from_config(config.model_config)
-[rank1]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank1]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank1]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank1]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank1]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank1]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank1]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank1]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank1]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank1]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank1]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank1]:     from mmcv.cnn import ConvModule
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank1]:     from .builder import MODELS, build_model_from_cfg
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank1]:     from ..runner import Sequential
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank1]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank1]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank1]:     from . import ipu, mlu, mps, npu
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank1]:     from .data_parallel import NPUDataParallel
-[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank1]:     for m in sys.modules:
-[rank1]: RuntimeError: dictionary changed size during iteration
-[rank5]: Traceback (most recent call last):
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank5]:     main()
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank5]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank5]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank5]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank5]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank5]:     return DistributedVAE(vae_config)
-[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank5]:     self.model = instantiate_from_config(config.model_config)
-[rank5]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank5]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank5]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank5]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank5]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank5]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank5]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank5]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank5]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank5]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank5]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank5]:     from mmcv.cnn import ConvModule
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank5]:     from .builder import MODELS, build_model_from_cfg
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank5]:     from ..runner import Sequential
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank5]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank5]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank5]:     from . import ipu, mlu, mps, npu
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank5]:     from .data_parallel import NPUDataParallel
-[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank5]:     for m in sys.modules:
-[rank5]: RuntimeError: dictionary changed size during iteration
-[rank4]: Traceback (most recent call last):
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank4]:     main()
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank4]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank4]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank4]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank4]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank4]:     return DistributedVAE(vae_config)
-[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank4]:     self.model = instantiate_from_config(config.model_config)
-[rank4]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank4]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank4]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank4]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank4]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank4]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank4]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank4]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank4]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank4]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank4]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank4]:     from mmcv.cnn import ConvModule
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank4]:     from .builder import MODELS, build_model_from_cfg
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank4]:     from ..runner import Sequential
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank4]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank4]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank4]:     from . import ipu, mlu, mps, npu
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank4]:     from .data_parallel import NPUDataParallel
-[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank4]:     for m in sys.modules:
-[rank4]: RuntimeError: dictionary changed size during iteration
-/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py:22: UserWarning: Torchaudio's I/O functions now support par-call bakcend dispatch. Importing backend implementation directly is no longer guaranteed to work. Please use `backend` keyword with load/save/info function, instead of calling the udnerlying implementation directly.
-  if hasattr(sys.modules[m], '_check_balance'):
-[rank3]: Traceback (most recent call last):
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank3]:     main()
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank3]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank3]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank3]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank3]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank3]:     return DistributedVAE(vae_config)
-[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank3]:     self.model = instantiate_from_config(config.model_config)
-[rank3]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank3]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank3]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank3]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank3]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank3]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank3]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank3]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank3]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank3]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank3]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank3]:     from mmcv.cnn import ConvModule
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank3]:     from .builder import MODELS, build_model_from_cfg
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank3]:     from ..runner import Sequential
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank3]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank3]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank3]:     from . import ipu, mlu, mps, npu
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank3]:     from .data_parallel import NPUDataParallel
-[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank3]:     for m in sys.modules:
-[rank3]: RuntimeError: dictionary changed size during iteration
-[rank2]: Traceback (most recent call last):
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank2]:     main()
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank2]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank2]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank2]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank2]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank2]:     return DistributedVAE(vae_config)
-[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank2]:     self.model = instantiate_from_config(config.model_config)
-[rank2]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank2]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank2]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank2]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank2]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank2]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank2]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank2]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank2]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank2]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank2]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank2]:     from mmcv.cnn import ConvModule
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank2]:     from .builder import MODELS, build_model_from_cfg
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank2]:     from ..runner import Sequential
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank2]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank2]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank2]:     from . import ipu, mlu, mps, npu
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank2]:     from .data_parallel import NPUDataParallel
-[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank2]:     for m in sys.modules:
-[rank2]: RuntimeError: dictionary changed size during iteration
-[rank7]: Traceback (most recent call last):
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank7]:     main()
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank7]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank7]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank7]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank7]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank7]:     return DistributedVAE(vae_config)
-[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank7]:     self.model = instantiate_from_config(config.model_config)
-[rank7]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank7]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank7]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank7]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank7]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank7]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank7]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank7]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank7]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank7]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank7]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank7]:     from mmcv.cnn import ConvModule
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank7]:     from .builder import MODELS, build_model_from_cfg
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank7]:     from ..runner import Sequential
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank7]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank7]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank7]:     from . import ipu, mlu, mps, npu
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank7]:     from .data_parallel import NPUDataParallel
-[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank7]:     for m in sys.modules:
-[rank7]: RuntimeError: dictionary changed size during iteration
-[rank0]: Traceback (most recent call last):
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
-[rank0]:     main()
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
-[rank0]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
-[rank0]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
-[rank0]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
-[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
-[rank0]:     return DistributedVAE(vae_config)
-[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
-[rank0]:     self.model = instantiate_from_config(config.model_config)
-[rank0]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
-[rank0]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
-[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
-[rank0]:     return getattr(importlib.import_module(module, package=None), cls)
-[rank0]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
-[rank0]:     return _bootstrap._gcd_import(name[level:], package, level)
-[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
-[rank0]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
-[rank0]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
-[rank0]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
-[rank0]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
-[rank0]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
-[rank0]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
-[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
-[rank0]:     from mmcv.cnn import ConvModule
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
-[rank0]:     from .builder import MODELS, build_model_from_cfg
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
-[rank0]:     from ..runner import Sequential
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
-[rank0]:     from mmcv.device import ipu  # isort:skip  # noqa
-[rank0]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
-[rank0]:     from . import ipu, mlu, mps, npu
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
-[rank0]:     from .data_parallel import NPUDataParallel
-[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
-[rank0]:     for m in sys.modules:
-[rank0]: RuntimeError: dictionary changed size during iteration
-[ERROR] 2026-09-06-16:14:16 (PID:3938695, Device:1, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
-[ERROR] 2026-09-06-16:14:17 (PID:3938699, Device:5, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
-[ERROR] 2026-09-06-16:14:17 (PID:3938701, Device:7, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-09-06-16:14:18 (PID:3938700, Device:6, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-09-06-16:14:18 (PID:3938696, Device:2, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-09-06-16:14:19 (PID:3938694, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-09-06-16:14:20 (PID:3938698, Device:4, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-W0906 16:14:21.241000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938694 closing signal SIGTERM
-W0906 16:14:21.242000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938696 closing signal SIGTERM
-W0906 16:14:21.242000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938697 closing signal SIGTERM
-W0906 16:14:21.243000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938698 closing signal SIGTERM
-W0906 16:14:21.243000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938700 closing signal SIGTERM
-W0906 16:14:21.243000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938701 closing signal SIGTERM
-/home/ma-user/anaconda/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 30 leaked semaphore objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '
-E0906 16:14:27.182000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: 1) local_rank: 1 (pid: 3938695) of binary: /home/ma-user/anaconda/bin/python
-Traceback (most recent call last):
-  File "/home/ma-user/anaconda/bin/torchrun", line 8, in <module>
-    sys.exit(main())
-             ^^^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
-    return f(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/run.py", line 918, in main
-    run(args)
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/run.py", line 909, in run
-    elastic_launch(
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
-    return launch_agent(self._config, self._entrypoint, list(args))
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/launcher/api.py", line 269, in launch_agent
-    raise ChildFailedError(
-torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
-============================================================
-scripts/inference_mmdit_i2v_id.py FAILED
-------------------------------------------------------------
-Failures:
-[1]:
-  time      : 2026-09-06_16:14:21
-  host      : notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84.notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84-distributed.default.svc.cluster.local
-  rank      : 5 (local_rank: 5)
-  exitcode  : 1 (pid: 3938699)
-  error_file: <N/A>
-  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
-------------------------------------------------------------
-Root Cause (first observed failure):
-[0]:
-  time      : 2026-09-06_16:14:21
-  host      : notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84.notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84-distributed.default.svc.cluster.local
-  rank      : 1 (local_rank: 1)
-  exitcode  : 1 (pid: 3938695)
-  error_file: <N/A>
-  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
-============================================================
-[ERROR] 2026-09-06-16:14:27 (PID:3938419, Device:-1, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[text-ref] block=3 sample=1 text_norm=1202.568101 ref_norm=1555.945395 text/ref=0.7728858000549901 cos_flat=0.011195658473152424 cos_token=-0.01340086360362399
+[text-ref] block=4 sample=0 text_norm=390.272892 ref_norm=2686.449892 text/ref=0.14527458460903633 cos_flat=-0.00975369321740988 cos_token=-0.012376754851925312
+[text-ref] block=4 sample=1 text_norm=466.282558 ref_norm=2762.658232 text/ref=0.16878039888935484 cos_flat=-0.0063718226328545145 cos_token=-0.008220294252041798
+[text-ref] block=5 sample=0 text_norm=795.184782 ref_norm=2897.662756 text/ref=0.27442281902131055 cos_flat=-0.0017367569985508636 cos_token=0.0009646243363469319
+[text-ref] block=5 sample=1 text_norm=741.262806 ref_norm=2895.097094 text/ref=0.2560407411649848 cos_flat=-0.0116291773937155 cos_token=-0.023436761956169047
+[text-ref] block=6 sample=0 text_norm=636.665085 ref_norm=2942.604424 text/ref=0.21636108471396004 cos_flat=-0.012779098503448588 cos_token=-0.019363111517243552
+[text-ref] block=6 sample=1 text_norm=791.514204 ref_norm=2923.104110 text/ref=0.270778656666159 cos_flat=-0.010347932252211485 cos_token=-0.036416493377378
+[text-ref] block=7 sample=0 text_norm=711.231122 ref_norm=2945.195958 text/ref=0.2414885570683534 cos_flat=-0.03355647161724407 cos_token=-0.04020963317943569
+[text-ref] block=7 sample=1 text_norm=737.825167 ref_norm=2934.042805 text/ref=0.2514704847831898 cos_flat=-0.03555852970615298 cos_token=-0.04356048914247041
+[text-ref] block=8 sample=0 text_norm=1724.317771 ref_norm=2957.765592 text/ref=0.5829798601592419 cos_flat=0.0070863226217473315 cos_token=0.03900715949724118
+[text-ref] block=8 sample=1 text_norm=1577.417898 ref_norm=2943.057313 text/ref=0.5359793338577129 cos_flat=-0.0036121848535590794 cos_token=0.026232486177238785
+[text-ref] block=9 sample=0 text_norm=617.906286 ref_norm=3260.530671 text/ref=0.18951095656970313 cos_flat=-0.014666186686743741 cos_token=-0.02274081722096422
+[text-ref] block=9 sample=1 text_norm=737.674756 ref_norm=3246.598890 text/ref=0.22721462707063753 cos_flat=-0.014585385690864823 cos_token=-0.022736833327330664
+[text-ref] block=10 sample=0 text_norm=1051.873114 ref_norm=3089.582518 text/ref=0.34045800953726796 cos_flat=-0.004701515927616581 cos_token=-0.0032119091617896518
+[text-ref] block=10 sample=1 text_norm=1245.522181 ref_norm=3078.780498 text/ref=0.40455049711083996 cos_flat=-0.024508772165034356 cos_token=-0.02059166336100265
+[text-ref] block=11 sample=0 text_norm=2455.280197 ref_norm=3034.356741 text/ref=0.8091600315870584 cos_flat=-0.004266025860532398 cos_token=-0.00611765743615539
+[text-ref] block=11 sample=1 text_norm=2948.941419 ref_norm=3018.275930 text/ref=0.9770284386370314 cos_flat=-0.004956411936334749 cos_token=-0.013088552346538294
+[text-ref] block=12 sample=0 text_norm=2735.427326 ref_norm=3072.979162 text/ref=0.8901548567814341 cos_flat=-0.006799137207340715 cos_token=-0.005934291668557495
+[text-ref] block=12 sample=1 text_norm=2905.859307 ref_norm=3048.188143 text/ref=0.9533070700596206 cos_flat=-0.01133981664601353 cos_token=-0.018433708698376777
+[text-ref] block=13 sample=0 text_norm=1162.670184 ref_norm=2509.785350 text/ref=0.4632548291757612 cos_flat=3.3204156009418196e-05 cos_token=0.0026251144100337006
+[text-ref] block=13 sample=1 text_norm=1421.335951 ref_norm=2484.049088 text/ref=0.5721851301392261 cos_flat=-0.003952491638511399 cos_token=-0.005429239198128202
+[text-ref] block=14 sample=0 text_norm=1572.600610 ref_norm=2631.271591 text/ref=0.5976580355997755 cos_flat=-0.013751337725963823 cos_token=-0.046812289332966175
+[text-ref] block=14 sample=1 text_norm=1781.973416 ref_norm=2609.945520 text/ref=0.6827626867596415 cos_flat=-0.01859778306584749 cos_token=-0.06064220336427601
+[text-ref] block=15 sample=0 text_norm=912.149528 ref_norm=2566.542243 text/ref=0.35540016158129356 cos_flat=-0.033938470222072095 cos_token=-0.03688462482223856
+[text-ref] block=15 sample=1 text_norm=1159.861875 ref_norm=2542.336340 text/ref=0.45621889456234727 cos_flat=-0.04615638471936307 cos_token=-0.046717474089382136
+[text-ref] block=16 sample=0 text_norm=1423.951093 ref_norm=2286.452138 text/ref=0.6227775641879109 cos_flat=-0.04394083186065119 cos_token=-0.05756817879414391
+[text-ref] block=16 sample=1 text_norm=1769.268567 ref_norm=2270.635849 text/ref=0.7791952054192434 cos_flat=-0.04444868381700322 cos_token=-0.062070639379663894
+[text-ref] block=17 sample=0 text_norm=1970.529453 ref_norm=2179.723050 text/ref=0.9040274417810596 cos_flat=-0.02734147932065858 cos_token=-0.03649015102064733
+[text-ref] block=17 sample=1 text_norm=2213.249399 ref_norm=2162.894181 text/ref=1.0232814061531987 cos_flat=-0.02859036626653814 cos_token=-0.03918909069819246
+[text-ref] block=18 sample=0 text_norm=815.930185 ref_norm=2411.342718 text/ref=0.3383717209510372 cos_flat=-0.04969728740854227 cos_token=-0.04096787599195256
+[text-ref] block=18 sample=1 text_norm=1204.956703 ref_norm=2402.318201 text/ref=0.5015808074926684 cos_flat=-0.05121432697610016 cos_token=-0.04303299918472189
+[text-ref] block=19 sample=0 text_norm=830.070920 ref_norm=2406.413460 text/ref=0.3449411058101124 cos_flat=-0.03953631199661754 cos_token=-0.040414629507861635
+[text-ref] block=19 sample=1 text_norm=1203.227480 ref_norm=2396.069992 text/ref=0.5021670837705611 cos_flat=-0.037216582272749994 cos_token=-0.04073795349436878
+[text-ref] block=20 sample=0 text_norm=618.190886 ref_norm=1907.073270 text/ref=0.32415686179321596 cos_flat=-0.0836963790672485 cos_token=-0.07927886068075449
+[text-ref] block=20 sample=1 text_norm=881.190309 ref_norm=1905.730801 text/ref=0.46238970822772696 cos_flat=-0.08011214636543723 cos_token=-0.07671120150063164
+[text-ref] block=21 sample=0 text_norm=977.683791 ref_norm=2150.317043 text/ref=0.4546696008537827 cos_flat=0.015262384875791445 cos_token=0.024827919393269105
+[text-ref] block=21 sample=1 text_norm=1227.878957 ref_norm=2153.149668 text/ref=0.5702710663969602 cos_flat=0.01789444278270393 cos_token=0.03634317515360093
+[text-ref] block=22 sample=0 text_norm=952.660327 ref_norm=2205.588033 text/ref=0.4319303118118618 cos_flat=-0.0057615811560350295 cos_token=0.0028846631513988253
+[text-ref] block=22 sample=1 text_norm=1021.609459 ref_norm=2200.721061 text/ref=0.4642157867818329 cos_flat=-0.00436513591698169 cos_token=0.0006146897245829404
+[text-ref] block=23 sample=0 text_norm=652.481443 ref_norm=2107.814383 text/ref=0.30955355839064197 cos_flat=0.024114310005211314 cos_token=0.02211252057372942
+[text-ref] block=23 sample=1 text_norm=790.951553 ref_norm=2110.804074 text/ref=0.3747157599145175 cos_flat=0.03926003397450883 cos_token=0.042349156010479755
+2026-09-06 17:01:58, forward_with_cfg timestep: tensor([0.1563, 0.1563], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=840.627677 ref_norm=128.870443 text/ref=6.523044850291728 cos_flat=-0.00366384796335404 cos_token=-0.017379501551271617
+[text-ref] block=0 sample=1 text_norm=937.693649 ref_norm=128.870450 text/ref=7.276250267950748 cos_flat=0.00014656626005733132 cos_token=-0.0030338276240975378
+[text-ref] block=1 sample=0 text_norm=692.694006 ref_norm=121.733487 text/ref=5.690250272676609 cos_flat=0.0082442859620792 cos_token=-0.0013050883434843007
+[text-ref] block=1 sample=1 text_norm=623.534077 ref_norm=121.672784 text/ref=5.124679951026906 cos_flat=0.0003748300900572678 cos_token=0.0006542435169039683
+[text-ref] block=2 sample=0 text_norm=366.621821 ref_norm=608.458061 text/ref=0.6025424665967379 cos_flat=-0.0036097948745841876 cos_token=-0.012342380432115517
+[text-ref] block=2 sample=1 text_norm=400.510411 ref_norm=649.511098 text/ref=0.6166336683933865 cos_flat=-0.0018944024110233812 cos_token=-0.008915637916372262
+[text-ref] block=3 sample=0 text_norm=1351.910031 ref_norm=1434.031549 text/ref=0.9427338135476189 cos_flat=0.020406344126382227 cos_token=-0.004732644141592129
+[text-ref] block=3 sample=1 text_norm=1188.262640 ref_norm=1586.132148 text/ref=0.7491574027790886 cos_flat=0.010665023339873504 cos_token=-0.013307504151103405
+[text-ref] block=4 sample=0 text_norm=382.430669 ref_norm=2713.421169 text/ref=0.1409404013614625 cos_flat=-0.009741128707289493 cos_token=-0.011973456467219512
+[text-ref] block=4 sample=1 text_norm=454.789667 ref_norm=2790.045394 text/ref=0.16300439693282184 cos_flat=-0.00610012365715557 cos_token=-0.00740866172978691
+[text-ref] block=5 sample=0 text_norm=781.457050 ref_norm=2900.821471 text/ref=0.26939163897859497 cos_flat=-0.0019403894529961359 cos_token=0.0009964163614217122
+[text-ref] block=5 sample=1 text_norm=730.880816 ref_norm=2896.916167 text/ref=0.2522961569091784 cos_flat=-0.011395027455246787 cos_token=-0.02314746117651015
+[text-ref] block=6 sample=0 text_norm=622.108920 ref_norm=2948.230413 text/ref=0.2110109567114629 cos_flat=-0.01212946882802659 cos_token=-0.018529060470014118
+[text-ref] block=6 sample=1 text_norm=778.106338 ref_norm=2927.965525 text/ref=0.26574982905074135 cos_flat=-0.009725707254411176 cos_token=-0.035801729617920594
+[text-ref] block=7 sample=0 text_norm=698.508454 ref_norm=2949.113766 text/ref=0.236853681943629 cos_flat=-0.033666916585629765 cos_token=-0.03992990170204654
+[text-ref] block=7 sample=1 text_norm=725.357440 ref_norm=2937.490499 text/ref=0.24693099096853613 cos_flat=-0.03567864988851397 cos_token=-0.043139390088951395
+[text-ref] block=8 sample=0 text_norm=1691.863999 ref_norm=2961.254782 text/ref=0.5713334799858422 cos_flat=0.006547360177194758 cos_token=0.03798003998464588
+[text-ref] block=8 sample=1 text_norm=1557.143912 ref_norm=2946.132752 text/ref=0.5285382713341125 cos_flat=-0.004183185394015022 cos_token=0.025592663212971517
+[text-ref] block=9 sample=0 text_norm=592.536326 ref_norm=3262.799828 text/ref=0.1816036402185389 cos_flat=-0.014522275752583195 cos_token=-0.02253531669340219
+[text-ref] block=9 sample=1 text_norm=706.250266 ref_norm=3249.170293 text/ref=0.21736326580245033 cos_flat=-0.014442231256974625 cos_token=-0.022503580331234806
+[text-ref] block=10 sample=0 text_norm=999.007526 ref_norm=3090.205548 text/ref=0.32328190170426446 cos_flat=-0.004801762663639957 cos_token=-0.0029161692257937306
+[text-ref] block=10 sample=1 text_norm=1176.906195 ref_norm=3079.835466 text/ref=0.38213281448399333 cos_flat=-0.02390057651909193 cos_token=-0.020499659953921633
+[text-ref] block=11 sample=0 text_norm=2393.840104 ref_norm=3035.563985 text/ref=0.7885981374182482 cos_flat=-0.004001122901223354 cos_token=-0.0070167932339658115
+[text-ref] block=11 sample=1 text_norm=2895.383309 ref_norm=3020.330433 text/ref=0.95863130653135 cos_flat=-0.004658766224253621 cos_token=-0.01274888772267307
+[text-ref] block=12 sample=0 text_norm=2725.177236 ref_norm=3075.889190 text/ref=0.8859803025242622 cos_flat=-0.006739573710434378 cos_token=-0.006484493305181125
+[text-ref] block=12 sample=1 text_norm=2843.191599 ref_norm=3051.954371 text/ref=0.9315970206075814 cos_flat=-0.011771419796235813 cos_token=-0.019215537257948646
+[text-ref] block=13 sample=0 text_norm=1138.183847 ref_norm=2512.635746 text/ref=0.4529840224229399 cos_flat=-0.00018792303352847578 cos_token=0.0013618309972717776
+[text-ref] block=13 sample=1 text_norm=1381.100309 ref_norm=2490.128313 text/ref=0.5546301777850965 cos_flat=-0.004094388650953544 cos_token=-0.006181232178944735
+[text-ref] block=14 sample=0 text_norm=1540.814208 ref_norm=2631.385054 text/ref=0.5855525423488002 cos_flat=-0.01386329419236048 cos_token=-0.0470822441318428
+[text-ref] block=14 sample=1 text_norm=1760.261934 ref_norm=2612.457779 text/ref=0.6737953619013728 cos_flat=-0.018401004760700432 cos_token=-0.06112603371186167
+[text-ref] block=15 sample=0 text_norm=919.637878 ref_norm=2566.375079 text/ref=0.3583411814281621 cos_flat=-0.03433609684787408 cos_token=-0.03644301644589416
+[text-ref] block=15 sample=1 text_norm=1144.913565 ref_norm=2544.883336 text/ref=0.4498884284680442 cos_flat=-0.046194501992926934 cos_token=-0.04694589568999269
+[text-ref] block=16 sample=0 text_norm=1396.307544 ref_norm=2284.928568 text/ref=0.6110946153102501 cos_flat=-0.04351202572146373 cos_token=-0.05775936316943607
+[text-ref] block=16 sample=1 text_norm=1736.170440 ref_norm=2270.299245 text/ref=0.764731981612894 cos_flat=-0.044487878156288206 cos_token=-0.06243415264556159
+[text-ref] block=17 sample=0 text_norm=1950.317406 ref_norm=2179.476088 text/ref=0.894856069931374 cos_flat=-0.028432398516049777 cos_token=-0.03845507104146226
+[text-ref] block=17 sample=1 text_norm=2180.524634 ref_norm=2163.175933 text/ref=1.0080200136494868 cos_flat=-0.028989071378293603 cos_token=-0.03952685752684156
+[text-ref] block=18 sample=0 text_norm=819.261048 ref_norm=2405.950996 text/ref=0.3405144365075409 cos_flat=-0.04983488236066102 cos_token=-0.0412935410963681
+[text-ref] block=18 sample=1 text_norm=1185.923225 ref_norm=2397.993328 text/ref=0.49454817561974 cos_flat=-0.0507956459816797 cos_token=-0.04300804164369513
+[text-ref] block=19 sample=0 text_norm=828.066007 ref_norm=2391.095506 text/ref=0.3463123932326765 cos_flat=-0.039433953956278744 cos_token=-0.04029046704345355
+[text-ref] block=19 sample=1 text_norm=1188.493599 ref_norm=2383.187137 text/ref=0.4986992336629028 cos_flat=-0.036786573156839183 cos_token=-0.04022489534328371
+[text-ref] block=20 sample=0 text_norm=620.584384 ref_norm=1888.417564 text/ref=0.3286266746270594 cos_flat=-0.08421252759551111 cos_token=-0.08027556356725679
+[text-ref] block=20 sample=1 text_norm=875.501907 ref_norm=1889.855972 text/ref=0.4632638252092317 cos_flat=-0.08012162632601054 cos_token=-0.07772466847806929
+[text-ref] block=21 sample=0 text_norm=967.596688 ref_norm=2126.088294 text/ref=0.45510654044444915 cos_flat=0.015258153775521012 cos_token=0.025096915122180628
+[text-ref] block=21 sample=1 text_norm=1210.320887 ref_norm=2131.715119 text/ref=0.5677685897679653 cos_flat=0.018071439389754775 cos_token=0.036994755557272496
+[text-ref] block=22 sample=0 text_norm=942.055824 ref_norm=2183.592811 text/ref=0.4314246775403594 cos_flat=-0.005527270590833062 cos_token=0.0028633696660120248
+[text-ref] block=22 sample=1 text_norm=1008.336521 ref_norm=2182.223158 text/ref=0.4620684726261124 cos_flat=-0.0034166441060458925 cos_token=0.001529786448621683
+[text-ref] block=23 sample=0 text_norm=648.120237 ref_norm=2084.751808 text/ref=0.31088604151535915 cos_flat=0.02365543764588538 cos_token=0.02177144324103648
+[text-ref] block=23 sample=1 text_norm=790.089722 ref_norm=2090.928830 text/ref=0.37786543046472204 cos_flat=0.037430921749103514 cos_token=0.04061675681146154
+2026-09-06 17:02:06, forward_with_cfg timestep: tensor([0.1760, 0.1760], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=839.410093 ref_norm=130.546066 text/ref=6.429991496395885 cos_flat=-0.0036775145209138995 cos_token=-0.017289797751321438
+[text-ref] block=0 sample=1 text_norm=938.767096 ref_norm=130.546161 text/ref=7.191073962351021 cos_flat=-9.645301085877978e-05 cos_token=-0.003498438550566865
+[text-ref] block=1 sample=0 text_norm=686.226249 ref_norm=117.173850 text/ref=5.856479498276659 cos_flat=0.008159873731195673 cos_token=-0.0014727167109725517
+[text-ref] block=1 sample=1 text_norm=616.821216 ref_norm=117.189492 text/ref=5.26345157186717 cos_flat=0.0006095985862628113 cos_token=0.0008683728489137044
+[text-ref] block=2 sample=0 text_norm=362.034041 ref_norm=592.376461 text/ref=0.6111553457043303 cos_flat=-0.00366992419268723 cos_token=-0.01215117106753336
+[text-ref] block=2 sample=1 text_norm=397.874881 ref_norm=636.462794 text/ref=0.6251345479744215 cos_flat=-0.00181654943176519 cos_token=-0.008878650806777697
+[text-ref] block=3 sample=0 text_norm=1350.692025 ref_norm=1424.281031 text/ref=0.9483325237065763 cos_flat=0.020673442523155092 cos_token=-0.004808601244711418
+[text-ref] block=3 sample=1 text_norm=1186.586856 ref_norm=1578.915905 text/ref=0.7515199841625214 cos_flat=0.010977651576852852 cos_token=-0.013003488426810159
+[text-ref] block=4 sample=0 text_norm=370.928351 ref_norm=2715.974344 text/ref=0.13657284804324257 cos_flat=-0.009559838751364794 cos_token=-0.011332088271066536
+[text-ref] block=4 sample=1 text_norm=440.772002 ref_norm=2792.197498 text/ref=0.15785846189707903 cos_flat=-0.005575086522593942 cos_token=-0.006381713406878897
+[text-ref] block=5 sample=0 text_norm=733.386262 ref_norm=2896.285671 text/ref=0.25321613462273374 cos_flat=-0.00239638239918155 cos_token=0.0009602225665827542
+[text-ref] block=5 sample=1 text_norm=697.652015 ref_norm=2890.135677 text/ref=0.24139074880431513 cos_flat=-0.011003339846876464 cos_token=-0.022574837773119714
+[text-ref] block=6 sample=0 text_norm=616.909771 ref_norm=2947.172804 text/ref=0.20932256521102793 cos_flat=-0.011654128821545325 cos_token=-0.018446222141903758
+[text-ref] block=6 sample=1 text_norm=776.347497 ref_norm=2925.305845 text/ref=0.26539019774857336 cos_flat=-0.009468437581688409 cos_token=-0.035951955485509064
+[text-ref] block=7 sample=0 text_norm=678.997069 ref_norm=2948.423695 text/ref=0.2302915522295904 cos_flat=-0.03390275933467936 cos_token=-0.040079181311971156
+[text-ref] block=7 sample=1 text_norm=706.739334 ref_norm=2935.545921 text/ref=0.24075226642812414 cos_flat=-0.03586232214656127 cos_token=-0.04312918612847745
+[text-ref] block=8 sample=0 text_norm=1661.835463 ref_norm=2961.545370 text/ref=0.5611379382626144 cos_flat=0.005672251147247043 cos_token=0.036935128528697195
+[text-ref] block=8 sample=1 text_norm=1554.659893 ref_norm=2945.293114 text/ref=0.5278455599791905 cos_flat=-0.0051802964607343925 cos_token=0.02460681886998832
+[text-ref] block=9 sample=0 text_norm=559.543066 ref_norm=3263.969993 text/ref=0.1714302115583648 cos_flat=-0.01464157690729282 cos_token=-0.022736252620820196
+[text-ref] block=9 sample=1 text_norm=670.308003 ref_norm=3249.315206 text/ref=0.2062920831868763 cos_flat=-0.014473232920950875 cos_token=-0.022518898126113997
+[text-ref] block=10 sample=0 text_norm=960.288498 ref_norm=3091.922606 text/ref=0.3105797331383658 cos_flat=-0.0051034364932348785 cos_token=-0.0031499872664757836
+[text-ref] block=10 sample=1 text_norm=1118.586898 ref_norm=3081.131799 text/ref=0.3630441573444293 cos_flat=-0.02369364627891236 cos_token=-0.020701981861463343
+[text-ref] block=11 sample=0 text_norm=2374.706034 ref_norm=3038.521241 text/ref=0.781533465001854 cos_flat=-0.0036284374173953036 cos_token=-0.007181462274146901
+[text-ref] block=11 sample=1 text_norm=2868.326708 ref_norm=3023.068640 text/ref=0.9488129611463008 cos_flat=-0.0045397552308970605 cos_token=-0.012294181953318802
+[text-ref] block=12 sample=0 text_norm=2704.317749 ref_norm=3079.449258 text/ref=0.8781822730269498 cos_flat=-0.007143366496224062 cos_token=-0.007337694948469615
+[text-ref] block=12 sample=1 text_norm=2801.125442 ref_norm=3055.454443 text/ref=0.9167622996005238 cos_flat=-0.012221125921337108 cos_token=-0.01998140677802967
+[text-ref] block=13 sample=0 text_norm=1127.999696 ref_norm=2516.538029 text/ref=0.4482347110405827 cos_flat=-0.0009580514970207485 cos_token=0.0004187011369610227
+[text-ref] block=13 sample=1 text_norm=1352.390263 ref_norm=2494.990837 text/ref=0.5420421760971269 cos_flat=-0.00448423196784215 cos_token=-0.006942556237844064
+[text-ref] block=14 sample=0 text_norm=1515.201237 ref_norm=2632.011620 text/ref=0.5756818189059518 cos_flat=-0.013993130389850086 cos_token=-0.047378235551336315
+[text-ref] block=14 sample=1 text_norm=1729.972936 ref_norm=2613.903754 text/ref=0.6618349788234202 cos_flat=-0.01864579417186868 cos_token=-0.06182255733076516
+[text-ref] block=15 sample=0 text_norm=907.361550 ref_norm=2565.910813 text/ref=0.35362162447455203 cos_flat=-0.03397850381977852 cos_token=-0.035928592261893724
+[text-ref] block=15 sample=1 text_norm=1114.495570 ref_norm=2545.423138 text/ref=0.4378429477310248 cos_flat=-0.04603707689605947 cos_token=-0.04699266119651811
+[text-ref] block=16 sample=0 text_norm=1349.880276 ref_norm=2283.725093 text/ref=0.5910870271615146 cos_flat=-0.043334508865449706 cos_token=-0.05760344240367809
+[text-ref] block=16 sample=1 text_norm=1697.318728 ref_norm=2270.104004 text/ref=0.7476832451717508 cos_flat=-0.044373487585455965 cos_token=-0.06297873191026539
+[text-ref] block=17 sample=0 text_norm=1900.765536 ref_norm=2177.867105 text/ref=0.8727647024178796 cos_flat=-0.028671286448475292 cos_token=-0.03940973175576717
+[text-ref] block=17 sample=1 text_norm=2136.080805 ref_norm=2161.879027 text/ref=0.9880667596788384 cos_flat=-0.029297607626866354 cos_token=-0.04002097964933341
+[text-ref] block=18 sample=0 text_norm=811.181870 ref_norm=2402.457960 text/ref=0.3376466451034635 cos_flat=-0.04999003696034718 cos_token=-0.04212799827753409
+[text-ref] block=18 sample=1 text_norm=1163.116014 ref_norm=2394.318513 text/ref=0.48578165678932744 cos_flat=-0.05074055189797593 cos_token=-0.04339370819531882
+[text-ref] block=19 sample=0 text_norm=825.726527 ref_norm=2380.790779 text/ref=0.3468286816144699 cos_flat=-0.039436528218242076 cos_token=-0.0405752424227928
+[text-ref] block=19 sample=1 text_norm=1180.381861 ref_norm=2372.708658 text/ref=0.49748284804011605 cos_flat=-0.03643311890674493 cos_token=-0.04005413258511021
+[text-ref] block=20 sample=0 text_norm=618.872315 ref_norm=1874.021759 text/ref=0.3302375290511318 cos_flat=-0.08494816888382338 cos_token=-0.08181883820126536
+[text-ref] block=20 sample=1 text_norm=870.789389 ref_norm=1874.245373 text/ref=0.46460799741954056 cos_flat=-0.08025999868669845 cos_token=-0.07873509151003227
+[text-ref] block=21 sample=0 text_norm=949.648845 ref_norm=2104.487429 text/ref=0.45124947376798236 cos_flat=0.015828198467535907 cos_token=0.02578459836863268
+[text-ref] block=21 sample=1 text_norm=1197.435626 ref_norm=2108.638779 text/ref=0.5678713861575371 cos_flat=0.018277263629796446 cos_token=0.037553928271812295
+[text-ref] block=22 sample=0 text_norm=931.097891 ref_norm=2164.232858 text/ref=0.4302207535565126 cos_flat=-0.005217788075828889 cos_token=0.0030138666755939215
+[text-ref] block=22 sample=1 text_norm=1000.560115 ref_norm=2162.061911 text/ref=0.4627805103390066 cos_flat=-0.0029268625687672947 cos_token=0.0019270634460560184
+[text-ref] block=23 sample=0 text_norm=643.185806 ref_norm=2062.938360 text/ref=0.3117813981784236 cos_flat=0.02417034509443651 cos_token=0.023293203389140257
+[text-ref] block=23 sample=1 text_norm=784.597769 ref_norm=2068.086380 text/ref=0.379383461111643 cos_flat=0.0373682357355268 cos_token=0.0410698416054818
+2026-09-06 17:02:14, forward_with_cfg timestep: tensor([0.2000, 0.2000], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=841.224396 ref_norm=132.800064 text/ref=6.334518002232159 cos_flat=-0.0036300888226500298 cos_token=-0.01728152387458765
+[text-ref] block=0 sample=1 text_norm=935.921902 ref_norm=132.800103 text/ref=7.047599227910188 cos_flat=-0.0002864779423729632 cos_token=-0.003920161409026949
+[text-ref] block=1 sample=0 text_norm=682.465078 ref_norm=113.446153 text/ref=6.015762190704948 cos_flat=0.00828430781863285 cos_token=-0.0015297205392923931
+[text-ref] block=1 sample=1 text_norm=611.665218 ref_norm=113.503909 text/ref=5.388935288676239 cos_flat=0.000705197594806237 cos_token=0.0009810840122067663
+[text-ref] block=2 sample=0 text_norm=363.659948 ref_norm=570.402798 text/ref=0.6375493759826696 cos_flat=-0.003603681498432887 cos_token=-0.012161719209582452
+[text-ref] block=2 sample=1 text_norm=397.361497 ref_norm=617.137339 text/ref=0.6438785526449933 cos_flat=-0.0016719020142847625 cos_token=-0.008963854528239158
+[text-ref] block=3 sample=0 text_norm=1346.208906 ref_norm=1421.557297 text/ref=0.946995882010557 cos_flat=0.020869579897651543 cos_token=-0.005074522485381221
+[text-ref] block=3 sample=1 text_norm=1178.003104 ref_norm=1580.080359 text/ref=0.7455336666230818 cos_flat=0.011213246793283492 cos_token=-0.012798807449524104
+[text-ref] block=4 sample=0 text_norm=359.915056 ref_norm=2721.147397 text/ref=0.13226591703314644 cos_flat=-0.009551318746254542 cos_token=-0.01073078978203125
+[text-ref] block=4 sample=1 text_norm=426.353791 ref_norm=2797.628883 text/ref=0.15239826606721582 cos_flat=-0.005421344858092007 cos_token=-0.005565164840252853
+[text-ref] block=5 sample=0 text_norm=694.971960 ref_norm=2893.422408 text/ref=0.240190287596274 cos_flat=-0.0024648672214100625 cos_token=0.0004619189949151493
+[text-ref] block=5 sample=1 text_norm=671.490941 ref_norm=2885.914276 text/ref=0.2326787552502696 cos_flat=-0.010406469762956222 cos_token=-0.02248119069524251
+[text-ref] block=6 sample=0 text_norm=608.079548 ref_norm=2948.302932 text/ref=0.20624730965023824 cos_flat=-0.011325731362660076 cos_token=-0.017986030060139706
+[text-ref] block=6 sample=1 text_norm=770.115052 ref_norm=2925.564444 text/ref=0.26323640004668425 cos_flat=-0.008875729189895541 cos_token=-0.0357356461832419
+[text-ref] block=7 sample=0 text_norm=659.973059 ref_norm=2950.139858 text/ref=0.2237090749630109 cos_flat=-0.03413373066460904 cos_token=-0.03995205643055893
+[text-ref] block=7 sample=1 text_norm=692.108703 ref_norm=2936.559109 text/ref=0.23568696461930527 cos_flat=-0.03616146442525446 cos_token=-0.04295755248277723
+[text-ref] block=8 sample=0 text_norm=1624.261978 ref_norm=2964.775094 text/ref=0.5478533535506979 cos_flat=0.00475546502142126 cos_token=0.03565612757785359
+[text-ref] block=8 sample=1 text_norm=1532.762986 ref_norm=2948.091451 text/ref=0.5199170418057424 cos_flat=-0.005819252343316181 cos_token=0.02369930055004981
+[text-ref] block=9 sample=0 text_norm=525.443467 ref_norm=3266.100030 text/ref=0.16087794678120146 cos_flat=-0.0146247610261952 cos_token=-0.02279953721236417
+[text-ref] block=9 sample=1 text_norm=634.822930 ref_norm=3251.446596 text/ref=0.1952432281339683 cos_flat=-0.014567559672946128 cos_token=-0.02249386323748186
+[text-ref] block=10 sample=0 text_norm=917.854616 ref_norm=3092.775252 text/ref=0.29677378461175014 cos_flat=-0.005584141653259557 cos_token=-0.0034083127243431308
+[text-ref] block=10 sample=1 text_norm=1071.692982 ref_norm=3081.975063 text/ref=0.34772928408896553 cos_flat=-0.023466452290045393 cos_token=-0.020623282063396222
+[text-ref] block=11 sample=0 text_norm=2339.553730 ref_norm=3039.582355 text/ref=0.769695785997469 cos_flat=-0.003157275535111348 cos_token=-0.007126256204942915
+[text-ref] block=11 sample=1 text_norm=2856.174714 ref_norm=3024.334994 text/ref=0.9443976015235591 cos_flat=-0.0043131317186843945 cos_token=-0.012103401216198831
+[text-ref] block=12 sample=0 text_norm=2639.246603 ref_norm=3079.988565 text/ref=0.8569014291819199 cos_flat=-0.007448200414427459 cos_token=-0.007934043579737537
+[text-ref] block=12 sample=1 text_norm=2734.474134 ref_norm=3056.230537 text/ref=0.8947211606492316 cos_flat=-0.012689598715461745 cos_token=-0.020721314827533376
+[text-ref] block=13 sample=0 text_norm=1109.445264 ref_norm=2519.084300 text/ref=0.4404160925488784 cos_flat=-0.001484766866880459 cos_token=-0.00013730909467048302
+[text-ref] block=13 sample=1 text_norm=1314.145832 ref_norm=2498.994738 text/ref=0.525869787567483 cos_flat=-0.00476212243570593 cos_token=-0.007300952616719959
+[text-ref] block=14 sample=0 text_norm=1476.369122 ref_norm=2629.908417 text/ref=0.5613766292897974 cos_flat=-0.014336381420243632 cos_token=-0.04778479391791659
+[text-ref] block=14 sample=1 text_norm=1699.110754 ref_norm=2613.090513 text/ref=0.6502303480089153 cos_flat=-0.018895742608377623 cos_token=-0.062344787057538466
+[text-ref] block=15 sample=0 text_norm=884.710121 ref_norm=2563.313115 text/ref=0.3451432117771352 cos_flat=-0.03432269030254267 cos_token=-0.03594655875713315
+[text-ref] block=15 sample=1 text_norm=1083.815915 ref_norm=2544.062679 text/ref=0.42601777232316057 cos_flat=-0.046349957840793383 cos_token=-0.04722824498800438
+[text-ref] block=16 sample=0 text_norm=1296.178819 ref_norm=2280.377101 text/ref=0.5684054706864883 cos_flat=-0.04391170155565236 cos_token=-0.05787369771715657
+[text-ref] block=16 sample=1 text_norm=1649.694628 ref_norm=2267.830589 text/ref=0.7274329204729116 cos_flat=-0.04476992547659497 cos_token=-0.06334674865451412
+[text-ref] block=17 sample=0 text_norm=1853.602812 ref_norm=2174.864265 text/ref=0.8522843661175107 cos_flat=-0.029149578758168523 cos_token=-0.040220583258673386
+[text-ref] block=17 sample=1 text_norm=2087.413953 ref_norm=2159.727557 text/ref=0.9665172564108827 cos_flat=-0.029697981366919004 cos_token=-0.040648426520096745
+[text-ref] block=18 sample=0 text_norm=797.079461 ref_norm=2395.472561 text/ref=0.33274414164456223 cos_flat=-0.05031274461026151 cos_token=-0.04301929009375089
+[text-ref] block=18 sample=1 text_norm=1161.743432 ref_norm=2387.673252 text/ref=0.48655879992805967 cos_flat=-0.05017510472419839 cos_token=-0.04333583590558626
+[text-ref] block=19 sample=0 text_norm=822.486051 ref_norm=2365.966310 text/ref=0.34763219064825407 cos_flat=-0.03900750567877564 cos_token=-0.04043238129942063
+[text-ref] block=19 sample=1 text_norm=1181.188719 ref_norm=2357.511595 text/ref=0.5010319870183106 cos_flat=-0.03590930521763364 cos_token=-0.03970970799808083
+[text-ref] block=20 sample=0 text_norm=620.388501 ref_norm=1857.445053 text/ref=0.3340009977517186 cos_flat=-0.08531073162707972 cos_token=-0.08335650739712934
+[text-ref] block=20 sample=1 text_norm=872.683182 ref_norm=1856.837958 text/ref=0.4699834888371566 cos_flat=-0.08004763886938292 cos_token=-0.0796862294062281
+[text-ref] block=21 sample=0 text_norm=933.966392 ref_norm=2081.005426 text/ref=0.4488053611104934 cos_flat=0.01674623799768794 cos_token=0.027323677379599072
+[text-ref] block=21 sample=1 text_norm=1183.252404 ref_norm=2083.572614 text/ref=0.567895928453756 cos_flat=0.01895756634613075 cos_token=0.03896887862889052
+[text-ref] block=22 sample=0 text_norm=914.190232 ref_norm=2139.663736 text/ref=0.4272588337566265 cos_flat=-0.004856196529743801 cos_token=0.002819103247663568
+[text-ref] block=22 sample=1 text_norm=984.859928 ref_norm=2136.269864 text/ref=0.4610184998812352 cos_flat=-0.0023241173560645083 cos_token=0.0022900279786692685
+[text-ref] block=23 sample=0 text_norm=640.666676 ref_norm=2035.542009 text/ref=0.31474009049788676 cos_flat=0.02334722671555703 cos_token=0.02295919275954769
+[text-ref] block=23 sample=1 text_norm=779.717415 ref_norm=2038.994324 text/ref=0.3824029356872472 cos_flat=0.03628117079640623 cos_token=0.04056472116730181
+2026-09-06 17:02:23, forward_with_cfg timestep: tensor([0.2299, 0.2299], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=847.531105 ref_norm=135.736442 text/ref=6.243946688893935 cos_flat=-0.0036521129215018274 cos_token=-0.01745004241294771
+[text-ref] block=0 sample=1 text_norm=936.468167 ref_norm=135.736451 text/ref=6.899164944432602 cos_flat=-0.0006030984498640526 cos_token=-0.004618996864025028
+[text-ref] block=1 sample=0 text_norm=674.881846 ref_norm=108.934191 text/ref=6.195317007564169 cos_flat=0.008232778221405602 cos_token=-0.0017573486264138745
+[text-ref] block=1 sample=1 text_norm=606.150272 ref_norm=109.038707 text/ref=5.559037623207437 cos_flat=0.000959084724442787 cos_token=0.0012565189625464797
+[text-ref] block=2 sample=0 text_norm=364.357933 ref_norm=533.973193 text/ref=0.6823524812851953 cos_flat=-0.0035356818458635746 cos_token=-0.012188007919834574
+[text-ref] block=2 sample=1 text_norm=395.159744 ref_norm=582.686049 text/ref=0.6781692198394689 cos_flat=-0.0015522526702153481 cos_token=-0.009102610609868405
+[text-ref] block=3 sample=0 text_norm=1342.327997 ref_norm=1392.470916 text/ref=0.9639899699007576 cos_flat=0.02110645531470366 cos_token=-0.0057312307478522085
+[text-ref] block=3 sample=1 text_norm=1173.493361 ref_norm=1552.979858 text/ref=0.7556397816823052 cos_flat=0.011522030815874006 cos_token=-0.012649663176680443
+[text-ref] block=4 sample=0 text_norm=350.258735 ref_norm=2694.058608 text/ref=0.13001154971706558 cos_flat=-0.009404984957957413 cos_token=-0.010153473755721324
+[text-ref] block=4 sample=1 text_norm=410.740549 ref_norm=2771.938966 text/ref=0.14817806396339234 cos_flat=-0.005165363936952365 cos_token=-0.004784056739148776
+[text-ref] block=5 sample=0 text_norm=642.451409 ref_norm=2875.902446 text/ref=0.22339123853896894 cos_flat=-0.0026216765100927812 cos_token=-2.0750702060038122e-05
+[text-ref] block=5 sample=1 text_norm=630.990590 ref_norm=2865.332787 text/ref=0.22021546413198229 cos_flat=-0.009481504881894946 cos_token=-0.022271737424646554
+[text-ref] block=6 sample=0 text_norm=603.666945 ref_norm=2945.370655 text/ref=0.20495449146020892 cos_flat=-0.011102007242796844 cos_token=-0.017525057656815692
+[text-ref] block=6 sample=1 text_norm=772.130126 ref_norm=2919.902621 text/ref=0.2644369439473379 cos_flat=-0.008144027866802097 cos_token=-0.03550670431757621
+[text-ref] block=7 sample=0 text_norm=645.348534 ref_norm=2949.773693 text/ref=0.21877899826580566 cos_flat=-0.0341390770770604 cos_token=-0.039675014384523095
+[text-ref] block=7 sample=1 text_norm=686.401653 ref_norm=2934.316937 text/ref=0.2339221250312231 cos_flat=-0.03577919901528785 cos_token=-0.04250395122768517
+[text-ref] block=8 sample=0 text_norm=1601.798336 ref_norm=2965.339046 text/ref=0.5401737579886797 cos_flat=0.003550333981866719 cos_token=0.034567866647195154
+[text-ref] block=8 sample=1 text_norm=1515.446980 ref_norm=2947.282659 text/ref=0.5141844726433186 cos_flat=-0.006440587801080995 cos_token=0.022653097799275865
+[text-ref] block=9 sample=0 text_norm=503.016728 ref_norm=3268.529697 text/ref=0.15389694300753262 cos_flat=-0.01492093407727217 cos_token=-0.023124325557266512
+[text-ref] block=9 sample=1 text_norm=609.084932 ref_norm=3253.058892 text/ref=0.18723452350544387 cos_flat=-0.014840007891740146 cos_token=-0.022572083179679882
+[text-ref] block=10 sample=0 text_norm=879.992140 ref_norm=3095.432327 text/ref=0.2842873133553152 cos_flat=-0.006570314581234062 cos_token=-0.004148136201388903
+[text-ref] block=10 sample=1 text_norm=1026.971332 ref_norm=3084.183951 text/ref=0.3329799222278432 cos_flat=-0.023867075294540997 cos_token=-0.02101713689865858
+[text-ref] block=11 sample=0 text_norm=2323.358129 ref_norm=3041.815433 text/ref=0.7638064111304593 cos_flat=-0.0026213037991085746 cos_token=-0.006696864908408554
+[text-ref] block=11 sample=1 text_norm=2835.530991 ref_norm=3026.585476 text/ref=0.9368745780303175 cos_flat=-0.003944365454664813 cos_token=-0.011809148391749742
+[text-ref] block=12 sample=0 text_norm=2590.164229 ref_norm=3082.539021 text/ref=0.8402697292077044 cos_flat=-0.008008747076172431 cos_token=-0.009012060183287283
+[text-ref] block=12 sample=1 text_norm=2667.687827 ref_norm=3059.394962 text/ref=0.8719658168868576 cos_flat=-0.013095540851727861 cos_token=-0.021419248724836863
+[text-ref] block=13 sample=0 text_norm=1081.441358 ref_norm=2522.203308 text/ref=0.42876851150226575 cos_flat=-0.0020486915067952334 cos_token=-0.0006711246039242757
+[text-ref] block=13 sample=1 text_norm=1266.118918 ref_norm=2503.221037 text/ref=0.505795892388952 cos_flat=-0.00511962650037033 cos_token=-0.007786576459662792
+[text-ref] block=14 sample=0 text_norm=1429.314794 ref_norm=2628.903820 text/ref=0.543692311361078 cos_flat=-0.014967189537994998 cos_token=-0.048123627725219054
+[text-ref] block=14 sample=1 text_norm=1641.433214 ref_norm=2613.279614 text/ref=0.6281123556845496 cos_flat=-0.019393295301211685 cos_token=-0.06292914178103547
+[text-ref] block=15 sample=0 text_norm=887.658799 ref_norm=2559.949917 text/ref=0.34674850207212554 cos_flat=-0.03499435753746888 cos_token=-0.03607418863259024
+[text-ref] block=15 sample=1 text_norm=1032.195641 ref_norm=2542.199481 text/ref=0.4060246446869827 cos_flat=-0.046105716248802026 cos_token=-0.04724331170696862
+[text-ref] block=16 sample=0 text_norm=1251.477797 ref_norm=2276.422287 text/ref=0.5497564331481419 cos_flat=-0.04498242372959494 cos_token=-0.058287263918907
+[text-ref] block=16 sample=1 text_norm=1598.219570 ref_norm=2265.984193 text/ref=0.7053092317904368 cos_flat=-0.044409825035844556 cos_token=-0.06319383724843664
+[text-ref] block=17 sample=0 text_norm=1790.684112 ref_norm=2170.826948 text/ref=0.824885702836912 cos_flat=-0.029422076337390114 cos_token=-0.04140587626665061
+[text-ref] block=17 sample=1 text_norm=2040.258633 ref_norm=2157.516781 text/ref=0.9456513392809203 cos_flat=-0.02981626308300172 cos_token=-0.04133216667822627
+[text-ref] block=18 sample=0 text_norm=781.956012 ref_norm=2385.582047 text/ref=0.32778416194289894 cos_flat=-0.05097354243719977 cos_token=-0.04450685168024765
+[text-ref] block=18 sample=1 text_norm=1123.775599 ref_norm=2378.474009 text/ref=0.4724775612787854 cos_flat=-0.049748915046572126 cos_token=-0.04360200190902735
+[text-ref] block=19 sample=0 text_norm=820.797176 ref_norm=2340.375400 text/ref=0.3507117604033697 cos_flat=-0.038039181280127364 cos_token=-0.0403287719093076
+[text-ref] block=19 sample=1 text_norm=1170.199697 ref_norm=2332.682929 text/ref=0.5016539892116951 cos_flat=-0.03527486478496273 cos_token=-0.039341030815235434
+[text-ref] block=20 sample=0 text_norm=614.669192 ref_norm=1830.406407 text/ref=0.33581022727523824 cos_flat=-0.08618887883381685 cos_token=-0.08539471977328197
+[text-ref] block=20 sample=1 text_norm=861.995792 ref_norm=1828.162523 text/ref=0.4715093875410975 cos_flat=-0.0797527548655559 cos_token=-0.08046542048898973
+[text-ref] block=21 sample=0 text_norm=909.956099 ref_norm=2045.429340 text/ref=0.4448729082131706 cos_flat=0.017220424162465692 cos_token=0.028457532026062677
+[text-ref] block=21 sample=1 text_norm=1159.834207 ref_norm=2044.281627 text/ref=0.5673553934035982 cos_flat=0.019307776286038827 cos_token=0.039749213125651196
+[text-ref] block=22 sample=0 text_norm=905.093207 ref_norm=2104.104372 text/ref=0.4301560413903074 cos_flat=-0.004362655680492216 cos_token=0.0028639179581251193
+[text-ref] block=22 sample=1 text_norm=975.071964 ref_norm=2097.599184 text/ref=0.46485142245744143 cos_flat=-0.002066435652129479 cos_token=0.002373958009186543
+[text-ref] block=23 sample=0 text_norm=632.406381 ref_norm=1996.549542 text/ref=0.3167496560856557 cos_flat=0.02412377975200562 cos_token=0.02508775938651069
+[text-ref] block=23 sample=1 text_norm=775.805738 ref_norm=1996.104468 text/ref=0.3886598877024932 cos_flat=0.03582077661956342 cos_token=0.04151539037916661
+2026-09-06 17:02:31, forward_with_cfg timestep: tensor([0.2683, 0.2683], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=854.356932 ref_norm=139.971290 text/ref=6.103801248686858 cos_flat=-0.003579464751709522 cos_token=-0.017588360922308036
+[text-ref] block=0 sample=1 text_norm=943.538088 ref_norm=139.971286 text/ref=6.740940335902417 cos_flat=-0.0008154857040067986 cos_token=-0.00521750523910457
+[text-ref] block=1 sample=0 text_norm=674.143270 ref_norm=105.216593 text/ref=6.407195407178967 cos_flat=0.008222415834592529 cos_token=-0.0019507170334372732
+[text-ref] block=1 sample=1 text_norm=600.984848 ref_norm=105.372900 text/ref=5.703409979421848 cos_flat=0.0011711189758943324 cos_token=0.0014701066768988654
+[text-ref] block=2 sample=0 text_norm=368.358109 ref_norm=499.752714 text/ref=0.7370807581834207 cos_flat=-0.0034337023201880075 cos_token=-0.012289992687568262
+[text-ref] block=2 sample=1 text_norm=397.796001 ref_norm=550.338994 text/ref=0.7228199433124904 cos_flat=-0.001300174433125424 cos_token=-0.00912112156353051
+[text-ref] block=3 sample=0 text_norm=1361.334357 ref_norm=1359.039932 text/ref=1.0016882688428863 cos_flat=0.022400055225290965 cos_token=-0.005749824631346478
+[text-ref] block=3 sample=1 text_norm=1184.319714 ref_norm=1524.202246 text/ref=0.7770095586387896 cos_flat=0.012841587932507767 cos_token=-0.012113150577619965
+[text-ref] block=4 sample=0 text_norm=337.060813 ref_norm=2668.217232 text/ref=0.1263243520669627 cos_flat=-0.009923933569032045 cos_token=-0.009665077991746217
+[text-ref] block=4 sample=1 text_norm=389.769784 ref_norm=2747.892706 text/ref=0.14184315970968384 cos_flat=-0.005205385654649093 cos_token=-0.004130029329534681
+[text-ref] block=5 sample=0 text_norm=598.541356 ref_norm=2861.965980 text/ref=0.20913643290877515 cos_flat=-0.002664766015684182 cos_token=-3.042466912568166e-05
+[text-ref] block=5 sample=1 text_norm=598.784975 ref_norm=2849.111529 text/ref=0.21016550914301763 cos_flat=-0.008126541801370478 cos_token=-0.021230794274908534
+[text-ref] block=6 sample=0 text_norm=604.212381 ref_norm=2940.353641 text/ref=0.20548969779527088 cos_flat=-0.010863188966906608 cos_token=-0.016892132953709046
+[text-ref] block=6 sample=1 text_norm=781.590756 ref_norm=2912.425093 text/ref=0.2683642431201893 cos_flat=-0.0074993649871234955 cos_token=-0.035584887425320864
+[text-ref] block=7 sample=0 text_norm=640.955257 ref_norm=2947.456278 text/ref=0.21746047993746856 cos_flat=-0.034197796505812963 cos_token=-0.039371888744957284
+[text-ref] block=7 sample=1 text_norm=690.259848 ref_norm=2930.089767 text/ref=0.23557634837320704 cos_flat=-0.03565645980035166 cos_token=-0.04216019490248374
+[text-ref] block=8 sample=0 text_norm=1588.106871 ref_norm=2964.280944 text/ref=0.535747758178487 cos_flat=0.002086455696230028 cos_token=0.03331839558102804
+[text-ref] block=8 sample=1 text_norm=1518.982741 ref_norm=2944.827106 text/ref=0.5158138952865288 cos_flat=-0.007241918070273833 cos_token=0.021662762330921164
+[text-ref] block=9 sample=0 text_norm=474.769807 ref_norm=3267.058557 text/ref=0.14532026238151705 cos_flat=-0.015307109921942126 cos_token=-0.023119260510874446
+[text-ref] block=9 sample=1 text_norm=583.726771 ref_norm=3250.553980 text/ref=0.17957762729107585 cos_flat=-0.015339379449573988 cos_token=-0.022478130580494315
+[text-ref] block=10 sample=0 text_norm=846.430035 ref_norm=3094.641462 text/ref=0.2735147335443649 cos_flat=-0.0077881832732821015 cos_token=-0.0051558102015931435
+[text-ref] block=10 sample=1 text_norm=985.830976 ref_norm=3082.643526 text/ref=0.3198005113453784 cos_flat=-0.024153672927687952 cos_token=-0.02158262209089968
+[text-ref] block=11 sample=0 text_norm=2329.278108 ref_norm=3041.649548 text/ref=0.7657943726203885 cos_flat=-0.0020429563442788197 cos_token=-0.00641030319406955
+[text-ref] block=11 sample=1 text_norm=2836.727371 ref_norm=3026.168638 text/ref=0.9373989722684833 cos_flat=-0.003580009331846882 cos_token=-0.011601939086234832
+[text-ref] block=12 sample=0 text_norm=2544.379427 ref_norm=3081.118538 text/ref=0.825797318362473 cos_flat=-0.008175701850888329 cos_token=-0.009484262264683423
+[text-ref] block=12 sample=1 text_norm=2593.630929 ref_norm=3058.275021 text/ref=0.8480698798323815 cos_flat=-0.013371995446162075 cos_token=-0.021810539481359487
+[text-ref] block=13 sample=0 text_norm=1064.529377 ref_norm=2521.076293 text/ref=0.4222519483887772 cos_flat=-0.002366500755165755 cos_token=-0.0018718248762654769
+[text-ref] block=13 sample=1 text_norm=1227.005876 ref_norm=2502.893122 text/ref=0.4902350263749568 cos_flat=-0.005546870583944436 cos_token=-0.008205318263887373
+[text-ref] block=14 sample=0 text_norm=1388.424424 ref_norm=2623.216453 text/ref=0.5292832096388762 cos_flat=-0.015749920179669554 cos_token=-0.04884149103593924
+[text-ref] block=14 sample=1 text_norm=1592.991344 ref_norm=2607.632233 text/ref=0.6108957098760956 cos_flat=-0.020074288974833623 cos_token=-0.06358782458395437
+[text-ref] block=15 sample=0 text_norm=836.647705 ref_norm=2549.779855 text/ref=0.32812546685152766 cos_flat=-0.0336154671121348 cos_token=-0.0352416453945459
+[text-ref] block=15 sample=1 text_norm=977.596237 ref_norm=2532.284762 text/ref=0.38605304243033634 cos_flat=-0.04595203783755653 cos_token=-0.04706290640637951
+[text-ref] block=16 sample=0 text_norm=1211.493657 ref_norm=2267.415569 text/ref=0.5343059620527573 cos_flat=-0.046038682636015724 cos_token=-0.05864666172995832
+[text-ref] block=16 sample=1 text_norm=1536.849399 ref_norm=2257.783965 text/ref=0.6806893055822841 cos_flat=-0.04421701374528709 cos_token=-0.06347917307759483
+[text-ref] block=17 sample=0 text_norm=1724.343036 ref_norm=2158.789054 text/ref=0.7987547614218242 cos_flat=-0.02872755045525658 cos_token=-0.04178895828078896
+[text-ref] block=17 sample=1 text_norm=1991.906762 ref_norm=2147.976817 text/ref=0.9273409035001878 cos_flat=-0.02945597868006282 cos_token=-0.04181255901218427
+[text-ref] block=18 sample=0 text_norm=759.017648 ref_norm=2369.277668 text/ref=0.3203582503723878 cos_flat=-0.0507120077181414 cos_token=-0.045023487545890306
+[text-ref] block=18 sample=1 text_norm=1074.538680 ref_norm=2362.901055 text/ref=0.45475398901123726 cos_flat=-0.04916932653345128 cos_token=-0.043744608399180464
+[text-ref] block=19 sample=0 text_norm=794.030640 ref_norm=2304.241672 text/ref=0.3445952088673002 cos_flat=-0.03681564946538921 cos_token=-0.04029766039092066
+[text-ref] block=19 sample=1 text_norm=1145.980874 ref_norm=2298.648159 text/ref=0.49854557756882395 cos_flat=-0.03464449703957689 cos_token=-0.038920978169335256
+[text-ref] block=20 sample=0 text_norm=597.553491 ref_norm=1793.499021 text/ref=0.3331774840664209 cos_flat=-0.08546729409968008 cos_token=-0.08765205108232672
+[text-ref] block=20 sample=1 text_norm=847.653380 ref_norm=1791.223175 text/ref=0.47322600107184376 cos_flat=-0.07902028656381187 cos_token=-0.08179794125230239
+[text-ref] block=21 sample=0 text_norm=884.525722 ref_norm=1997.480254 text/ref=0.44282075912506463 cos_flat=0.01739653798585156 cos_token=0.0294722544756315
+[text-ref] block=21 sample=1 text_norm=1142.791852 ref_norm=1995.433457 text/ref=0.5727035635457112 cos_flat=0.019819221279949218 cos_token=0.041109813763913684
+[text-ref] block=22 sample=0 text_norm=882.571343 ref_norm=2056.829917 text/ref=0.4290930112648034 cos_flat=-0.00446235090970607 cos_token=0.0029122380378669285
+[text-ref] block=22 sample=1 text_norm=954.371938 ref_norm=2048.562302 text/ref=0.46587401183090354 cos_flat=-0.0016002746371501645 cos_token=0.002729942794221368
+[text-ref] block=23 sample=0 text_norm=625.007537 ref_norm=1945.752740 text/ref=0.3212163210133923 cos_flat=0.021715615875788335 cos_token=0.025621664080788222
+[text-ref] block=23 sample=1 text_norm=768.913376 ref_norm=1944.000205 text/ref=0.39553153059051327 cos_flat=0.034452199472076186 cos_token=0.041876008629275804
+2026-09-06 17:02:39, forward_with_cfg timestep: tensor([0.3191, 0.3191], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=866.100841 ref_norm=145.505889 text/ref=5.952342191016214 cos_flat=-0.0034747254419683553 cos_token=-0.018008977576132037
+[text-ref] block=0 sample=1 text_norm=948.638423 ref_norm=145.505995 text/ref=6.519583095402134 cos_flat=-0.0010034126471229388 cos_token=-0.005863011730639882
+[text-ref] block=1 sample=0 text_norm=668.191315 ref_norm=102.313488 text/ref=6.530823353275444 cos_flat=0.008598976887623436 cos_token=-0.0020441928188870946
+[text-ref] block=1 sample=1 text_norm=598.288701 ref_norm=102.518650 text/ref=5.835901074007909 cos_flat=0.0014406014505142864 cos_token=0.0019203611051879588
+[text-ref] block=2 sample=0 text_norm=374.346724 ref_norm=456.927726 text/ref=0.8192690063231043 cos_flat=-0.003217979253364995 cos_token=-0.012359128200038785
+[text-ref] block=2 sample=1 text_norm=400.738747 ref_norm=508.593215 text/ref=0.7879356914197885 cos_flat=-0.0009820076771819776 cos_token=-0.009014370158112713
+[text-ref] block=3 sample=0 text_norm=1397.340248 ref_norm=1303.139161 text/ref=1.072287818035202 cos_flat=0.02408223657886032 cos_token=-0.005917697119333549
+[text-ref] block=3 sample=1 text_norm=1215.294483 ref_norm=1471.765948 text/ref=0.8257389598093559 cos_flat=0.014519595828436371 cos_token=-0.011539104840696812
+[text-ref] block=4 sample=0 text_norm=318.154457 ref_norm=2614.903358 text/ref=0.1216696806529639 cos_flat=-0.010359681766165545 cos_token=-0.00964590253584402
+[text-ref] block=4 sample=1 text_norm=362.578555 ref_norm=2698.583995 text/ref=0.1343588175277865 cos_flat=-0.005161879067512629 cos_token=-0.0038053981656674344
+[text-ref] block=5 sample=0 text_norm=553.096437 ref_norm=2839.330419 text/ref=0.19479819387882144 cos_flat=-0.0028820166141248905 cos_token=-9.377960044267067e-05
+[text-ref] block=5 sample=1 text_norm=565.668067 ref_norm=2823.506460 text/ref=0.20034240231093822 cos_flat=-0.006567279348131637 cos_token=-0.019838696974663613
+[text-ref] block=6 sample=0 text_norm=621.637792 ref_norm=2933.087677 text/ref=0.21193972368755448 cos_flat=-0.010605367527931432 cos_token=-0.01595090686328539
+[text-ref] block=6 sample=1 text_norm=821.450620 ref_norm=2901.216050 text/ref=0.2831401060512129 cos_flat=-0.006632943871737797 cos_token=-0.03507796755000465
+[text-ref] block=7 sample=0 text_norm=636.773936 ref_norm=2944.128451 text/ref=0.216286057733107 cos_flat=-0.03380335272075483 cos_token=-0.03868373582310767
+[text-ref] block=7 sample=1 text_norm=692.846643 ref_norm=2923.618696 text/ref=0.23698256001098225 cos_flat=-0.03475578338197667 cos_token=-0.04150899469869333
+[text-ref] block=8 sample=0 text_norm=1556.919438 ref_norm=2963.619485 text/ref=0.5253439065729153 cos_flat=0.000477284686511266 cos_token=0.03158098187622501
+[text-ref] block=8 sample=1 text_norm=1487.119204 ref_norm=2941.946631 text/ref=0.5054881650272566 cos_flat=-0.008059914445578674 cos_token=0.02003003501605802
+[text-ref] block=9 sample=0 text_norm=458.276651 ref_norm=3266.264144 text/ref=0.1403060595214803 cos_flat=-0.016319243916918726 cos_token=-0.02309623745659565
+[text-ref] block=9 sample=1 text_norm=559.636442 ref_norm=3248.735611 text/ref=0.1722628459300192 cos_flat=-0.01601459126642016 cos_token=-0.02240332292824959
+[text-ref] block=10 sample=0 text_norm=845.507369 ref_norm=3096.909206 text/ref=0.27301651851934877 cos_flat=-0.009978310997041632 cos_token=-0.007112389912640131
+[text-ref] block=10 sample=1 text_norm=958.952153 ref_norm=3084.403351 text/ref=0.31090361519242765 cos_flat=-0.025140771447253088 cos_token=-0.022614878337978084
+[text-ref] block=11 sample=0 text_norm=2424.165066 ref_norm=3040.915825 text/ref=0.7971825613581967 cos_flat=-0.0009913498835937866 cos_token=-0.0058990363207000185
+[text-ref] block=11 sample=1 text_norm=2813.814788 ref_norm=3025.490295 text/ref=0.9300359655831261 cos_flat=-0.0030260731109318416 cos_token=-0.011445577386774678
+[text-ref] block=12 sample=0 text_norm=2540.687953 ref_norm=3079.059365 text/ref=0.8251506879122915 cos_flat=-0.008070718666962531 cos_token=-0.01008421777097167
+[text-ref] block=12 sample=1 text_norm=2526.613171 ref_norm=3057.275791 text/ref=0.8264263167853951 cos_flat=-0.014075357579249855 cos_token=-0.022553207638242753
+[text-ref] block=13 sample=0 text_norm=1051.680946 ref_norm=2517.256841 text/ref=0.4177884944380308 cos_flat=-0.0030249152507426766 cos_token=-0.003076194523835457
+[text-ref] block=13 sample=1 text_norm=1175.362476 ref_norm=2500.674756 text/ref=0.47001813132318593 cos_flat=-0.006101340255322497 cos_token=-0.009156743841037122
+[text-ref] block=14 sample=0 text_norm=1339.306226 ref_norm=2614.115343 text/ref=0.5123363165811091 cos_flat=-0.016960035341592135 cos_token=-0.04991401772343097
+[text-ref] block=14 sample=1 text_norm=1541.864058 ref_norm=2599.020504 text/ref=0.5932481318131858 cos_flat=-0.021135666550573303 cos_token=-0.06422540296555107
+[text-ref] block=15 sample=0 text_norm=818.267342 ref_norm=2534.676969 text/ref=0.32282904370617277 cos_flat=-0.03430070093876557 cos_token=-0.03602573631169293
+[text-ref] block=15 sample=1 text_norm=952.460918 ref_norm=2517.093594 text/ref=0.3783971005185152 cos_flat=-0.04769787936154062 cos_token=-0.04732169867024749
+[text-ref] block=16 sample=0 text_norm=1229.950392 ref_norm=2254.149832 text/ref=0.5456382600634816 cos_flat=-0.04642572368875062 cos_token=-0.05930185555216953
+[text-ref] block=16 sample=1 text_norm=1463.632671 ref_norm=2245.176308 text/ref=0.6519009960444656 cos_flat=-0.044492458220800925 cos_token=-0.06375566576679634
+[text-ref] block=17 sample=0 text_norm=1683.914359 ref_norm=2143.095742 text/ref=0.7857392116907436 cos_flat=-0.029258152682234237 cos_token=-0.0432528494226816
+[text-ref] block=17 sample=1 text_norm=1950.470088 ref_norm=2135.762315 text/ref=0.9132430487471634 cos_flat=-0.029089647260716528 cos_token=-0.04216894467430988
+[text-ref] block=18 sample=0 text_norm=744.773073 ref_norm=2346.028251 text/ref=0.31746125495958494 cos_flat=-0.05087967419589929 cos_token=-0.04530637234288465
+[text-ref] block=18 sample=1 text_norm=1071.447385 ref_norm=2341.308950 text/ref=0.4576275100838325 cos_flat=-0.048868612460252224 cos_token=-0.04361412787964557
+[text-ref] block=19 sample=0 text_norm=792.987065 ref_norm=2248.885476 text/ref=0.35261336047499564 cos_flat=-0.036373265398718574 cos_token=-0.04024432426771943
+[text-ref] block=19 sample=1 text_norm=1151.199869 ref_norm=2249.131731 text/ref=0.5118419046103174 cos_flat=-0.03351721384294353 cos_token=-0.03838379121426423
+[text-ref] block=20 sample=0 text_norm=598.033147 ref_norm=1736.617737 text/ref=0.344366600768324 cos_flat=-0.0855040854474615 cos_token=-0.08856839959531701
+[text-ref] block=20 sample=1 text_norm=848.855617 ref_norm=1740.142093 text/ref=0.4878082199946734 cos_flat=-0.07795032963386962 cos_token=-0.08260806640803492
+[text-ref] block=21 sample=0 text_norm=864.155268 ref_norm=1922.922903 text/ref=0.4493967319723398 cos_flat=0.01764839201775481 cos_token=0.031295207526447856
+[text-ref] block=21 sample=1 text_norm=1126.721851 ref_norm=1928.717062 text/ref=0.5841820311005105 cos_flat=0.020432738021540157 cos_token=0.04321467041062952
+[text-ref] block=22 sample=0 text_norm=863.257683 ref_norm=1979.967056 text/ref=0.43599598311215826 cos_flat=-0.0037530114331457013 cos_token=0.0033334636896954297
+[text-ref] block=22 sample=1 text_norm=935.146278 ref_norm=1978.144055 text/ref=0.47273922041266064 cos_flat=-0.0011949089728477491 cos_token=0.002799597813502832
+[text-ref] block=23 sample=0 text_norm=620.552421 ref_norm=1861.207708 text/ref=0.33341384675298175 cos_flat=0.022381747704232652 cos_token=0.02812256405010334
+[text-ref] block=23 sample=1 text_norm=764.368723 ref_norm=1866.946648 text/ref=0.4094218351934341 cos_flat=0.03348521870146106 cos_token=0.04356986343503076
+2026-09-06 17:02:47, forward_with_cfg timestep: tensor([0.3898, 0.3898], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=893.220269 ref_norm=156.206775 text/ref=5.718191591552943 cos_flat=-0.0032904735706409905 cos_token=-0.018641671266712102
+[text-ref] block=0 sample=1 text_norm=974.781458 ref_norm=156.206807 text/ref=6.240326370533946 cos_flat=-0.001117917598293557 cos_token=-0.006603919139867006
+[text-ref] block=1 sample=0 text_norm=679.874163 ref_norm=100.808462 text/ref=6.744217189961753 cos_flat=0.008928509189429548 cos_token=-0.002240170998790036
+[text-ref] block=1 sample=1 text_norm=604.211954 ref_norm=101.065882 text/ref=5.978396896616383 cos_flat=0.001961389728625173 cos_token=0.0025156976460690263
+[text-ref] block=2 sample=0 text_norm=390.126523 ref_norm=401.280649 text/ref=0.9722036782601009 cos_flat=-0.0028305582367345317 cos_token=-0.01329330434699698
+[text-ref] block=2 sample=1 text_norm=408.271844 ref_norm=454.374075 text/ref=0.8985368368089409 cos_flat=-0.0006501843245282346 cos_token=-0.009547144739387656
+[text-ref] block=3 sample=0 text_norm=1433.543700 ref_norm=1204.560834 text/ref=1.1900965560565209 cos_flat=0.027183606635589705 cos_token=-0.005563292606870877
+[text-ref] block=3 sample=1 text_norm=1254.769223 ref_norm=1384.152189 text/ref=0.9065254771132855 cos_flat=0.01654142340248106 cos_token=-0.010122986907561667
+[text-ref] block=4 sample=0 text_norm=305.816084 ref_norm=2492.030317 text/ref=0.12271764190904162 cos_flat=-0.01185936555054281 cos_token=-0.010484302230653162
+[text-ref] block=4 sample=1 text_norm=335.004099 ref_norm=2596.359155 text/ref=0.1290284122340568 cos_flat=-0.006058943859764437 cos_token=-0.004610884204626647
+[text-ref] block=5 sample=0 text_norm=505.463092 ref_norm=2792.934639 text/ref=0.1809792056273516 cos_flat=-0.0024215328199690776 cos_token=5.895512194182178e-05
+[text-ref] block=5 sample=1 text_norm=522.118578 ref_norm=2778.398158 text/ref=0.18792071842462024 cos_flat=-0.004266561904173251 cos_token=-0.017987064259949073
+[text-ref] block=6 sample=0 text_norm=655.969100 ref_norm=2916.741215 text/ref=0.22489794309285638 cos_flat=-0.009286076974480058 cos_token=-0.014403531360269055
+[text-ref] block=6 sample=1 text_norm=889.749504 ref_norm=2881.315743 text/ref=0.3087997230452772 cos_flat=-0.0051587413915475675 cos_token=-0.03457211372436971
+[text-ref] block=7 sample=0 text_norm=636.715533 ref_norm=2935.526020 text/ref=0.2168999793530916 cos_flat=-0.032507134816551916 cos_token=-0.03738783759717126
+[text-ref] block=7 sample=1 text_norm=714.462904 ref_norm=2911.332478 text/ref=0.24540752714760805 cos_flat=-0.03321881257288853 cos_token=-0.04054370517350645
+[text-ref] block=8 sample=0 text_norm=1489.416487 ref_norm=2955.409838 text/ref=0.5039627558789894 cos_flat=-0.001152112595661651 cos_token=0.029390560434618174
+[text-ref] block=8 sample=1 text_norm=1453.651472 ref_norm=2930.800604 text/ref=0.4959912558518048 cos_flat=-0.009090340235910413 cos_token=0.01874511817563743
+[text-ref] block=9 sample=0 text_norm=438.872540 ref_norm=3258.860349 text/ref=0.1346705575675271 cos_flat=-0.017347233496217168 cos_token=-0.022025002544791013
+[text-ref] block=9 sample=1 text_norm=537.036609 ref_norm=3239.994412 text/ref=0.16575232578739554 cos_flat=-0.01695281390737068 cos_token=-0.022190358354060292
+[text-ref] block=10 sample=0 text_norm=833.782603 ref_norm=3091.435356 text/ref=0.26970727401179295 cos_flat=-0.011783232710544544 cos_token=-0.009140016387173485
+[text-ref] block=10 sample=1 text_norm=950.763926 ref_norm=3077.645156 text/ref=0.30892577848101105 cos_flat=-0.02712260556644832 cos_token=-0.024323451315992523
+[text-ref] block=11 sample=0 text_norm=2441.956321 ref_norm=3034.201494 text/ref=0.8048102031534845 cos_flat=4.057124948981759e-05 cos_token=-0.005458024783427899
+[text-ref] block=11 sample=1 text_norm=2841.414271 ref_norm=3017.939961 text/ref=0.9415078852580617 cos_flat=-0.0023817572115954265 cos_token=-0.011069198189176026
+[text-ref] block=12 sample=0 text_norm=2441.294871 ref_norm=3072.186458 text/ref=0.7946441092327251 cos_flat=-0.00916461058961228 cos_token=-0.011717679265625192
+[text-ref] block=12 sample=1 text_norm=2438.183096 ref_norm=3049.568729 text/ref=0.7995173456971884 cos_flat=-0.015295333436242058 cos_token=-0.023681857445326082
+[text-ref] block=13 sample=0 text_norm=1031.330574 ref_norm=2507.862557 text/ref=0.4112388741843982 cos_flat=-0.004356605400027447 cos_token=-0.005119683468773105
+[text-ref] block=13 sample=1 text_norm=1116.385044 ref_norm=2491.917126 text/ref=0.4480024764231689 cos_flat=-0.007480363367514326 cos_token=-0.011266091001969368
+[text-ref] block=14 sample=0 text_norm=1241.445848 ref_norm=2595.653255 text/ref=0.47827877060450463 cos_flat=-0.01967857815131052 cos_token=-0.05198835360403187
+[text-ref] block=14 sample=1 text_norm=1442.464180 ref_norm=2579.918061 text/ref=0.5591124003280588 cos_flat=-0.024012466349111555 cos_token=-0.06494904045340119
+[text-ref] block=15 sample=0 text_norm=771.829483 ref_norm=2505.437208 text/ref=0.30806179493766617 cos_flat=-0.040300397559050204 cos_token=-0.03988223790698574
+[text-ref] block=15 sample=1 text_norm=917.173390 ref_norm=2485.109279 text/ref=0.3690676293845868 cos_flat=-0.049979267791451544 cos_token=-0.04757776954802234
+[text-ref] block=16 sample=0 text_norm=1178.758112 ref_norm=2229.170924 text/ref=0.5287876757701775 cos_flat=-0.047615554829603016 cos_token=-0.06192328124644656
+[text-ref] block=16 sample=1 text_norm=1364.203564 ref_norm=2219.371720 text/ref=0.6146800698969258 cos_flat=-0.044606093234819774 cos_token=-0.06492404546302007
+[text-ref] block=17 sample=0 text_norm=1666.512998 ref_norm=2115.558045 text/ref=0.7877415619153147 cos_flat=-0.02970661892186207 cos_token=-0.045202485960410085
+[text-ref] block=17 sample=1 text_norm=1920.370298 ref_norm=2109.193944 text/ref=0.9104759204123073 cos_flat=-0.028668352860843443 cos_token=-0.0431044419094293
+[text-ref] block=18 sample=0 text_norm=732.074128 ref_norm=2305.038871 text/ref=0.31759730285760446 cos_flat=-0.0514482380477485 cos_token=-0.04612338987036478
+[text-ref] block=18 sample=1 text_norm=1044.031629 ref_norm=2301.163622 text/ref=0.45369725974316055 cos_flat=-0.0483610320811871 cos_token=-0.04348127196425689
+[text-ref] block=19 sample=0 text_norm=796.287500 ref_norm=2161.404898 text/ref=0.36841199939365904 cos_flat=-0.0356381973118196 cos_token=-0.0402076550697276
+[text-ref] block=19 sample=1 text_norm=1127.300828 ref_norm=2165.804434 text/ref=0.5204998247504299 cos_flat=-0.03292461553011571 cos_token=-0.038601786582759715
+[text-ref] block=20 sample=0 text_norm=583.280288 ref_norm=1654.786247 text/ref=0.3524807443386654 cos_flat=-0.08379277838796527 cos_token=-0.09104001901773924
+[text-ref] block=20 sample=1 text_norm=842.064905 ref_norm=1660.794591 text/ref=0.5070253176485864 cos_flat=-0.07610903443235686 cos_token=-0.08375872286393911
+[text-ref] block=21 sample=0 text_norm=838.074957 ref_norm=1820.451949 text/ref=0.4603664256461887 cos_flat=0.018054118678877153 cos_token=0.033002292354217394
+[text-ref] block=21 sample=1 text_norm=1110.183627 ref_norm=1829.041905 text/ref=0.6069755008766994 cos_flat=0.020951942388531434 cos_token=0.045401112597865965
+[text-ref] block=22 sample=0 text_norm=824.801610 ref_norm=1868.374941 text/ref=0.4414540098008808 cos_flat=-0.003162246241696956 cos_token=0.0031655900566177147
+[text-ref] block=22 sample=1 text_norm=897.929424 ref_norm=1867.209739 text/ref=0.4808937130470228 cos_flat=-0.0004179552175734725 cos_token=0.0030397763389660576
+[text-ref] block=23 sample=0 text_norm=619.523166 ref_norm=1738.675751 text/ref=0.35631897746809943 cos_flat=0.018127078909223306 cos_token=0.02644482031065751
+[text-ref] block=23 sample=1 text_norm=752.468382 ref_norm=1746.249431 text/ref=0.43090544184159174 cos_flat=0.03053856078777476 cos_token=0.04350257131165877
+2026-09-06 17:02:56, forward_with_cfg timestep: tensor([0.4947, 0.4947], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=960.974587 ref_norm=177.670631 text/ref=5.408741890957787 cos_flat=-0.002872316842216707 cos_token=-0.01944126332680378
+[text-ref] block=0 sample=1 text_norm=1037.865949 ref_norm=177.670801 text/ref=5.841511058809161 cos_flat=-0.0009338944816460496 cos_token=-0.006852520699736426
+[text-ref] block=1 sample=0 text_norm=701.124286 ref_norm=102.058971 text/ref=6.869795759333112 cos_flat=0.009687729492778527 cos_token=-0.002669133707890682
+[text-ref] block=1 sample=1 text_norm=626.341821 ref_norm=102.414478 text/ref=6.115754663287612 cos_flat=0.002631121407094452 cos_token=0.003095989131837531
+[text-ref] block=2 sample=0 text_norm=423.172402 ref_norm=332.872599 text/ref=1.271274363711384 cos_flat=-0.0024129839912012878 cos_token=-0.014449806488196408
+[text-ref] block=2 sample=1 text_norm=433.858571 ref_norm=384.052242 text/ref=1.1296863393252856 cos_flat=-0.00023219984757423111 cos_token=-0.009495053812581384
+[text-ref] block=3 sample=0 text_norm=1447.101118 ref_norm=1031.609173 text/ref=1.4027610032143982 cos_flat=0.03116974595960021 cos_token=-0.004789487050059456
+[text-ref] block=3 sample=1 text_norm=1309.731450 ref_norm=1225.423758 text/ref=1.0687988061197222 cos_flat=0.018495679447509 cos_token=-0.008229021922254278
+[text-ref] block=4 sample=0 text_norm=282.971179 ref_norm=2272.462227 text/ref=0.12452184057340508 cos_flat=-0.012859517068157961 cos_token=-0.011069169979719318
+[text-ref] block=4 sample=1 text_norm=296.471751 ref_norm=2419.729380 text/ref=0.12252268914316751 cos_flat=-0.007212576297353966 cos_token=-0.005903227051579047
+[text-ref] block=5 sample=0 text_norm=453.206738 ref_norm=2733.899760 text/ref=0.16577299013691824 cos_flat=-0.0013432230033436528 cos_token=0.0017348937440067962
+[text-ref] block=5 sample=1 text_norm=476.705788 ref_norm=2726.733120 text/ref=0.17482671285735826 cos_flat=-0.001947583293415513 cos_token=-0.014234912169629152
+[text-ref] block=6 sample=0 text_norm=736.592362 ref_norm=2899.099417 text/ref=0.2540762684405011 cos_flat=-0.007892174242104578 cos_token=-0.013215405808550736
+[text-ref] block=6 sample=1 text_norm=1043.884325 ref_norm=2860.495995 text/ref=0.3649312310973988 cos_flat=-0.0048620933748762035 cos_token=-0.0347410481910665
+[text-ref] block=7 sample=0 text_norm=651.906333 ref_norm=2926.070533 text/ref=0.22279241926140236 cos_flat=-0.030158022134914402 cos_token=-0.0355981567528107
+[text-ref] block=7 sample=1 text_norm=741.116436 ref_norm=2897.634383 text/ref=0.2557660278442829 cos_flat=-0.031952944198092366 cos_token=-0.03958462056325945
+[text-ref] block=8 sample=0 text_norm=1406.462667 ref_norm=2945.337470 text/ref=0.477521737902401 cos_flat=-0.0029871170188305895 cos_token=0.026555659254665135
+[text-ref] block=8 sample=1 text_norm=1456.138385 ref_norm=2916.668026 text/ref=0.499247213689941 cos_flat=-0.01169849346311258 cos_token=0.01582826760133863
+[text-ref] block=9 sample=0 text_norm=436.349284 ref_norm=3243.583949 text/ref=0.1345268970271803 cos_flat=-0.017963179687716452 cos_token=-0.019744026983491977
+[text-ref] block=9 sample=1 text_norm=528.897402 ref_norm=3221.775319 text/ref=0.164163341423037 cos_flat=-0.01785988566274415 cos_token=-0.021627812495722838
+[text-ref] block=10 sample=0 text_norm=830.289653 ref_norm=3082.160443 text/ref=0.26938560428899644 cos_flat=-0.01384319380471487 cos_token=-0.012132725160969344
+[text-ref] block=10 sample=1 text_norm=946.459656 ref_norm=3066.481742 text/ref=0.30864676056672125 cos_flat=-0.0297480958095164 cos_token=-0.026888371816893544
+[text-ref] block=11 sample=0 text_norm=2490.422795 ref_norm=3023.004306 text/ref=0.8238237671030397 cos_flat=0.001016776820125982 cos_token=-0.00491694885179707
+[text-ref] block=11 sample=1 text_norm=2886.640818 ref_norm=3005.439874 text/ref=0.960471990505459 cos_flat=-0.001965144737000486 cos_token=-0.011705659449895342
+[text-ref] block=12 sample=0 text_norm=2356.066368 ref_norm=3061.296891 text/ref=0.7696301444836446 cos_flat=-0.011635575673148461 cos_token=-0.014868350916289677
+[text-ref] block=12 sample=1 text_norm=2288.783562 ref_norm=3035.886888 text/ref=0.7539093668671198 cos_flat=-0.01619385230929389 cos_token=-0.0243124797997915
+[text-ref] block=13 sample=0 text_norm=1003.008323 ref_norm=2485.974240 text/ref=0.4034669012873994 cos_flat=-0.005838403798507921 cos_token=-0.007088383039780395
+[text-ref] block=13 sample=1 text_norm=1018.287858 ref_norm=2468.855891 text/ref=0.41245333977377246 cos_flat=-0.00891331717061538 cos_token=-0.013044855657914894
+[text-ref] block=14 sample=0 text_norm=1095.073967 ref_norm=2558.356573 text/ref=0.42803805301620723 cos_flat=-0.023185072494413633 cos_token=-0.053860407868693075
+[text-ref] block=14 sample=1 text_norm=1223.278342 ref_norm=2541.231702 text/ref=0.4813722183738196 cos_flat=-0.030236681989731163 cos_token=-0.06562386716885234
+[text-ref] block=15 sample=0 text_norm=698.236595 ref_norm=2451.732838 text/ref=0.2847930996923372 cos_flat=-0.045616364758516284 cos_token=-0.043099296828627086
+[text-ref] block=15 sample=1 text_norm=837.816695 ref_norm=2425.697176 text/ref=0.34539212198311475 cos_flat=-0.04928257193245088 cos_token=-0.04656548769335488
+[text-ref] block=16 sample=0 text_norm=1082.525850 ref_norm=2190.552479 text/ref=0.4941793727238831 cos_flat=-0.05083586220172362 cos_token=-0.06536172452879921
+[text-ref] block=16 sample=1 text_norm=1259.098624 ref_norm=2177.013305 text/ref=0.578360555390309 cos_flat=-0.04557820914130987 cos_token=-0.06528992390229357
+[text-ref] block=17 sample=0 text_norm=1637.597488 ref_norm=2074.421999 text/ref=0.7894235064829287 cos_flat=-0.028447568495440233 cos_token=-0.0464393707177884
+[text-ref] block=17 sample=1 text_norm=1949.781606 ref_norm=2063.402314 text/ref=0.9449352619744099 cos_flat=-0.025458392851500054 cos_token=-0.04247507759970272
+[text-ref] block=18 sample=0 text_norm=700.442832 ref_norm=2237.062878 text/ref=0.3131082449513769 cos_flat=-0.0511834568194228 cos_token=-0.04731901906749863
+[text-ref] block=18 sample=1 text_norm=988.709974 ref_norm=2226.200085 text/ref=0.44412448859041975 cos_flat=-0.04602837135083042 cos_token=-0.04242099762239129
+[text-ref] block=19 sample=0 text_norm=805.683642 ref_norm=2023.857381 text/ref=0.39809309178621494 cos_flat=-0.03383306122761141 cos_token=-0.04137990209027777
+[text-ref] block=19 sample=1 text_norm=1119.743908 ref_norm=2021.226204 text/ref=0.5539923764254083 cos_flat=-0.03177614088563811 cos_token=-0.03908860544198411
+[text-ref] block=20 sample=0 text_norm=593.277290 ref_norm=1539.868026 text/ref=0.38527801056930705 cos_flat=-0.08166279308217218 cos_token=-0.09444397017507343
+[text-ref] block=20 sample=1 text_norm=834.339911 ref_norm=1538.712580 text/ref=0.5422324624595419 cos_flat=-0.07345837790413427 cos_token=-0.08636050143267499
+[text-ref] block=21 sample=0 text_norm=826.550968 ref_norm=1673.711031 text/ref=0.49384329332357924 cos_flat=0.018247879056307943 cos_token=0.0339556477332599
+[text-ref] block=21 sample=1 text_norm=1086.884819 ref_norm=1673.871931 text/ref=0.6493237620330884 cos_flat=0.020845791069460322 cos_token=0.047954677695370956
+[text-ref] block=22 sample=0 text_norm=779.574823 ref_norm=1696.128177 text/ref=0.45962023022187937 cos_flat=-0.0031381348104930346 cos_token=0.0008094556725683219
+[text-ref] block=22 sample=1 text_norm=852.365618 ref_norm=1686.597015 text/ref=0.505375979058146 cos_flat=-0.0005203862675171461 cos_token=0.000795885500186838
+[text-ref] block=23 sample=0 text_norm=635.396472 ref_norm=1553.823341 text/ref=0.40892452497301107 cos_flat=0.01727137101549404 cos_token=0.03521096053126693
+[text-ref] block=23 sample=1 text_norm=748.421073 ref_norm=1554.255943 text/ref=0.4815301342875552 cos_flat=0.027740021310089076 cos_token=0.05005662695753998
+2026-09-06 17:03:04, forward_with_cfg timestep: tensor([0.6667, 0.6667], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=1151.112267 ref_norm=258.018614 text/ref=4.461353578390124 cos_flat=-0.0019701260814363095 cos_token=-0.02022039587867548
+[text-ref] block=0 sample=1 text_norm=1245.118151 ref_norm=258.018627 text/ref=4.825690938408025 cos_flat=-0.00040395104358375476 cos_token=-0.007208213446980571
+[text-ref] block=1 sample=0 text_norm=814.388370 ref_norm=114.175948 text/ref=7.132748932772428 cos_flat=0.008170607737377183 cos_token=-0.0064604184201888576
+[text-ref] block=1 sample=1 text_norm=727.431333 ref_norm=114.640580 text/ref=6.345321493232339 cos_flat=0.0036125267790465153 cos_token=0.0037915917305277012
+[text-ref] block=2 sample=0 text_norm=486.349725 ref_norm=231.405842 text/ref=2.101717574257731 cos_flat=-0.003717292929098015 cos_token=-0.019309405840242086
+[text-ref] block=2 sample=1 text_norm=480.369788 ref_norm=271.614434 text/ref=1.7685723847477681 cos_flat=-0.0007674040647631037 cos_token=-0.01286298599719839
+[text-ref] block=3 sample=0 text_norm=1430.709125 ref_norm=756.783650 text/ref=1.8905127306014902 cos_flat=0.03482568748661966 cos_token=3.394736823691329e-05
+[text-ref] block=3 sample=1 text_norm=1430.852185 ref_norm=949.671923 text/ref=1.5066805188606716 cos_flat=0.020976554404477925 cos_token=-0.0025305432833399298
+[text-ref] block=4 sample=0 text_norm=248.460261 ref_norm=1802.134084 text/ref=0.1378700192348091 cos_flat=-0.011645091895981253 cos_token=-0.011216034537846418
+[text-ref] block=4 sample=1 text_norm=258.282319 ref_norm=2001.316479 text/ref=0.12905620982238028 cos_flat=-0.011388968716359785 cos_token=-0.009678089070232905
+[text-ref] block=5 sample=0 text_norm=361.389029 ref_norm=2583.857203 text/ref=0.13986416458517306 cos_flat=0.0028337655493460012 cos_token=0.006754340054481586
+[text-ref] block=5 sample=1 text_norm=417.402361 ref_norm=2598.436818 text/ref=0.16063594790876196 cos_flat=-0.0010668576325292363 cos_token=-0.008085239361067958
+[text-ref] block=6 sample=0 text_norm=925.077317 ref_norm=2836.677248 text/ref=0.32611299649396547 cos_flat=-0.009147273769429172 cos_token=-0.02129678541591816
+[text-ref] block=6 sample=1 text_norm=1338.091534 ref_norm=2796.347444 text/ref=0.4785140476717987 cos_flat=-0.0067762422515231175 cos_token=-0.04097767026181764
+[text-ref] block=7 sample=0 text_norm=726.784139 ref_norm=2893.715265 text/ref=0.25115952058308194 cos_flat=-0.024550720866227282 cos_token=-0.034932221899721644
+[text-ref] block=7 sample=1 text_norm=851.564318 ref_norm=2858.141880 text/ref=0.2979433331809446 cos_flat=-0.028822426954183213 cos_token=-0.04008771483264685
+[text-ref] block=8 sample=0 text_norm=1177.363645 ref_norm=2915.050344 text/ref=0.40389135904343726 cos_flat=-0.007787896668558164 cos_token=0.013497333029891716
+[text-ref] block=8 sample=1 text_norm=1425.382519 ref_norm=2879.120023 text/ref=0.49507575486487954 cos_flat=-0.01257877357180478 cos_token=0.00919495169248128
+[text-ref] block=9 sample=0 text_norm=415.700848 ref_norm=3181.251775 text/ref=0.13067209941262484 cos_flat=-0.021980067588977924 cos_token=-0.01837582127387214
+[text-ref] block=9 sample=1 text_norm=499.681938 ref_norm=3144.904512 text/ref=0.15888620346684112 cos_flat=-0.021012321178958047 cos_token=-0.021607461641304858
+[text-ref] block=10 sample=0 text_norm=743.977970 ref_norm=3049.086407 text/ref=0.24400029069247092 cos_flat=-0.017923284432325187 cos_token=-0.017192916470288377
+[text-ref] block=10 sample=1 text_norm=905.429279 ref_norm=3025.970910 text/ref=0.29921942617520875 cos_flat=-0.032030461022546065 cos_token=-0.029422920599001912
+[text-ref] block=11 sample=0 text_norm=2385.938718 ref_norm=2981.469628 text/ref=0.8002559193101134 cos_flat=0.00014327659393779366 cos_token=-0.0048192733233727815
+[text-ref] block=11 sample=1 text_norm=2850.892648 ref_norm=2956.850564 text/ref=0.9641652788392439 cos_flat=-0.0022893254010099276 cos_token=-0.01333782692693589
+[text-ref] block=12 sample=0 text_norm=2025.844440 ref_norm=3014.902417 text/ref=0.6719436186181547 cos_flat=-0.01639029603029459 cos_token=-0.020546028613308186
+[text-ref] block=12 sample=1 text_norm=1873.033587 ref_norm=2976.766455 text/ref=0.6292175133830054 cos_flat=-0.017068746279096155 cos_token=-0.02690319438597366
+[text-ref] block=13 sample=0 text_norm=852.423919 ref_norm=2419.111811 text/ref=0.35237061593564983 cos_flat=-0.007158880105090593 cos_token=-0.005994648697996893
+[text-ref] block=13 sample=1 text_norm=814.044137 ref_norm=2390.094582 text/ref=0.3405907628852711 cos_flat=-0.011756264656479514 cos_token=-0.0135340392567277
+[text-ref] block=14 sample=0 text_norm=828.118992 ref_norm=2463.470995 text/ref=0.3361594247482811 cos_flat=-0.03181688834785517 cos_token=-0.05623052488329748
+[text-ref] block=14 sample=1 text_norm=863.337716 ref_norm=2432.749272 text/ref=0.35488150196873625 cos_flat=-0.040960991074776104 cos_token=-0.06701719153288531
+[text-ref] block=15 sample=0 text_norm=617.617282 ref_norm=2276.457693 text/ref=0.2713062860372087 cos_flat=-0.05050659629100786 cos_token=-0.04497572517229566
+[text-ref] block=15 sample=1 text_norm=721.032838 ref_norm=2224.351313 text/ref=0.3241542076668506 cos_flat=-0.04404166596954923 cos_token=-0.043666740666029845
+[text-ref] block=16 sample=0 text_norm=930.969711 ref_norm=2071.998176 text/ref=0.4493101018545485 cos_flat=-0.057675724136709176 cos_token=-0.06934708318109117
+[text-ref] block=16 sample=1 text_norm=1070.479566 ref_norm=2041.126021 text/ref=0.5244554011677631 cos_flat=-0.04540559362144678 cos_token=-0.06597497301331595
+[text-ref] block=17 sample=0 text_norm=1515.954418 ref_norm=1959.648090 text/ref=0.7735850257287773 cos_flat=-0.024982292874690934 cos_token=-0.048295724377993635
+[text-ref] block=17 sample=1 text_norm=1856.962594 ref_norm=1927.224386 text/ref=0.9635424950952063 cos_flat=-0.020682722962146856 cos_token=-0.04244374943538172
+[text-ref] block=18 sample=0 text_norm=611.802761 ref_norm=2043.261559 text/ref=0.2994245932159442 cos_flat=-0.04824082469633016 cos_token=-0.04708189099478294
+[text-ref] block=18 sample=1 text_norm=875.081672 ref_norm=1996.248961 text/ref=0.43836299410405416 cos_flat=-0.039710288384043606 cos_token=-0.039711393027977396
+[text-ref] block=19 sample=0 text_norm=745.966424 ref_norm=1653.755835 text/ref=0.4510740990875484 cos_flat=-0.03386415978974118 cos_token=-0.046340131005490524
+[text-ref] block=19 sample=1 text_norm=1056.558698 ref_norm=1599.622569 text/ref=0.6605049955086252 cos_flat=-0.029605163330156573 cos_token=-0.04152489929517468
+[text-ref] block=20 sample=0 text_norm=529.141702 ref_norm=1266.636146 text/ref=0.4177535150466402 cos_flat=-0.07377644181523427 cos_token=-0.10067860719562793
+[text-ref] block=20 sample=1 text_norm=812.429634 ref_norm=1223.826066 text/ref=0.6638440349448417 cos_flat=-0.06647558551633888 cos_token=-0.09234893289966731
+[text-ref] block=21 sample=0 text_norm=820.821741 ref_norm=1350.718793 text/ref=0.6076925453353906 cos_flat=0.01835393598719255 cos_token=0.03630248075278196
+[text-ref] block=21 sample=1 text_norm=1044.838451 ref_norm=1305.083654 text/ref=0.8005911707991616 cos_flat=0.020060072379526863 cos_token=0.04910858029309407
+[text-ref] block=22 sample=0 text_norm=724.969698 ref_norm=1311.359931 text/ref=0.5528380731103649 cos_flat=0.00013687709424364786 cos_token=0.004213061146205476
+[text-ref] block=22 sample=1 text_norm=767.141216 ref_norm=1253.813182 text/ref=0.6118465066203144 cos_flat=0.0011199259873500428 cos_token=-0.001658814447986749
+[text-ref] block=23 sample=0 text_norm=668.635273 ref_norm=1163.270046 text/ref=0.5747893834855944 cos_flat=0.007178678688911001 cos_token=0.03848982494412586
+[text-ref] block=23 sample=1 text_norm=752.935620 ref_norm=1113.016101 text/ref=0.6764822351941344 cos_flat=0.01738896686500771 cos_token=0.05804801295468118
 
-2026-09-06 16:14:29:INFO:copy from s3://bucket-9861-guiyang/code/jwx1416454/I2V-ID/train_runs/cross_v55_formal_20260901/output/mmdit4.5B_ip_cloud_i2v_720p_lognorm_ts8_cross_v55.yml/ckpt/iter_4249.pth to /cache/bucket-9861-guiyang/code/jwx1416454/I2V-ID/train_runs/cross_v55_formal_20260901/output/mmdit4.5B_ip_cloud_i2v_720p_lognorm_ts8_cross_v55.yml/ckpt/iter_4249.pth
+2026-09-06 17:03:14:INFO:inference idx=1, inference time=405.8s
 
-2026-09-06 16:14:29:INFO:rm -rf /cache/bucket-9861-guiyang/code/jwx1416454/I2V-ID/train_runs/cross_v55_formal_20260901/output/mmdit4.5B_ip_cloud_i2v_720p_lognorm_ts8_cross_v55.yml/ckpt/iter_4249.pth
-[ma-user 20260514-ID-cross-v20-new]$
+2026-09-06 17:03:19:INFO:Saved to ./id_test_0906_v1/iter_4249.pth/only_face/sample_01.mp4
+
+2026-09-06 17:03:19:INFO:prompt: Have the main character perform situational acting.
+
+2026-09-06 17:03:19:INFO:==============use face ref!!!==============
+
+2026-09-06 17:03:19:INFO:['white/hjh_1_original.png', 'white/hjh_2_original.png', 'white/hjh_3_original.png']
+
+2026-09-06 17:03:19:INFO:test_data/ref_face_images/white/hjh_1_original.png
+
+2026-09-06 17:03:19:INFO:test_data/ref_face_images/white/hjh_2_original.png
+
+2026-09-06 17:03:19:INFO:test_data/ref_face_images/white/hjh_3_original.png
+
+2026-09-06 17:03:19:INFO:Use 3 ref imgs
+2026-09-06 17:03:20, forward_with_cfg timestep: tensor([0., 0.], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=891.966437 ref_norm=182.671937 text/ref=4.882887051161612 cos_flat=-0.013371385169914788 cos_token=-0.038642692013921384
+[text-ref] block=0 sample=1 text_norm=1085.358817 ref_norm=182.671946 text/ref=5.941573620778554 cos_flat=-0.003211025994347112 cos_token=-0.009188945578456776
+[text-ref] block=1 sample=0 text_norm=972.150031 ref_norm=195.184848 text/ref=4.980663425716513 cos_flat=0.011370896270098895 cos_token=0.008844289006087885
+[text-ref] block=1 sample=1 text_norm=969.862143 ref_norm=196.258104 text/ref=4.941768637743138 cos_flat=0.02144271257703257 cos_token=0.03603310335288751
+[text-ref] block=2 sample=0 text_norm=1540.291562 ref_norm=923.176746 text/ref=1.668468761463183 cos_flat=0.016052576352823065 cos_token=0.014425502588747965
+[text-ref] block=2 sample=1 text_norm=1324.868427 ref_norm=954.362274 text/ref=1.388223805388424 cos_flat=0.015735470916435464 cos_token=0.02006740021978334
+[text-ref] block=3 sample=0 text_norm=2333.914544 ref_norm=1363.221195 text/ref=1.712058581257483 cos_flat=-0.02082578006354719 cos_token=-0.04272431049953094
+[text-ref] block=3 sample=1 text_norm=2464.908567 ref_norm=1408.887237 text/ref=1.7495428326764637 cos_flat=-0.012102662010184525 cos_token=-0.04032936249116004
+[text-ref] block=4 sample=0 text_norm=783.304702 ref_norm=1433.960475 text/ref=0.5462526443976315 cos_flat=0.008488609773521609 cos_token=-0.011342543641905508
+[text-ref] block=4 sample=1 text_norm=1195.955203 ref_norm=1445.513737 text/ref=0.8273565114881565 cos_flat=0.006945416946474687 cos_token=0.010207416888923997
+[text-ref] block=5 sample=0 text_norm=1575.157791 ref_norm=1676.276070 text/ref=0.9396768345218005 cos_flat=-0.02594491688800823 cos_token=-0.02667979701415334
+[text-ref] block=5 sample=1 text_norm=2073.055127 ref_norm=1604.981639 text/ref=1.2916379077994968 cos_flat=-0.016833492150759154 cos_token=-0.01779559497133953
+[text-ref] block=6 sample=0 text_norm=2677.353373 ref_norm=1690.356669 text/ref=1.5838984885733531 cos_flat=-0.011399371664454 cos_token=-0.015098913264160858
+[text-ref] block=6 sample=1 text_norm=3025.757630 ref_norm=1627.657848 text/ref=1.8589641752735837 cos_flat=-0.015219949924457108 cos_token=-0.05328845165580964
+[text-ref] block=7 sample=0 text_norm=1456.426442 ref_norm=1724.020391 text/ref=0.8447849283906762 cos_flat=-0.03808061376002592 cos_token=-0.04264137492412309
+[text-ref] block=7 sample=1 text_norm=2856.337271 ref_norm=1704.971652 text/ref=1.6752989814094226 cos_flat=-0.011942740909685055 cos_token=-0.04631666103752018
+[text-ref] block=8 sample=0 text_norm=3387.999917 ref_norm=1717.250752 text/ref=1.9729209108712338 cos_flat=-0.0070890981971251975 cos_token=0.003983982956621134
+[text-ref] block=8 sample=1 text_norm=3570.884011 ref_norm=1724.137827 text/ref=2.071112851324636 cos_flat=0.006483822404348303 cos_token=0.02807809740058256
+[text-ref] block=9 sample=0 text_norm=1868.961989 ref_norm=1840.143851 text/ref=1.0156608072206932 cos_flat=-0.02599944522538162 cos_token=-0.04092705559695877
+[text-ref] block=9 sample=1 text_norm=2511.768769 ref_norm=1824.789717 text/ref=1.376470256200421 cos_flat=-0.01223612249264747 cos_token=-0.03392041797650975
+[text-ref] block=10 sample=0 text_norm=4082.638721 ref_norm=1775.249545 text/ref=2.299754833069956 cos_flat=-0.004059913953516533 cos_token=0.006516095368147624
+[text-ref] block=10 sample=1 text_norm=4029.631587 ref_norm=1732.893615 text/ref=2.3253773646073093 cos_flat=-0.005956376337208381 cos_token=0.003967196396160835
+[text-ref] block=11 sample=0 text_norm=3853.283302 ref_norm=1687.315978 text/ref=2.2836761774303116 cos_flat=-0.006767226147256176 cos_token=-0.01743828722237288
+[text-ref] block=11 sample=1 text_norm=4937.596289 ref_norm=1652.210320 text/ref=2.988479268823543 cos_flat=-0.0014491408445331275 cos_token=-0.02051393018829064
+[text-ref] block=12 sample=0 text_norm=4276.477002 ref_norm=1753.996450 text/ref=2.4381332133914304 cos_flat=-0.017038509019029594 cos_token=-0.0068957283588072125
+[text-ref] block=12 sample=1 text_norm=4422.154654 ref_norm=1700.488177 text/ref=2.6005206701987555 cos_flat=-0.01159877815535666 cos_token=-0.018889078615873273
+[text-ref] block=13 sample=0 text_norm=3266.946235 ref_norm=1431.006671 text/ref=2.28297065358884 cos_flat=-0.012181864134879946 cos_token=-0.005179016353419856
+[text-ref] block=13 sample=1 text_norm=3547.913703 ref_norm=1417.273055 text/ref=2.5033381470373306 cos_flat=-0.01486098672654563 cos_token=0.0013742089294859932
+[text-ref] block=14 sample=0 text_norm=1118.768521 ref_norm=1499.478507 text/ref=0.7461050729651412 cos_flat=-0.036029945316546796 cos_token=-0.012778265842003273
+[text-ref] block=14 sample=1 text_norm=2263.533822 ref_norm=1486.991353 text/ref=1.5222239309523549 cos_flat=-0.02739296924345735 cos_token=-0.016778083641792684
+[text-ref] block=15 sample=0 text_norm=826.612410 ref_norm=1427.937543 text/ref=0.5788855497209275 cos_flat=-0.04321398352858089 cos_token=-0.04302306165060401
+[text-ref] block=15 sample=1 text_norm=1190.560195 ref_norm=1413.954722 text/ref=0.8420072976845326 cos_flat=-0.04778549961157197 cos_token=-0.05230317715702387
+[text-ref] block=16 sample=0 text_norm=1331.928972 ref_norm=1284.804710 text/ref=1.0366781520704953 cos_flat=-0.025746490590518863 cos_token=-0.0309318019566984
+[text-ref] block=16 sample=1 text_norm=2521.965670 ref_norm=1265.806535 text/ref=1.9923784555419426 cos_flat=-0.02729503791462764 cos_token=-0.05711644555192422
+[text-ref] block=17 sample=0 text_norm=3737.898143 ref_norm=1249.427838 text/ref=2.9916878973652925 cos_flat=-0.016845151271338593 cos_token=-0.031000567566544308
+[text-ref] block=17 sample=1 text_norm=3756.921310 ref_norm=1218.949887 text/ref=3.082096607315731 cos_flat=-0.025652897482943665 cos_token=-0.04428941088272771
+[text-ref] block=18 sample=0 text_norm=1526.250897 ref_norm=1412.876920 text/ref=1.0802433498234318 cos_flat=-0.030445642825469132 cos_token=-0.018378450172084775
+[text-ref] block=18 sample=1 text_norm=1834.398421 ref_norm=1390.774570 text/ref=1.3189761015110102 cos_flat=-0.04096127982226556 cos_token=-0.026159689484910622
+[text-ref] block=19 sample=0 text_norm=999.346502 ref_norm=1476.660216 text/ref=0.6767613097770356 cos_flat=-0.04098649774838003 cos_token=-0.04037645901190939
+[text-ref] block=19 sample=1 text_norm=1448.532463 ref_norm=1467.445009 text/ref=0.9871119222349619 cos_flat=-0.03954355831996845 cos_token=-0.04719976983308612
+[text-ref] block=20 sample=0 text_norm=660.516711 ref_norm=1219.286865 text/ref=0.5417237980045261 cos_flat=-0.07203993959182416 cos_token=-0.0249910628128083
+[text-ref] block=20 sample=1 text_norm=839.114659 ref_norm=1208.586866 text/ref=0.6942940409921192 cos_flat=-0.059367908848930895 cos_token=-0.02868480779742928
+[text-ref] block=21 sample=0 text_norm=1173.217307 ref_norm=1423.850742 text/ref=0.8239749240800736 cos_flat=-0.01794400961365417 cos_token=0.0017930549887795343
+[text-ref] block=21 sample=1 text_norm=1402.566142 ref_norm=1405.356700 text/ref=0.9980143417546707 cos_flat=-0.007069654507739655 cos_token=0.02558765981303149
+[text-ref] block=22 sample=0 text_norm=1350.355747 ref_norm=1384.972959 text/ref=0.975005135569944 cos_flat=-0.0033712811614438473 cos_token=0.014650743949049983
+[text-ref] block=22 sample=1 text_norm=1435.429140 ref_norm=1362.105549 text/ref=1.0538310642014934 cos_flat=0.006946460263620277 cos_token=0.022040714440175507
+[text-ref] block=23 sample=0 text_norm=796.109697 ref_norm=1337.822746 text/ref=0.5950786080068357 cos_flat=0.021985497364116036 cos_token=0.05808481759566536
+[text-ref] block=23 sample=1 text_norm=1080.592806 ref_norm=1329.668591 text/ref=0.812678296380552 cos_flat=0.030100191262484442 cos_token=0.06979095501854696
+2026-09-06 17:03:28, forward_with_cfg timestep: tensor([0.0009, 0.0009], device='npu:0') cfg_scale: 8.5
+[text-ref] block=0 sample=0 text_norm=893.063512 ref_norm=179.637033 text/ref=4.9714888677413125 cos_flat=-0.013340066694953705 cos_token=-0.03868921269004569
+[text-ref] block=0 sample=1 text_norm=1083.278927 ref_norm=179.637047 text/ref=6.030375949028145 cos_flat=-0.003171249273693906 cos_token=-0.009183926248936802
+[text-ref] block=1 sample=0 text_norm=936.807584 ref_norm=180.233166 text/ref=5.1977535940107655 cos_flat=0.010633868293538474 cos_token=0.007218749933036557
+[text-ref] block=1 sample=1 text_norm=925.022173 ref_norm=180.148575 text/ref=5.134773746217302 cos_flat=0.02032857529447262 cos_token=0.034943087112565135
+[text-ref] block=2 sample=0 text_norm=1423.909672 ref_norm=982.385668 text/ref=1.4494406008911027 cos_flat=0.01310935841700145 cos_token=0.012204067205518426
+[text-ref] block=2 sample=1 text_norm=1216.172453 ref_norm=1004.841071 text/ref=1.2103132399368897 cos_flat=0.012728081556041524 cos_token=0.016805062500213134
+[text-ref] block=3 sample=0 text_norm=2313.773399 ref_norm=1434.582965 text/ref=1.6128543660707177 cos_flat=-0.01922043116995789 cos_token=-0.04737990881527156
+[text-ref] block=3 sample=1 text_norm=2424.859999 ref_norm=1472.311036 text/ref=1.6469753610569626 cos_flat=-0.011007714228066918 cos_token=-0.04486880104109611
+[text-ref] block=4 sample=0 text_norm=662.016026 ref_norm=1457.724132 text/ref=0.4541435592484333 cos_flat=0.004423799872372251 cos_token=-0.015290386742525738
+[text-ref] block=4 sample=1 text_norm=986.998630 ref_norm=1459.488874 text/ref=0.6762632090964905 cos_flat=0.005622132910944482 cos_token=0.008369209101104813
+[text-ref] block=5 sample=0 text_norm=1424.088176 ref_norm=1664.607276 text/ref=0.8555100032494733 cos_flat=-0.026786109103553724 cos_token=-0.029158656409034384
+[text-ref] block=5 sample=1 text_norm=1811.930921 ref_norm=1612.923044 text/ref=1.123383368281451 cos_flat=-0.018608469196880403 cos_token=-0.022451284070166982
+[text-ref] block=6 sample=0 text_norm=2402.855021 ref_norm=1677.607903 text/ref=1.4323102656237219 cos_flat=-0.011881706559616971 cos_token=-0.01751014297368375
+[text-ref] block=6 sample=1 text_norm=2699.922862 ref_norm=1628.112793 text/ref=1.6583143826607711 cos_flat=-0.015054541400942959 cos_token=-0.05841449061706434
+[text-ref] block=7 sample=0 text_norm=1324.989951 ref_norm=1703.215397 text/ref=0.7779344605524634 cos_flat=-0.039578251498133515 cos_token=-0.042667853814888454
+[text-ref] block=7 sample=1 text_norm=2412.073639 ref_norm=1700.111078 text/ref=1.4187741432644516 cos_flat=-0.012924163593277426 cos_token=-0.04721276653022462
+[text-ref] block=8 sample=0 text_norm=3013.531998 ref_norm=1694.743643 text/ref=1.7781639190822844 cos_flat=-0.007618695252146325 cos_token=0.00151855562471451
+[text-ref] block=8 sample=1 text_norm=3148.480483 ref_norm=1713.551301 text/ref=1.8374007716899354 cos_flat=0.005002612191158432 cos_token=0.026733375548653508
+[text-ref] block=9 sample=0 text_norm=1689.606983 ref_norm=1818.036571 text/ref=0.9293580834050907 cos_flat=-0.02609535446251447 cos_token=-0.04080184491912463
+[text-ref] block=9 sample=1 text_norm=2258.841940 ref_norm=1814.313656 text/ref=1.2450118160750372 cos_flat=-0.012273039148650746 cos_token=-0.034401846436093356
+[text-ref] block=10 sample=0 text_norm=3718.787698 ref_norm=1760.770933 text/ref=2.1120224253935107 cos_flat=-0.005141950795101277 cos_token=0.004349549088601818
+[text-ref] block=10 sample=1 text_norm=3651.494295 ref_norm=1737.214201 text/ref=2.101925193003197 cos_flat=-0.007634838571731161 cos_token=0.0035924590417992773
+[text-ref] block=11 sample=0 text_norm=3589.360600 ref_norm=1679.839320 text/ref=2.136728529348857 cos_flat=-0.0077312416798202485 cos_token=-0.01619103356475207
+[text-ref] block=11 sample=1 text_norm=4498.828515 ref_norm=1659.319111 text/ref=2.7112497446379122 cos_flat=-0.0014980839184259777 cos_token=-0.02074361448782943
+[text-ref] block=12 sample=0 text_norm=3961.937618 ref_norm=1743.417442 text/ref=2.2725123204455295 cos_flat=-0.017226470341834225 cos_token=-0.007515330357483921
+[text-ref] block=12 sample=1 text_norm=4058.135138 ref_norm=1710.977784 text/ref=2.371822226252124 cos_flat=-0.012258604181561019 cos_token=-0.021871595752550932
+[text-ref] block=13 sample=0 text_norm=2971.298122 ref_norm=1421.894605 text/ref=2.0896753610021666 cos_flat=-0.012137813724958455 cos_token=-0.0031017086433410388
+[text-ref] block=13 sample=1 text_norm=3285.705353 ref_norm=1420.665828 text/ref=2.3127925564813703 cos_flat=-0.01492526339663238 cos_token=0.004987222926696676
