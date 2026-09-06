@@ -1,102 +1,400 @@
-(geneval) root@develop-zdk2koiy-675bbf7666-kpggq:/home/ma-user/work/wx1468559/Bagel-Reca# pip install clip-benchmark
-Looking in indexes: http://cmc-cd-mirror.rnd.huawei.com/pypi/simple, https://mirrors.tools.huawei.com/pypi/simple/
-Collecting clip-benchmark
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/2a/e1/6a5cb1b56918b5b7821b321262f4305ec42d709c833f9b0d6884d9f27d6d/clip_benchmark-1.6.2-py2.py3-none-any.whl (1.9 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.9/1.9 MB 15.7 MB/s eta 0:00:00
-Requirement already satisfied: torch>=1.8.1 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from clip-benchmark) (2.1.2)
-Requirement already satisfied: torchvision>=0.8.9 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from clip-benchmark) (0.16.2)
-Requirement already satisfied: tqdm>=2 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from clip-benchmark) (4.65.2)
-Collecting scikit-learn<2,>=1.0 (from clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/3f/48/6fdd99f5717045f9984616b5c2ec683d6286d30c0ac234563062132b83ab/scikit_learn-1.3.2-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (11.1 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.1/11.1 MB 5.1 MB/s eta 0:00:00
-Requirement already satisfied: open-clip-torch>=0.2.1 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from clip-benchmark) (2.26.1)
-Collecting pycocoevalcap (from clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/08/f9/466f289f1628296b5e368940f89e3cfcfb066d15ddc02ff536dc532b1c93/pycocoevalcap-1.2-py3-none-any.whl (104.3 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 104.3/104.3 MB 5.6 MB/s eta 0:00:00
-Collecting webdataset>=0.2.31 (from clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/8e/84/cf2319c375f4e061f27354685295905dc81105d2a2d2239baaf6f6e73c87/webdataset-0.2.100-py3-none-any.whl (74 kB)
-Collecting transformers (from clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/51/51/b87caa939fedf307496e4dbf412f4b909af3d9ca8b189fc3b65c1faa456f/transformers-4.46.3-py3-none-any.whl (10.0 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.0/10.0 MB 82.8 MB/s eta 0:00:00
-Requirement already satisfied: regex in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from open-clip-torch>=0.2.1->clip-benchmark) (2024.11.6)
-Requirement already satisfied: ftfy in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from open-clip-torch>=0.2.1->clip-benchmark) (6.2.3)
-Requirement already satisfied: huggingface-hub in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from open-clip-torch>=0.2.1->clip-benchmark) (0.36.2)
-Requirement already satisfied: timm in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from open-clip-torch>=0.2.1->clip-benchmark) (1.0.27)
-Requirement already satisfied: numpy<2.0,>=1.17.3 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from scikit-learn<2,>=1.0->clip-benchmark) (1.24.4)
-Collecting scipy>=1.5.0 (from scikit-learn<2,>=1.0->clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/69/f0/fb07a9548e48b687b8bf2fa81d71aba9cfc548d365046ca1c791e24db99d/scipy-1.10.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (34.5 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 34.5/34.5 MB 5.5 MB/s eta 0:00:00
-Collecting joblib>=1.1.1 (from scikit-learn<2,>=1.0->clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/91/29/df4b9b42f2be0b623cbd5e2140cafcaa2bef0759a00b7b70104dcfe2fb51/joblib-1.4.2-py3-none-any.whl (301 kB)
-Collecting threadpoolctl>=2.0.0 (from scikit-learn<2,>=1.0->clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/4b/2c/ffbf7a134b9ab11a67b0cf0726453cedd9c5043a4fe7a35d1cefa9a1bcfb/threadpoolctl-3.5.0-py3-none-any.whl (18 kB)
-Requirement already satisfied: filelock in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (3.14.0)
-Requirement already satisfied: typing-extensions in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (4.13.2)
-Requirement already satisfied: sympy in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (1.13.3)
-Requirement already satisfied: networkx in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (2.8.8)
-Requirement already satisfied: jinja2 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (3.1.6)
-Requirement already satisfied: fsspec in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (2025.3.1)
-Requirement already satisfied: nvidia-cuda-nvrtc-cu12==12.1.105 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (12.1.105)
-Requirement already satisfied: nvidia-cuda-runtime-cu12==12.1.105 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (12.1.105)
-Requirement already satisfied: nvidia-cuda-cupti-cu12==12.1.105 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (12.1.105)
-Requirement already satisfied: nvidia-cudnn-cu12==8.9.2.26 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (8.9.2.26)
-Requirement already satisfied: nvidia-cublas-cu12==12.1.3.1 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (12.1.3.1)
-Requirement already satisfied: nvidia-cufft-cu12==11.0.2.54 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (11.0.2.54)
-Requirement already satisfied: nvidia-curand-cu12==10.3.2.106 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (10.3.2.106)
-Requirement already satisfied: nvidia-cusolver-cu12==11.4.5.107 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (11.4.5.107)
-Requirement already satisfied: nvidia-cusparse-cu12==12.1.0.106 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (12.1.0.106)
-Requirement already satisfied: nvidia-nccl-cu12==2.18.1 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (2.18.1)
-Requirement already satisfied: nvidia-nvtx-cu12==12.1.105 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (12.1.105)
-Requirement already satisfied: triton==2.1.0 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torch>=1.8.1->clip-benchmark) (2.1.0)
-Requirement already satisfied: nvidia-nvjitlink-cu12 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from nvidia-cusolver-cu12==11.4.5.107->torch>=1.8.1->clip-benchmark) (12.9.86)
-Requirement already satisfied: requests in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torchvision>=0.8.9->clip-benchmark) (2.28.2)
-Requirement already satisfied: pillow!=8.3.*,>=5.3.0 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from torchvision>=0.8.9->clip-benchmark) (10.4.0)
-Collecting braceexpand (from webdataset>=0.2.31->clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/fa/93/e8c04e80e82391a6e51f218ca49720f64236bc824e92152a2633b74cf7ab/braceexpand-0.1.7-py2.py3-none-any.whl (5.9 kB)
-Requirement already satisfied: pyyaml in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from webdataset>=0.2.31->clip-benchmark) (6.0.3)
-Collecting pycocotools>=2.0.2 (from pycocoevalcap->clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/6c/11/6cb76ebc71388ac17691bc3da76276d1642af30bf9097de9bb5f64c92cfa/pycocotools-2.0.7-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (439 kB)
-Requirement already satisfied: packaging>=20.0 in /root/miniconda3/envs/geneval/lib/python3.8/site-packages (from transformers->clip-benchmark) (24.2)
-Collecting tokenizers<0.21,>=0.20 (from transformers->clip-benchmark)
-  Downloading https://mirrors.tools.huawei.com/pypi/packages/1a/98/0df883ea6201e35e286a97f5fb2a601bfb5b52e4165f7688a76e4553eeec/tokenizers-0.20.4.tar.gz (343 kB)
-  Installing build dependencies ... done
-  Getting requirements to build wheel ... done
-  Preparing metadata (pyproject.toml) ... error
-  error: subprocess-exited-with-error
-  
-  × Preparing metadata (pyproject.toml) did not run successfully.
-  │ exit code: 1
-  ╰─> [23 lines of output]
-          Updating crates.io index
-      warning: spurious network error (3 tries remaining): [28] Timeout was reached (Failed to connect to index.crates.io port 443 after 15626 ms: Connection timed out)
-      warning: spurious network error (2 tries remaining): [28] Timeout was reached (Failed to connect to index.crates.io port 443 after 15215 ms: Connection timed out)
-      warning: spurious network error (1 tries remaining): [28] Timeout was reached (Failed to connect to index.crates.io port 443 after 15214 ms: Connection timed out)
-      error: failed to get `env_logger` as a dependency of package `tokenizers-python v0.20.4 (/tmp/pip-install-w9uw8xnd/tokenizers_6add9ca944de40f7b1110a0c2ca3fff0/bindings/python)`
-      
-      Caused by:
-        failed to query replaced source registry `crates-io`
-      
-      Caused by:
-        download of config.json failed
-      
-      Caused by:
-        failed to download from `https://index.crates.io/config.json`
-      
-      Caused by:
-        [28] Timeout was reached (Failed to connect to index.crates.io port 443 after 15211 ms: Connection timed out)
-      💥 maturin failed
-        Caused by: Cargo metadata failed. Does your crate compile with `cargo build`?
-        Caused by: `cargo metadata` exited with an error:
-      Error running maturin: Command '['maturin', 'pep517', 'write-dist-info', '--metadata-directory', '/tmp/pip-modern-metadata-ch88ws87', '--interpreter', '/root/miniconda3/envs/geneval/bin/python3.8']' returned non-zero exit status 1.
-      Checking for Rust toolchain....
-      Running `maturin pep517 write-dist-info --metadata-directory /tmp/pip-modern-metadata-ch88ws87 --interpreter /root/miniconda3/envs/geneval/bin/python3.8`
-      [end of output]
-  
-  note: This error originates from a subprocess, and is likely not a problem with pip.
-error: metadata-generation-failed
+: Traceback (most recent call last):
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank1]:     main()
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank1]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank1]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank1]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank1]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank1]:     return DistributedVAE(vae_config)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank1]:     self.model = instantiate_from_config(config.model_config)
+[rank1]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank1]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank1]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank1]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank1]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank1]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank1]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank1]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank1]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank1]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank1]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank1]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank1]:     from mmcv.cnn import ConvModule
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank1]:     from .builder import MODELS, build_model_from_cfg
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank1]:     from ..runner import Sequential
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank1]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank1]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank1]:     from . import ipu, mlu, mps, npu
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank1]:     from .data_parallel import NPUDataParallel
+[rank1]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank1]:     for m in sys.modules:
+[rank1]: RuntimeError: dictionary changed size during iteration
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank5]:     main()
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank5]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank5]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank5]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank5]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank5]:     return DistributedVAE(vae_config)
+[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank5]:     self.model = instantiate_from_config(config.model_config)
+[rank5]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank5]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank5]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank5]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank5]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank5]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank5]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank5]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank5]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank5]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank5]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank5]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank5]:     from mmcv.cnn import ConvModule
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank5]:     from .builder import MODELS, build_model_from_cfg
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank5]:     from ..runner import Sequential
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank5]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank5]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank5]:     from . import ipu, mlu, mps, npu
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank5]:     from .data_parallel import NPUDataParallel
+[rank5]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank5]:     for m in sys.modules:
+[rank5]: RuntimeError: dictionary changed size during iteration
+[rank4]: Traceback (most recent call last):
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank4]:     main()
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank4]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank4]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank4]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank4]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank4]:     return DistributedVAE(vae_config)
+[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank4]:     self.model = instantiate_from_config(config.model_config)
+[rank4]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank4]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank4]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank4]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank4]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank4]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank4]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank4]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank4]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank4]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank4]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank4]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank4]:     from mmcv.cnn import ConvModule
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank4]:     from .builder import MODELS, build_model_from_cfg
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank4]:     from ..runner import Sequential
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank4]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank4]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank4]:     from . import ipu, mlu, mps, npu
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank4]:     from .data_parallel import NPUDataParallel
+[rank4]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank4]:     for m in sys.modules:
+[rank4]: RuntimeError: dictionary changed size during iteration
+/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py:22: UserWarning: Torchaudio's I/O functions now support par-call bakcend dispatch. Importing backend implementation directly is no longer guaranteed to work. Please use `backend` keyword with load/save/info function, instead of calling the udnerlying implementation directly.
+  if hasattr(sys.modules[m], '_check_balance'):
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank3]:     main()
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank3]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank3]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank3]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank3]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank3]:     return DistributedVAE(vae_config)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank3]:     self.model = instantiate_from_config(config.model_config)
+[rank3]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank3]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank3]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank3]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank3]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank3]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank3]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank3]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank3]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank3]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank3]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank3]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank3]:     from mmcv.cnn import ConvModule
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank3]:     from .builder import MODELS, build_model_from_cfg
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank3]:     from ..runner import Sequential
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank3]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank3]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank3]:     from . import ipu, mlu, mps, npu
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank3]:     from .data_parallel import NPUDataParallel
+[rank3]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank3]:     for m in sys.modules:
+[rank3]: RuntimeError: dictionary changed size during iteration
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank2]:     main()
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank2]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank2]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank2]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank2]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank2]:     return DistributedVAE(vae_config)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank2]:     self.model = instantiate_from_config(config.model_config)
+[rank2]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank2]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank2]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank2]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank2]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank2]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank2]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank2]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank2]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank2]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank2]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank2]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank2]:     from mmcv.cnn import ConvModule
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank2]:     from .builder import MODELS, build_model_from_cfg
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank2]:     from ..runner import Sequential
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank2]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank2]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank2]:     from . import ipu, mlu, mps, npu
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank2]:     from .data_parallel import NPUDataParallel
+[rank2]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank2]:     for m in sys.modules:
+[rank2]: RuntimeError: dictionary changed size during iteration
+[rank7]: Traceback (most recent call last):
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank7]:     main()
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank7]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank7]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank7]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank7]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank7]:     return DistributedVAE(vae_config)
+[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank7]:     self.model = instantiate_from_config(config.model_config)
+[rank7]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank7]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank7]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank7]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank7]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank7]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank7]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank7]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank7]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank7]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank7]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank7]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank7]:     from mmcv.cnn import ConvModule
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank7]:     from .builder import MODELS, build_model_from_cfg
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank7]:     from ..runner import Sequential
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank7]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank7]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank7]:     from . import ipu, mlu, mps, npu
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank7]:     from .data_parallel import NPUDataParallel
+[rank7]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank7]:     for m in sys.modules:
+[rank7]: RuntimeError: dictionary changed size during iteration
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 578, in <module>
+[rank0]:     main()
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/scripts/inference_mmdit_i2v_id.py", line 308, in main
+[rank0]:     vae = build_backbone(cfg, cfg.vae.get("backbone", "vae_causal_16ch_dist"))
+[rank0]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/build.py", line 10, in build_backbone
+[rank0]:     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg)
+[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 1186, in motionvae_16ch_dist
+[rank0]:     return DistributedVAE(vae_config)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/vae/distributed_vae.py", line 960, in __init__
+[rank0]:     self.model = instantiate_from_config(config.model_config)
+[rank0]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 14, in instantiate_from_config
+[rank0]:     return get_obj_from_str(config["target"])(**config.get("params", dict()))
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/utils.py", line 10, in get_obj_from_str
+[rank0]:     return getattr(importlib.import_module(module, package=None), cls)
+[rank0]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/importlib/__init__.py", line 126, in import_module
+[rank0]:     return _bootstrap._gcd_import(name[level:], package, level)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+[rank0]:   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+[rank0]:   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+[rank0]:   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+[rank0]:   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+[rank0]:   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/autoencoder3d_t8_flow_decom_sim_dist.py", line 12, in <module>
+[rank0]:     from mimogpt.models.modules.ldm.encoder.spynet import SPyNet
+[rank0]:   File "/data/guiyang/code/jwx1416454/20260514-ID-cross-v20-new/mimogpt/models/modules/ldm/encoder/spynet.py", line 4, in <module>
+[rank0]:     from mmcv.cnn import ConvModule
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/__init__.py", line 14, in <module>
+[rank0]:     from .builder import MODELS, build_model_from_cfg
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/cnn/builder.py", line 2, in <module>
+[rank0]:     from ..runner import Sequential
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/runner/__init__.py", line 45, in <module>
+[rank0]:     from mmcv.device import ipu  # isort:skip  # noqa
+[rank0]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/__init__.py", line 2, in <module>
+[rank0]:     from . import ipu, mlu, mps, npu
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/__init__.py", line 3, in <module>
+[rank0]:     from .data_parallel import NPUDataParallel
+[rank0]:   File "/home/ma-user/anaconda/lib/python3.11/site-packages/mmcv/device/npu/data_parallel.py", line 20, in <module>
+[rank0]:     for m in sys.modules:
+[rank0]: RuntimeError: dictionary changed size during iteration
+[ERROR] 2026-09-06-16:14:16 (PID:3938695, Device:1, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+[ERROR] 2026-09-06-16:14:17 (PID:3938699, Device:5, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+[ERROR] 2026-09-06-16:14:17 (PID:3938701, Device:7, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-09-06-16:14:18 (PID:3938700, Device:6, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-09-06-16:14:18 (PID:3938696, Device:2, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-09-06-16:14:19 (PID:3938694, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-09-06-16:14:20 (PID:3938698, Device:4, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+W0906 16:14:21.241000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938694 closing signal SIGTERM
+W0906 16:14:21.242000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938696 closing signal SIGTERM
+W0906 16:14:21.242000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938697 closing signal SIGTERM
+W0906 16:14:21.243000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938698 closing signal SIGTERM
+W0906 16:14:21.243000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938700 closing signal SIGTERM
+W0906 16:14:21.243000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 3938701 closing signal SIGTERM
+/home/ma-user/anaconda/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 30 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+E0906 16:14:27.182000 3938419 site-packages/torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: 1) local_rank: 1 (pid: 3938695) of binary: /home/ma-user/anaconda/bin/python
+Traceback (most recent call last):
+  File "/home/ma-user/anaconda/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/run.py", line 918, in main
+    run(args)
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/run.py", line 909, in run
+    elastic_launch(
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/distributed/launcher/api.py", line 269, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+scripts/inference_mmdit_i2v_id.py FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-09-06_16:14:21
+  host      : notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84.notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84-distributed.default.svc.cluster.local
+  rank      : 5 (local_rank: 5)
+  exitcode  : 1 (pid: 3938699)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-09-06_16:14:21
+  host      : notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84.notebook-7fa88179-4a92-4d27-bef7-2c4d6f2a8b84-distributed.default.svc.cluster.local
+  rank      : 1 (local_rank: 1)
+  exitcode  : 1 (pid: 3938695)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
+[ERROR] 2026-09-06-16:14:27 (PID:3938419, Device:-1, RankID:-1) ERR99999 UNKNOWN applicaiton exception
 
-× Encountered error while generating package metadata.
-╰─> See above for output.
+2026-09-06 16:14:29:INFO:copy from s3://bucket-9861-guiyang/code/jwx1416454/I2V-ID/train_runs/cross_v55_formal_20260901/output/mmdit4.5B_ip_cloud_i2v_720p_lognorm_ts8_cross_v55.yml/ckpt/iter_4249.pth to /cache/bucket-9861-guiyang/code/jwx1416454/I2V-ID/train_runs/cross_v55_formal_20260901/output/mmdit4.5B_ip_cloud_i2v_720p_lognorm_ts8_cross_v55.yml/ckpt/iter_4249.pth
 
-note: This is an issue with the package mentioned above, not pip.
-hint: See above for details.
+2026-09-06 16:14:29:INFO:rm -rf /cache/bucket-9861-guiyang/code/jwx1416454/I2V-ID/train_runs/cross_v55_formal_20260901/output/mmdit4.5B_ip_cloud_i2v_720p_lognorm_ts8_cross_v55.yml/ckpt/iter_4249.pth
+[ma-user 20260514-ID-cross-v20-new]$
