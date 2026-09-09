@@ -1,14 +1,19 @@
+"""
+批量视频描述生成脚本。
 
+整体流程：
+1. 从 PKL 或 JSONL 读取视频相对路径；
+2. 从 OBS/S3 将视频复制到本机 /cache；
+3. 截取视频前 5 秒并均匀采样 32 帧；
+4. 使用 Qwen3-VL 生成短描述；
+5. 将 video_fn 与生成的 prompt 逐行写入远端 JSONL。
+
+当前模型输入由 Qwen3-VL 的 AutoProcessor 和 qwen_vl_utils 负责构造。
+"""
 
 import argparse
 import torch
-import copy
-from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
-from llava.conversation import conv_templates, SeparatorStyle
-from llava.model.builder import load_pretrained_model, load_llava_lora_model
-from llava.utils.utils import disable_torch_init
 from torch.utils.data import Dataset, DataLoader
-from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria, process_images
 try:
     import torch_npu
     from torch_npu.contrib import transfer_to_npu
@@ -23,7 +28,6 @@ from tqdm import tqdm
 import cv2
 # from decord import VideoReader, cpu
 
-from transformers import AutoConfig
 from PIL import Image
 
 import time
@@ -32,12 +36,16 @@ import moxing as mox
 import numpy as np
 import pickle
 
+from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
+from qwen_vl_utils import process_vision_info
 
 
 
 
 
 class VideoDataset(Dataset):
+    """负责解析视频路径，并把每个远端视频下载到本地缓存。"""
+
     def __init__(self, video_paths, s3_data_root, s3_save_root):
         self.s3_data_root = s3_data_root
         self.s3_save_root = s3_save_root
@@ -47,11 +55,14 @@ class VideoDataset(Dataset):
         return len(self.paths)
 
     def __getitem__(self, index):
-        
+        # 兼容两种输入：
+        # 1. PKL/JSONL 中直接保存路径字符串；
+        # 2. JSONL 中保存包含 video_fn 字段的字典。
         if isinstance(self.paths[index], str):
             path = os.path.join(self.s3_data_root, self.paths[index])
             s3_save_path = os.path.join(self.s3_save_root, self.paths[index])
             # local_path = f"/cache/{index}.mp4" /cache/0.01.mp4    /cache/00999_2/f83e523297e8eb973d8c4373b8128333/011.mp4
+            # 保留原相对目录结构，避免不同子目录下的同名视频互相覆盖。
             local_path = f"/cache/{self.paths[index]}"
 
             try:
@@ -61,6 +72,7 @@ class VideoDataset(Dataset):
                 print(f"copy file {path} fail, change index")
                 return {"local_path": "", "s3_path": path, "s3_save_path": s3_save_path}
         else:
+            # 字典输入会额外返回 video_fn，输出时可原样保留该相对路径。
             path = os.path.join(self.s3_data_root, self.paths[index]['video_fn'])
             s3_save_path = os.path.join(self.s3_save_root, self.paths[index]['video_fn'])
             # local_path = f"/cache/{index}.mp4" /cache/0.01.mp4    /cache/00999_2/f83e523297e8eb973d8c4373b8128333/011.mp4
@@ -75,20 +87,19 @@ class VideoDataset(Dataset):
 
 
 def split_list(lst, n):
-    """Split a list into n (roughly) equal-sized chunks"""
+    """将列表近似均分为 n 份；当前主流程未调用。"""
     chunk_size = math.ceil(len(lst) / n)  # integer division
     return [lst[i: i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
 
 def get_chunk(lst, n, k):
+    """返回均分后的第 k 份；当前主流程未调用。"""
     chunks = split_list(lst, n)
     return chunks[k]
 
 
 def parse_args():
-    """
-    Parse command-line arguments.
-    """
+    """解析数据路径、模型配置、采帧参数及推理参数。"""
     parser = argparse.ArgumentParser()
 
     # Define the command-line arguments
@@ -96,7 +107,7 @@ def parse_args():
     #parser.add_argument("--output_dir", help="Directory to save the model results JSON (single save).", required=False)
     parser.add_argument("--start", type=int, default=0, help="start index of inference")
     parser.add_argument("--end", type=int, default=-1, help="end index of inference. -1 means infering through the whole data")
-    parser.add_argument("--model_path", type=str, default="facebook/opt-350m")
+    parser.add_argument("--model_path", type=str, default="Qwen/Qwen3-VL-4B-Instruct")
     parser.add_argument("--model_base", type=str, default=None)
     parser.add_argument("--model_name", type=str, default="llava_onevision_qwen")
     parser.add_argument("--vision-tower", help=str, default="google/siglip-so400m-patch14-384")
@@ -111,6 +122,7 @@ def parse_args():
     parser.add_argument("--mm_spatial_pool_mode", type=str, default="bilinear")
     parser.add_argument("--mm_patch_merge_type", type=str, default="spatial_unpad")
     parser.add_argument("--image_aspect_ratio", type=str, default=None)
+    # 计划送入视觉模型的采样帧数；后文目前固定覆盖为 32。
     parser.add_argument("--for_get_frames_num", type=int, default=32)
     parser.add_argument("--overwrite", type=lambda x: (str(x).lower() == 'true'), default=True)
     parser.add_argument("--load_8bit", type=lambda x: (str(x).lower() == 'true'), default=False)
@@ -118,6 +130,7 @@ def parse_args():
     parser.add_argument("--add_image_token", action="store_true", default=False)
     parser.add_argument("--no_do_sample", action="store_true", default=False)
     parser.add_argument("--prompt", type=str, default="Describe the video in details.")
+    # pkl_path 和 jsonl_path 二选一；jsonl_path 非空时优先使用 JSONL。
     parser.add_argument('--pkl_path', type=str, default='')
     parser.add_argument("--output_name", help="Name of the file for storing results JSON.", default="pred_res_")
     parser.add_argument("--output_dir", help="Directory to save the model results JSON.", default="s3://bucket-6824-huanan/code/l60037260/video_50_res/")
@@ -137,6 +150,7 @@ def parse_args():
     return parser.parse_args()
 
 def get_all_videos_from_dir(video_path):
+    """递归收集目录中的 MP4；当前主流程未调用。"""
     mp4_files = []
     count = 0
     for root, dirs, files in os.walk(video_path):
@@ -146,17 +160,23 @@ def get_all_videos_from_dir(video_path):
                 mp4_files.append(os.path.join(root, file))
     return mp4_files, count
 
-# Function to extract frames from video
 def load_video(video_path, max_frames_num):
+    """从视频前 5 秒内均匀抽取 max_frames_num 帧，并返回 RGB 数组。
+
+    例如 24 FPS 视频会先限定到前 120 个原始帧，再从中等间隔取 32 帧。
+    这里的抽帧只用于生成 caption，不是 VAE target 使用的逐帧采样。
+    """
     cv2_vr = cv2.VideoCapture(video_path)
+    # OpenCV 给出的原始视频总帧数。
     duration = int(cv2_vr.get(cv2.CAP_PROP_FRAME_COUNT))
 
     fps = int(cv2_vr.get(cv2.CAP_PROP_FPS))
-    #print(f"old total_frames:{duration}")
+    # caption 只描述前 5 秒；长于 5 秒的后续内容不会进入模型。
     if duration > fps*5:
         duration = int(fps*5)
         print(f"new total_frames:{duration}")
 
+    # 在有效时间区间首尾之间等间隔选帧，而不是连续读取前 32 帧。
     frame_id_list = np.linspace(0, (duration - 1), max_frames_num, dtype=int).tolist()
     print(frame_id_list)
     frames = []
@@ -165,6 +185,7 @@ def load_video(video_path, max_frames_num):
         ret, frame = cv2_vr.read()
         if not ret:
             raise ValueError(f'video error at {video_path}')
+        # OpenCV 默认 BGR；视觉预处理器需要 RGB。
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # cv2.imwrite(str(frame_idx).zfill(4) + ".jpg", frame)
         frames.append(frame)
@@ -175,115 +196,42 @@ def load_video(video_path, max_frames_num):
 
 
 
-""" 模型初始化 """
+# ========================= 模型初始化 =========================
 args = parse_args()
-# if os.path.exists("/cache/llava/models/Model_VideoCaption_v1.3") and os.path.isdir("/cache/llava/models/Model_VideoCaption_v1.3"):
-#     print("模型文件夹2存在")
-# else:
-#     print("文件夹2不存在")
-#     print("开始下载")
-#     copy_start_time = time.time()
-#     os.makedirs("/cache/llava/models/Model_VideoCaption_v1.3", exist_ok=True)
-#     mox.file.copy_parallel(args.s3_llava_path, "/cache/llava/models/Model_VideoCaption_v1.3")
 
-#     os.makedirs("/cache/llava/models/llava-onevision-qwen2-7b-ov", exist_ok=True)
-#     mox.file.copy_parallel(args.s3_base_path, "/cache/llava/models/llava-onevision-qwen2-7b-ov")
-
-
-#     os.makedirs("/cache/llava/models/siglip-so400m-patch14-384", exist_ok=True)
-#     mox.file.copy_parallel(args.s3_clip_path, "/cache/llava/models/siglip-so400m-patch14-384")
-
-#     mox.file.copy(args.s3_config_path, "/cache/configs/generation_configs/llava_onevision_npu/generation_config.json")
-
-#     copy_end_time = time.time()
-#     print("下载模型耗时：",copy_end_time-copy_start_time)
-
-
-args.model_path = "/home/ma-user/modelarts/user-job-dir/llava_onevision_infer/llava/models/Model_VideoCaption_v1.3/"
-args.model_base = "/home/ma-user/modelarts/user-job-dir/llava_onevision_infer/llava/models/llava-onevision-qwen2-7b-ov/"
-args.model_name = "llava_onevision_qwen_lora"
-args.generation_config = "/home/ma-user/modelarts/user-job-dir/llava_onevision_infer/configs/generation_configs/llava_onevision_npu/generation_config.json"
-args.conv_mode = "qwen_2"
 args.for_get_frames_num = 32
 args.num_samples_per_conv = 1
 args.mm_spatial_pool_stride = 4
 args.overwrite = True
-args.vision_tower = "/home/ma-user/modelarts/user-job-dir/llava_onevision_infer/llava/models/siglip-so400m-patch14-384"
 args.add_image_token = True
 args.no_do_sample = True
-# args.prompt = "Please provide a detailed description of the video, focusing on the main subjects, their actions and the background scenes. Please give your most confident answer and do not answer with uncertain content."
-args.prompt = "Please provide a detailed description of the video, focusing on the main subjects, their actions and the background scenes. Please give your most confident answer and do not answer with uncertain content. The number of words to output must be less than 25 words."
 
-# 配置文件更新
-overwrite_config = {}
-overwrite_config["mm_resampler_type"] = args.mm_resampler_type
-overwrite_config["mm_spatial_pool_stride"] = args.mm_spatial_pool_stride
-overwrite_config["mm_spatial_pool_out_channels"] = args.mm_spatial_pool_out_channels
-overwrite_config["mm_spatial_pool_mode"] = args.mm_spatial_pool_mode
-overwrite_config["mm_vision_tower"] = args.vision_tower
-overwrite_config["patchify_video_feature"] = False
-if args.image_aspect_ratio is not None:
-    overwrite_config["image_aspect_ratio"] = args.image_aspect_ratio
-if args.model_base is not None: #LoRA
-    cfg_pretrained = AutoConfig.from_pretrained(args.model_base)
-else:
-    cfg_pretrained = AutoConfig.from_pretrained(args.model_path)
-cfg_pretrained.mm_vision_tower = args.vision_tower
-if "224" in cfg_pretrained.mm_vision_tower:
-    least_token_number = args.for_get_frames_num * (16 // args.mm_spatial_pool_stride) ** 2 + 1000
-else:
-    least_token_number = args.for_get_frames_num * (24 // args.mm_spatial_pool_stride) ** 2 + 1000
-
-scaling_factor = math.ceil(least_token_number / 4096)
-
-
-if scaling_factor >= 2:
-    if "mistral" not in cfg_pretrained._name_or_path.lower() and "7b" in cfg_pretrained._name_or_path.lower():
-        print(float(scaling_factor))
-        overwrite_config["rope_scaling"] = {"factor": float(scaling_factor), "type": "linear"}
-    overwrite_config["max_sequence_length"] = 4096 * scaling_factor
-    overwrite_config["tokenizer_model_max_length"] = 4096 * scaling_factor
-
-tokenizer, model, image_processor, context_len = load_pretrained_model(
+model = Qwen3VLForConditionalGeneration.from_pretrained(
     args.model_path,
-    args.model_base,
-    args.model_name,
-    overwrite_config=overwrite_config,
-    attn_implementation=None,
-    device_map="auto"
+    dtype="auto",
+    device_map="auto",
 )
-
-
-# 初始化prompt
-qs = args.prompt
-if args.add_image_token:
-    if model.config.mm_use_im_start_end:
-        qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + "\n" + qs
-    else:
-        qs = DEFAULT_IMAGE_TOKEN + "\n" + qs
-conv = copy.deepcopy(conv_templates[args.conv_mode])
-conv.append_message(conv.roles[0], qs)
-conv.append_message(conv.roles[1], None)
-prompt = conv.get_prompt()
+processor = AutoProcessor.from_pretrained(args.model_path)
 
 def write_json(file_path, data):
+    """将列表写为 JSONL；当前主流程使用 mox.file.append 直接写远端。"""
     f = open(file_path, "w", encoding='utf-8')
     for item in tqdm(data):
         f.writelines(json.dumps(item, ensure_ascii=False)+"\n")
     f.close()
 
 def run_inference():
-    """
-    Run inference
-    """
+    """执行数据读取、逐视频推理、结果写入和本地缓存清理。"""
 
     pid = os.getpid()
     output_name = args.output_name+str(pid)+"_"+str(args.start_index)+"_"+str(args.end_index)+"_3s_short_caption"
     
     #print("当前进程pid：",pid)
+    # 每个进程使用包含 PID 和数据切片范围的独立输出文件，降低并发写冲突。
     answers_file = os.path.join(args.output_dir, f"{output_name}.jsonl")
     mox.file.File(answers_file, "w")
     sample_set = {}
+    # JSONL 优先；未提供时把远端 PKL 下载到固定本地路径。
     if args.jsonl_path != '':
         input_file = args.jsonl_path
     else:
@@ -291,7 +239,9 @@ def run_inference():
         mox.file.copy(args.pkl_path, "/cache/wl_48/human240W_FI_2_intersection_set_new.pkl")
         input_file = "/cache/wl_48/human240W_FI_2_intersection_set_new.pkl"
 
-    # 读取 pkl 文件并加载列表
+    # 将两类输入统一整理为 paths：
+    # - 路径字符串列表；
+    # - 含 video_fn 字段的字典列表。
     if input_file.endswith('jsonl'):
         paths = []
         with open(input_file, "r", encoding="utf-8") as f:
@@ -315,11 +265,13 @@ def run_inference():
     else:
         with open(input_file, "rb") as infile:
             paths = pickle.load(infile)
+    # 多任务并行时可用起止下标切分数据。
     paths = paths[args.start_index: args.end_index]
     data_set = VideoDataset(paths, args.s3_data_root, args.s3_save_path)
     loader = DataLoader(data_set, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=False,
                         drop_last=False)
 
+    # DataLoader 批量完成下载；模型推理仍在 batch 内逐条执行。
     for batch in tqdm(loader,desc="当前进度"): 
         for i in range(len(batch["local_path"])):
             local_path = batch["local_path"][i]
@@ -332,54 +284,81 @@ def run_inference():
 
             try:
                 question = args.prompt
+                # 获取前 5 秒的 32 个均匀采样 RGB 帧。
                 video_frames = load_video(local_path, max_frames_num=args.for_get_frames_num)
-                image_tensors = []
-                frames = image_processor.preprocess(video_frames, return_tensors="pt")["pixel_values"].half().cuda()
-                image_tensors.append(frames)
 
-                input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).cuda()
-                image_sizes = [frame.size for frame in video_frames]
-                modalities = ["video"] * len(video_frames)
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "video",
+                                "video": [Image.fromarray(frame) for frame in video_frames],
+                            },
+                            {
+                                "type": "text",
+                                "text": question,
+                            },
+                        ],
+                    }
+                ]
 
-                if args.conv_mode=="llava_llama_3":
-                    attention_masks = None
+                text = processor.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+
+                image_inputs, video_inputs, video_kwargs = process_vision_info(
+                    messages,
+                    image_patch_size=16,
+                    return_video_kwargs=True,
+                    return_video_metadata=True,
+                )
+                if video_inputs is not None:
+                    video_inputs, video_metadatas = zip(*video_inputs)
+                    video_inputs = list(video_inputs)
+                    video_metadatas = list(video_metadatas)
                 else:
-                    attention_masks = input_ids.ne(tokenizer.pad_token_id).long().cuda()
-                    # attention_masks = input_ids.ne(tokenizer.pad_token_id).cuda()
+                    video_metadatas = None
 
-                stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
-                keywords = [stop_str]
-                # import pdb;pdb.set_trace()
-                predictions = []
-
-                if args.generation_config is not None and os.path.exists(args.generation_config):
-                    from transformers.generation.configuration_utils import GenerationConfig
-                    with open(args.generation_config, "r") as f:
-                        generation_config = json.load(f)
-                    generation_config = GenerationConfig.from_dict(generation_config)
-                else:
-                    generation_config = None
+                inputs = processor(
+                    text=[text],
+                    images=image_inputs,
+                    videos=video_inputs,
+                    video_metadata=video_metadatas,
+                    padding=True,
+                    return_tensors="pt",
+                    do_resize=False,
+                    **video_kwargs,
+                ).to(model.device)
 
 
                 with torch.inference_mode():
                     start_time = time.time()
-                    output_ids = model.generate(inputs=input_ids, images=image_tensors,
-                                                attention_mask=attention_masks,
-                                                image_sizes=image_sizes,
-                                                modalities=modalities,
-                                                max_new_tokens=args.max_new_tokens, use_cache=True,
-                                                temperature=args.temperature,
-                                                do_sample=False,
-                                                generation_config=generation_config
-                                                ) ##
+
+                    generated_ids = model.generate(
+                        **inputs,
+                        max_new_tokens=args.max_new_tokens,
+                        do_sample=False,
+                        use_cache=True,
+                    )
+
                     end_time = time.time()
                     print(f"Time taken for inference: {end_time - start_time} seconds")
-                    outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
-                    #print(f"Question: {prompt}\n")
-                    #print(f"Response: {outputs}\n")
-                    if outputs.endswith(stop_str):
-                        outputs = outputs[: -len(stop_str)]
-                    outputs = outputs.strip()
+
+                    generated_ids_trimmed = [
+                        output_ids[len(input_ids):]
+                        for input_ids, output_ids
+                        in zip(inputs.input_ids, generated_ids)
+                    ]
+                    outputs = processor.batch_decode(
+                        generated_ids_trimmed,
+                        skip_special_tokens=True,
+                        clean_up_tokenization_spaces=False,
+                    )[0].strip()
+                    
+                    # 字典输入优先保留原 video_fn；字符串输入则从 S3 路径截取末三级。
                     if 'video_fn' not in batch:
                         try:
                             sample_set["video_fn"] = "/".join(s3_path.split("/")[-3:])
@@ -388,13 +367,17 @@ def run_inference():
                     else:
                         sample_set["video_fn"] = batch["video_fn"][i]
                     sample_set["prompt"] = outputs
+                    # 每成功处理一个视频便立即追加一行，避免进程中断丢失全部结果。
                     mox.file.append(answers_file, json.dumps(sample_set)+"\n")
                     try:
                         os.remove(local_path)
                         print(f"Deleted file: {local_path}")
-                    except:
+                    except Exception as e:
                         print(f"Error deleting file {local_path}: {e}")
-            except:
+            except Exception as e:
+                print(f"Failed to caption {local_path}: {e}")
+                # 推理失败时记录空描述，但当前写出语句被注释，因此失败样本
+                # 实际不会出现在输出 JSONL 中。
                 try:
                     sample_set["video_fn"] = "/".join(s3_path.split("/")[-3:])
                 except:
@@ -404,8 +387,8 @@ def run_inference():
                 try:
                     os.remove(local_path)
                     print(f"Deleted file: {local_path}")
-                except:
-                    print(f"Error deleting file {local_path}: {e}")
+                except Exception as cleanup_error:
+                    print(f"Error deleting file {local_path}: {cleanup_error}")
 
 
 if __name__ == "__main__":
