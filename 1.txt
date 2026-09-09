@@ -1,547 +1,286 @@
+#!/usr/bin/env python3
+"""Merge a rectified candidate with Base using two native BAGEL CE views.
+
+The first JSONL is the rectified candidate and the second is Base.  Lower CE
+is better.  The candidate is kept unless both the user-caption CE and a strict
+Correct/Incorrect CE verifier prefer Base.  The rule is global and never uses
+the GenEval task/tag.
+
+For evaluation efficiency, pairs with identical ``correct`` labels are skipped
+by default because their choice cannot change the reported score.  Pass
+``--score-all`` to score every pair for deployment-style selection.
+"""
+
+from __future__ import annotations
+
 import argparse
-import hashlib
+import inspect
 import json
 import os
-import sys
+from collections import defaultdict
 from pathlib import Path
 
-REPO_DIR = Path(__file__).resolve().parent
-ULTRALYTICS_DIR = REPO_DIR / "utils" / "ultralytics"
-if ULTRALYTICS_DIR.exists():
-    sys.path.insert(0, str(ULTRALYTICS_DIR))
-
-import cv2
 import numpy as np
+from PIL import Image
 import torch
-from decord import VideoReader as DecordVideoReader, cpu
 from tqdm import tqdm
-from ultralytics import SAM, YOLO
-from ultralytics.data.loaders import LoadNumpyVideo
-from ultralytics.models.sam import SAM3VideoPredictor
-
-try:
-    from insightface.app import FaceAnalysis
-except ImportError:
-    FaceAnalysis = None
-
-try:
-    from facexlib.detection import init_detection_model
-except ImportError:
-    init_detection_model = None
 
 
-def read_jsonl(path):
-    rows = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-
-def write_jsonl(path, rows):
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def stable_video_dir(video_path):
-    stem = Path(video_path).stem
-    digest = hashlib.md5(os.path.abspath(video_path).encode("utf-8")).hexdigest()[:10]
-    return f"{stem}_{digest}"
-
-
-def to_rel(path, root):
-    return os.path.relpath(os.path.abspath(path), os.path.abspath(root))
-
-
-def resolve_path(path):
-    if not path:
-        return path
-    if os.path.isabs(path):
-        return path
-    repo_path = REPO_DIR / path
-    if repo_path.exists():
-        return str(repo_path)
-    return os.path.abspath(path)
-
-
-def clamp_box(box, width, height):
-    x1, y1, x2, y2 = [float(v) for v in box]
-    x1 = max(0, min(width, x1))
-    x2 = max(0, min(width, x2))
-    y1 = max(0, min(height, y1))
-    y2 = max(0, min(height, y2))
-    if x2 <= x1 or y2 <= y1:
-        return None
-    return x1, y1, x2, y2
-
-
-def crop_by_mask(image_bgr, mask):
-    ys, xs = np.where(mask)
-    if len(xs) == 0:
-        return None
-    x1, x2 = xs.min(), xs.max() + 1
-    y1, y2 = ys.min(), ys.max() + 1
-    white = np.ones_like(image_bgr) * 255
-    foreground = np.where(mask[:, :, None], image_bgr, white)
-    return foreground[y1:y2, x1:x2], image_bgr[y1:y2, x1:x2], mask[y1:y2, x1:x2], x1, y1
-
-
-def vae_style_frame_indices(total_frames, original_fps, target_fps, max_frames):
-    if total_frames <= 0:
-        return []
-    if target_fps <= 0 or max_frames <= 0:
-        return list(range(total_frames))
-
-    duration = total_frames / float(original_fps)
-    end_time = min(duration, max_frames // target_fps + 1)
-    sample_count = int(end_time * target_fps)
-    if sample_count <= 0:
-        sample_count = 1
-
-    sample_count = sample_count - (sample_count - 1) % 8
-    sample_count = max(1, min(sample_count, max_frames))
-
-    indices = []
-    for idx in range(sample_count):
-        frame_idx = int(round(idx * original_fps / target_fps))
-        frame_idx = min(total_frames - 1, frame_idx)
-        indices.append(frame_idx)
-    return indices
-
-
-def get_sample_plan(total_frames, original_fps, target_fps, max_frames, vid_stride):
-    if vid_stride > 0:
-        frame_indices = list(range(0, total_frames, vid_stride))
-        sam3_vid_stride = vid_stride
-    else:
-        frame_indices = vae_style_frame_indices(total_frames, original_fps, target_fps, max_frames)
-        sam3_vid_stride = max(1, round(original_fps / target_fps)) if target_fps > 0 else 1
-    return frame_indices, sam3_vid_stride
-
-
-VAE_TARGET_SIZES = {
-    "480p": {1.0: (512, 512), 1.5: (720, 480), 0.6667: (480, 720)},
-    "720p": {1.7778: (1072, 720)},
-    "640p": {1.0: (640, 640), 1.5: (960, 640), 0.6667: (640, 960)},
-    "560p": {1.0: (576, 576), 1.5: (840, 560), 0.6667: (560, 840)},
-    "400p": {0.5625: (592, 400)},
-    "320p": {1.0: (320, 320), 1.5: (480, 320), 0.6667: (320, 480)},
-    "240p": {1.0: (256, 256), 1.5: (360, 240), 0.6667: (240, 360)},
-}
-
-
-def get_vae_resize_crop_size(frame_h, frame_w, image_size):
-    targets = VAE_TARGET_SIZES[image_size]
-    input_ratio = frame_h / float(frame_w)
-    closest_ratio = min(targets, key=lambda ratio: abs(ratio - input_ratio))
-    crop_h, crop_w = targets[closest_ratio]
-    scale = max(crop_h / frame_h, crop_w / frame_w)
-    resize_h = int(np.ceil(frame_h * scale))
-    resize_w = int(np.ceil(frame_w * scale))
-    return (resize_h, resize_w), (crop_h, crop_w)
-
-
-def spatial_mask_to_vae_tokens(mask, image_size):
-    frame_h, frame_w = mask.shape
-    (resize_h, resize_w), (crop_h, crop_w) = get_vae_resize_crop_size(
-        frame_h, frame_w, image_size
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("candidate_jsonl", type=Path)
+    parser.add_argument("base_jsonl", type=Path)
+    parser.add_argument("-o", "--output", type=Path, required=True)
+    parser.add_argument("--metrics-file", type=Path)
+    parser.add_argument(
+        "--model-path",
+        default="/data/jyb/pretrained_models/BAGEL-7B-MoT",
     )
-    resized = cv2.resize(mask.astype(np.uint8), (resize_w, resize_h), interpolation=cv2.INTER_NEAREST)
-    y1 = (resize_h - crop_h) // 2
-    x1 = (resize_w - crop_w) // 2
-    cropped = resized[y1:y1 + crop_h, x1:x1 + crop_w]
-    return cropped.reshape(crop_h // 8, 8, crop_w // 8, 8).max(axis=(1, 3)).astype(bool)
+    parser.add_argument("--caption-vit-max-side", type=int, default=168)
+    parser.add_argument("--correct-vit-max-side", type=int, default=224)
+    parser.add_argument("--caption-max-tokens", type=int, default=192)
+    parser.add_argument(
+        "--score-all",
+        action="store_true",
+        help="Score all pairs instead of skipping equal-correctness pairs.",
+    )
+    return parser.parse_args()
 
 
-def masks_to_vae_tokens(masks, frame_count, frame_h, frame_w, image_size):
-    spatial_tokens = []
-    zero = np.zeros((frame_h, frame_w), dtype=bool)
-    for frame_idx in range(frame_count):
-        spatial_tokens.append(spatial_mask_to_vae_tokens(masks.get(frame_idx, zero), image_size))
-
-    # The causal VAE keeps frame 0 as its own token, then compresses every four new frames.
-    temporal_tokens = [spatial_tokens[0]]
-    for start in range(1, frame_count, 4):
-        temporal_tokens.append(np.any(spatial_tokens[start:start + 4], axis=0))
-    return np.stack(temporal_tokens).astype(bool)
+def read_jsonl(path: Path) -> list[dict]:
+    with path.open("r", encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle if line.strip()]
 
 
-def mask_from_result(result, mask_idx, frame_shape):
-    mask_tensor = result.masks.data[mask_idx]
-    if isinstance(mask_tensor, torch.Tensor):
-        mask = mask_tensor.detach().cpu().numpy()
-    else:
-        mask = np.asarray(mask_tensor)
-    if mask.ndim == 3:
-        mask = mask[0]
-    mask = mask > 0
-
-    h, w = frame_shape[:2]
-    if mask.shape[:2] != (h, w):
-        mask = cv2.resize(mask.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST) > 0
-    return mask
+def metadata_dict(value):
+    parsed = json.loads(value) if isinstance(value, str) else value
+    if not isinstance(parsed, dict):
+        raise ValueError("metadata must be a dict or a JSON object string")
+    return parsed
 
 
-class FaceDetector:
-    def __init__(self, backend, device, insightface_root, insightface_model_name, retinaface_root):
-        self.backend = backend
-        self.device = device
-        if backend == "insightface":
-            if FaceAnalysis is None:
-                raise ImportError("insightface is not installed")
-            ctx_id = int(device.split(":")[-1]) if device.startswith("cuda") else -1
-            self.app = FaceAnalysis(
-                name=insightface_model_name,
-                root=insightface_root,
-                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+def row_key(row: dict) -> tuple[str, str]:
+    return (
+        json.dumps(metadata_dict(row["metadata"]), sort_keys=True, ensure_ascii=False),
+        os.path.basename(row["filename"]),
+    )
+
+
+def summarize(rows: list[dict]) -> dict:
+    by_tag = defaultdict(list)
+    for row in rows:
+        by_tag[str(row["tag"])].append(bool(row["correct"]))
+    per_tag = {
+        tag: sum(values) / len(values) for tag, values in sorted(by_tag.items())
+    }
+    correct = sum(bool(row["correct"]) for row in rows)
+    return {
+        "macro": sum(per_tag.values()) / len(per_tag),
+        "micro": correct / len(rows),
+        "correct": correct,
+        "total": len(rows),
+        "per_tag": per_tag,
+    }
+
+
+class DualViewCEScorer:
+    def __init__(self, args: argparse.Namespace):
+        import inference
+        from modeling.bagel.b import Bagel as CEBagel
+        from modeling.bagel.b import BagelConfig as CEBagelConfig
+
+        inference.Bagel = CEBagel
+        inference.BagelConfig = CEBagelConfig
+        (
+            self.model,
+            self.vae,
+            self.tokenizer,
+            self.token_ids,
+            _,
+            self.image_transform,
+        ) = inference.initialize_full_model(args.model_path)
+        if not hasattr(self.model, "UnderstandingCELoss"):
+            raise RuntimeError("Loaded BAGEL model has no UnderstandingCELoss")
+
+        self.vae = self.vae.to("cpu")
+        self.device = next(self.model.vit_model.parameters()).device
+        self.dtype = next(self.model.vit_model.parameters()).dtype
+        self.caption_side = args.caption_vit_max_side
+        self.correct_side = args.correct_vit_max_side
+        self.caption_tokens = args.caption_max_tokens
+        self.supports_context = (
+            "prepared_visual_context"
+            in inspect.signature(self.model.UnderstandingCELoss).parameters
+        )
+        if not self.supports_context:
+            raise RuntimeError(
+                "This script requires UnderstandingCELoss visual-context reuse"
             )
-            self.app.prepare(ctx_id=ctx_id, det_size=(640, 640))
-            self.model = None
-        else:
-            if init_detection_model is None:
-                raise ImportError("facexlib is not installed")
-            self.app = None
-            self.model = init_detection_model(
-                "retinaface_resnet50",
-                device=device,
-                model_rootpath=retinaface_root,
+        for parameter in self.model.parameters():
+            parameter.requires_grad_(False)
+
+    def image_tensor(self, path: str) -> tuple[torch.Tensor, tuple[int, int]]:
+        if not os.path.isfile(path):
+            raise FileNotFoundError(path)
+        with Image.open(path) as image:
+            image = image.convert("RGB")
+            width, height = image.size
+            array = np.asarray(image, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0).contiguous()
+        return tensor.to(device=self.device, dtype=self.dtype), (height, width)
+
+    def score(self, image_path: str, prompt: str) -> dict[str, float]:
+        image, image_shape = self.image_tensor(image_path)
+        common = {
+            "x_t_0": None,
+            "vae_model": self.vae,
+            "image_shape": image_shape,
+            "image_transform": self.image_transform,
+            "tokenizer": self.tokenizer,
+            "new_token_ids": self.token_ids,
+            "umm_dropbp_layers": (),
+            "decoded_image": image,
+        }
+        correct_instruction = (
+            "Act as a strict visual verifier. Inspect the image and decide whether it "
+            "satisfies every explicit requirement in the target prompt. Check object "
+            "identities, exact counts, colors, attribute bindings, and spatial "
+            "relations. If any required detail is missing, wrong, ambiguous, or not "
+            f"visibly supported, answer Incorrect. Target prompt: {prompt}\n"
+            "Answer exactly Correct or Incorrect."
+        )
+
+        with torch.inference_mode():
+            caption_loss, _ = self.model.UnderstandingCELoss(
+                target_text=prompt,
+                instruction=None,
+                ce_max_tokens=self.caption_tokens,
+                ce_vit_max_side=self.caption_side,
+                **common,
             )
-
-    def detect(self, image_bgr):
-        if self.backend == "insightface":
-            faces = self.app.get(image_bgr)
-            if not faces:
-                return None
-            face = max(faces, key=lambda x: x.det_score)
-            return face.bbox.astype(np.float32)
-
-        with torch.no_grad():
-            faces = self.model.detect_faces(image_bgr, conf_threshold=0.8)
-        if faces is None or len(faces) == 0:
-            return None
-        return faces[int(np.argmax(faces[:, 4]))][:4].astype(np.float32)
-
-
-class MaskProcessor:
-    def __init__(self, args):
-        self.args = args
-        self.device = args.device
-
-        print("Loading YOLO pose...")
-        self.pose_model = YOLO(args.yolo_pose_checkpoint)
-        self.pose_model.to(self.device)
-        self.pose_model.eval()
-
-        print("Loading SAM3 tracker...")
-        overrides = dict(
-            conf=args.sam_conf,
-            task="segment",
-            mode="predict",
-            imgsz=args.sam_imgsz,
-            model=args.sam3_checkpoint,
-            half=False,
-            save=False,
-            show=False,
-            verbose=False,
-            compile=None,
-        )
-        self.sam3_predictor = SAM3VideoPredictor(overrides=overrides)
-        self.sam2 = None
-        self.face_detector = None
-
-    def get_sam2(self):
-        if self.sam2 is None:
-            print("Loading SAM image segmenter...")
-            self.sam2 = SAM(self.args.sam2_checkpoint or self.args.sam3_checkpoint)
-            try:
-                self.sam2.to(self.device)
-            except Exception:
-                pass
-        return self.sam2
-
-    def get_face_detector(self):
-        if self.face_detector is None:
-            print(f"Loading face detector ({self.args.face_backend})...")
-            self.face_detector = FaceDetector(
-                self.args.face_backend,
-                self.args.device,
-                self.args.insightface_root,
-                self.args.insightface_model_name,
-                self.args.retinaface_root,
+            correct_positive, _, visual_context = self.model.UnderstandingCELoss(
+                target_text="Correct",
+                instruction=correct_instruction,
+                ce_max_tokens=1,
+                ce_vit_max_side=self.correct_side,
+                return_visual_context=True,
+                **common,
             )
-        return self.face_detector
-
-    def pose_bboxes(self, image_bgr):
-        result = self.pose_model.predict(image_bgr, save=False, verbose=False, device=self.device)[0]
-        if len(result) == 0:
-            return []
-        return result.boxes.xyxy.cpu().numpy().tolist()
-
-    def track_ids(self, video_path, bboxes, fps, frame_indices, sam3_vid_stride):
-        vr = DecordVideoReader(video_path, ctx=cpu(0))
-        if not frame_indices:
-            return {}, []
-
-        frames_rgb = vr.get_batch(frame_indices).asnumpy()
-        del vr
-        frames_bgr = [cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) for frame in frames_rgb]
-
-        dataset = LoadNumpyVideo(
-            frames_list=frames_bgr,
-            video_path=video_path,
-            fps=int(fps),
-            vid_stride=sam3_vid_stride,
-        )
-        results = self.sam3_predictor(source=dataset, bboxes=bboxes, stream=False)
-
-        tracks = {}
-        for local_idx, result in enumerate(results):
-            if result.masks is None or result.boxes is None:
-                continue
-
-            raw_bgr = result.orig_img.copy()
-            for mask_idx in range(len(result.masks.data)):
-                mask = mask_from_result(result, mask_idx, raw_bgr.shape)
-                if not mask.any():
-                    continue
-                obj_id = int(result.boxes.id[mask_idx]) if result.boxes.is_track else mask_idx
-                tracks.setdefault(obj_id, {})[local_idx] = (raw_bgr, mask)
-
-        self.sam3_predictor.inference_state = {}
-        return tracks, frame_indices
-
-    def sam2_mask(self, image_bgr, bbox):
-        with torch.no_grad():
-            results = self.get_sam2().predict(
-                source=image_bgr,
-                bboxes=np.array([bbox]),
-                imgsz=self.args.sam_imgsz,
-                verbose=False,
+            correct_negative, _ = self.model.UnderstandingCELoss(
+                target_text="Incorrect",
+                instruction=correct_instruction,
+                ce_max_tokens=1,
+                ce_vit_max_side=self.correct_side,
+                prepared_visual_context=visual_context,
+                **common,
             )
-        result = results[0] if results else None
-        if result is None or result.masks is None or len(result.masks.data) == 0:
-            return None
-        return mask_from_result(result, 0, image_bgr.shape)
-
-    def process_video(self, video_path, output_dir):
-        vr = DecordVideoReader(video_path, ctx=cpu(0))
-        total_frames = len(vr)
-        if total_frames == 0:
-            raise RuntimeError("empty video")
-
-        fps = vr.get_avg_fps() or 25.0
-        first_bgr = cv2.cvtColor(vr[0].asnumpy(), cv2.COLOR_RGB2BGR)
-        frame_h, frame_w = first_bgr.shape[:2]
-        frame_indices, sam3_vid_stride = get_sample_plan(
-            total_frames,
-            fps,
-            self.args.fps,
-            self.args.max_frames,
-            self.args.vid_stride,
-        )
-
-        bboxes = self.pose_bboxes(first_bgr)
-        rel_dir = os.path.join("masks", stable_video_dir(video_path))
-        save_dir = os.path.join(output_dir, rel_dir)
-        os.makedirs(save_dir, exist_ok=True)
-
-        cropped_numpy_path = os.path.join(save_dir, "face_mask_cropped.npy")
-        sam2_numpy_path = os.path.join(save_dir, "face_mask_sam2.npy")
-
-        if not bboxes:
-            empty_tokens = masks_to_vae_tokens(
-                {}, len(frame_indices), frame_h, frame_w, self.args.image_size
-            )
-            np.save(cropped_numpy_path, empty_tokens)
-            np.save(sam2_numpy_path, empty_tokens)
-            del vr
-            return to_rel(cropped_numpy_path, output_dir), to_rel(sam2_numpy_path, output_dir)
-
-        tracks, _ = self.track_ids(video_path, bboxes, fps, frame_indices, sam3_vid_stride)
-        cropped_masks = {}
-        sam2_masks = {}
-
-        for obj_id, frames in tracks.items():
-            for sample_idx, (raw_bgr, person_mask) in frames.items():
-                cropped = crop_by_mask(raw_bgr, person_mask)
-                if cropped is None:
-                    continue
-
-                square_white, _, square_mask, off_x, off_y = cropped
-                crop_h, crop_w = square_white.shape[:2]
-                face_bbox = self.get_face_detector().detect(square_white)
-                face_bbox = clamp_box(face_bbox, crop_w, crop_h) if face_bbox is not None else None
-                if face_bbox is None:
-                    continue
-
-                fx1, fy1, fx2, fy2 = face_bbox
-                fw, fh = fx2 - fx1, fy2 - fy1
-                cx, cy = (fx1 + fx2) / 2, (fy1 + fy2) / 2
-                side = int(max(fw, fh) * self.args.face_scale)
-                if side < self.args.min_face_size:
-                    continue
-
-                x1 = max(0, int(cx - side / 2))
-                y1 = max(0, int(cy - side / 2))
-                x2 = min(crop_w, x1 + side)
-                y2 = min(crop_h, y1 + side)
-                if x2 <= x1 or y2 <= y1:
-                    continue
-
-                crop_face_mask = np.zeros((frame_h, frame_w), dtype=bool)
-                crop_face_mask[off_y + y1:off_y + y2, off_x + x1:off_x + x2] = square_mask[y1:y2, x1:x2]
-                cropped_masks[sample_idx] = cropped_masks.get(sample_idx, np.zeros((frame_h, frame_w), dtype=bool)) | crop_face_mask
-
-                sam_mask_crop = self.sam2_mask(square_white, face_bbox)
-                if sam_mask_crop is None or not sam_mask_crop.any():
-                    continue
-
-                sam_face_mask = np.zeros((frame_h, frame_w), dtype=bool)
-                sam_face_mask[off_y:off_y + crop_h, off_x:off_x + crop_w] = sam_mask_crop[:crop_h, :crop_w]
-                sam2_masks[sample_idx] = sam2_masks.get(sample_idx, np.zeros((frame_h, frame_w), dtype=bool)) | sam_face_mask
-
-        cropped_tokens = masks_to_vae_tokens(
-            cropped_masks, len(frame_indices), frame_h, frame_w, self.args.image_size
-        )
-        sam2_tokens = masks_to_vae_tokens(
-            sam2_masks, len(frame_indices), frame_h, frame_w, self.args.image_size
-        )
-        np.save(cropped_numpy_path, cropped_tokens)
-        np.save(sam2_numpy_path, sam2_tokens)
-        del vr
-        return to_rel(cropped_numpy_path, output_dir), to_rel(sam2_numpy_path, output_dir)
+        return {
+            "caption": float(caption_loss.float().item()),
+            "correct": float(
+                (correct_positive.float() - correct_negative.float()).item()
+            ),
+        }
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_jsonl", required=True)
-    parser.add_argument("--output_dir", required=True)
-    parser.add_argument("--output_jsonl", default="")
-    parser.add_argument("--rank", type=int, default=0)
-    parser.add_argument("--total", type=int, default=1)
-    parser.add_argument("--device", default="cuda:0")
-    parser.add_argument("--sam3_checkpoint", default="./pretrained_models/sam3/sam3.pt")
-    parser.add_argument("--sam2_checkpoint", default="")
-    parser.add_argument("--yolo_pose_checkpoint", default="./pretrained_models/yolo/yolo11n-pose.pt")
-    parser.add_argument("--sam_imgsz", type=int, default=1008)
-    parser.add_argument("--sam_conf", type=float, default=0.75)
-    parser.add_argument("--fps", type=int, default=24)
-    parser.add_argument("--max_frames", type=int, default=121)
-    parser.add_argument("--image_size", choices=sorted(VAE_TARGET_SIZES), default="480p")
-    parser.add_argument("--vid_stride", type=int, default=0)
-    parser.add_argument("--face_backend", choices=["insightface", "facexlib"], default="facexlib")
-    parser.add_argument("--insightface_root", default="./pretrained_models/insightface")
-    parser.add_argument("--insightface_model_name", default="buffalo_l")
-    parser.add_argument("--retinaface_root", default="./pretrained_models/facexlib/weights")
-    parser.add_argument("--face_scale", type=float, default=1.5)
-    parser.add_argument("--min_face_size", type=int, default=16)
-    parser.add_argument("--mock", action="store_true")
-    args = parser.parse_args()
-    args.sam3_checkpoint = resolve_path(args.sam3_checkpoint)
-    args.sam2_checkpoint = resolve_path(args.sam2_checkpoint) if args.sam2_checkpoint else ""
-    args.yolo_pose_checkpoint = resolve_path(args.yolo_pose_checkpoint)
-    args.insightface_root = resolve_path(args.insightface_root)
-    args.retinaface_root = resolve_path(args.retinaface_root)
-    return args
-
-
-class MockMaskProcessor:
-    def __init__(self, args):
-        self.args = args
-
-    def process_video(self, video_path, output_dir):
-        vr = DecordVideoReader(video_path, ctx=cpu(0))
-        total_frames = len(vr)
-        if total_frames == 0:
-            raise RuntimeError("empty video")
-
-        fps = vr.get_avg_fps() or 25.0
-        first_bgr = cv2.cvtColor(vr[0].asnumpy(), cv2.COLOR_RGB2BGR)
-        frame_h, frame_w = first_bgr.shape[:2]
-        frame_indices, _ = get_sample_plan(
-            total_frames,
-            fps,
-            self.args.fps,
-            self.args.max_frames,
-            self.args.vid_stride,
-        )
-
-        rel_dir = os.path.join("masks", stable_video_dir(video_path))
-        save_dir = os.path.join(output_dir, rel_dir)
-        os.makedirs(save_dir, exist_ok=True)
-        cropped_numpy_path = os.path.join(save_dir, "face_mask_cropped.npy")
-        sam2_numpy_path = os.path.join(save_dir, "face_mask_sam2.npy")
-
-        cropped_masks = {}
-        sam2_masks = {}
-        for sample_idx in range(len(frame_indices)):
-            cropped_mask = np.zeros((frame_h, frame_w), dtype=bool)
-            sam2_mask = np.zeros((frame_h, frame_w), dtype=bool)
-            cropped_mask[frame_h // 4:frame_h // 2, frame_w // 4:frame_w // 2] = True
-            sam2_mask[frame_h // 3:frame_h * 2 // 3, frame_w // 3:frame_w * 2 // 3] = True
-            cropped_masks[sample_idx] = cropped_mask
-            sam2_masks[sample_idx] = sam2_mask
-
-        cropped_tokens = masks_to_vae_tokens(
-            cropped_masks, len(frame_indices), frame_h, frame_w, self.args.image_size
-        )
-        sam2_tokens = masks_to_vae_tokens(
-            sam2_masks, len(frame_indices), frame_h, frame_w, self.args.image_size
-        )
-        np.save(cropped_numpy_path, cropped_tokens)
-        np.save(sam2_numpy_path, sam2_tokens)
-        del vr
-        return to_rel(cropped_numpy_path, output_dir), to_rel(sam2_numpy_path, output_dir)
-
-
-def main():
+def main() -> None:
     args = parse_args()
-    if args.total < 1:
-        raise ValueError("--total must be >= 1")
-    if args.rank < 0 or args.rank >= args.total:
-        raise ValueError("--rank must satisfy 0 <= rank < total")
-    if args.vid_stride < 0:
-        raise ValueError("--vid_stride must be >= 0")
+    candidate_rows = read_jsonl(args.candidate_jsonl)
+    base_rows = read_jsonl(args.base_jsonl)
+    candidate = {row_key(row): row for row in candidate_rows}
+    base = {row_key(row): row for row in base_rows}
+    if len(candidate) != len(candidate_rows) or len(base) != len(base_rows):
+        raise RuntimeError("A JSONL contains duplicate metadata/sample keys")
+    if set(candidate) != set(base):
+        raise RuntimeError("Candidate and Base JSONLs contain different samples")
 
-    os.makedirs(args.output_dir, exist_ok=True)
-    if not args.output_jsonl:
-        base = Path(args.input_jsonl).stem
-        suffix = f"_rank{args.rank}" if args.total > 1 else ""
-        args.output_jsonl = os.path.join(args.output_dir, f"{base}_with_masks{suffix}.jsonl")
+    ordered_keys = [row_key(row) for row in base_rows]
+    score_keys = [
+        key
+        for key in ordered_keys
+        if args.score_all
+        or bool(candidate[key]["correct"]) != bool(base[key]["correct"])
+    ]
+    scorer = DualViewCEScorer(args) if score_keys else None
 
-    rows = read_jsonl(args.input_jsonl)
-    shard = rows[args.rank::args.total]
-    print(f"Rank {args.rank}/{args.total}: {len(shard)} of {len(rows)} records")
+    scores = {}
+    for key in tqdm(score_keys, desc="Scoring candidate/Base with native UMM CE"):
+        prompt = candidate[key].get("prompt") or metadata_dict(
+            candidate[key]["metadata"]
+        ).get("prompt")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError(f"Missing prompt for sample key: {key}")
+        candidate_score = scorer.score(candidate[key]["filename"], prompt)
+        base_score = scorer.score(base[key]["filename"], prompt)
+        scores[key] = {
+            "candidate": candidate_score,
+            "base": base_score,
+            "delta_caption": candidate_score["caption"] - base_score["caption"],
+            "delta_correct": candidate_score["correct"] - base_score["correct"],
+        }
 
-    processor = MockMaskProcessor(args) if args.mock else MaskProcessor(args)
-    output_rows = []
-    for item in tqdm(shard, desc="Processing videos"):
-        item = dict(item)
-        video_path = resolve_path(item.get("target_video"))
-        if not video_path or not os.path.exists(video_path):
-            print(f"[Warning] missing target_video: {video_path}")
-            item["video_mask_cropped"] = ""
-            item["video_mask_sam2"] = ""
-            output_rows.append(item)
-            write_jsonl(args.output_jsonl, output_rows)
-            continue
+    merged = []
+    base_selected = fixes = harms = 0
+    for key in ordered_keys:
+        candidate_row = candidate[key]
+        base_row = base[key]
+        if key not in scores:
+            use_base = False
+            selector = {
+                "selected": "candidate",
+                "reason": "equal_correctness_skip_ce",
+            }
+        else:
+            pair_scores = scores[key]
+            use_base = (
+                pair_scores["delta_caption"] > 0.0
+                and pair_scores["delta_correct"] > 0.0
+            )
+            selector = {
+                "selected": "base" if use_base else "candidate",
+                "reason": (
+                    "both_ce_views_prefer_base"
+                    if use_base
+                    else "keep_candidate_without_two_view_base_consensus"
+                ),
+                **pair_scores,
+            }
+        selected = dict(base_row if use_base else candidate_row)
+        selected["base_ce_selector"] = selector
+        merged.append(selected)
+        base_selected += int(use_base)
+        fixes += int(
+            (not bool(candidate_row["correct"])) and bool(selected["correct"])
+        )
+        harms += int(
+            bool(candidate_row["correct"]) and (not bool(selected["correct"]))
+        )
 
-        try:
-            cropped_rel, sam2_rel = processor.process_video(video_path, args.output_dir)
-            item["video_mask_cropped"] = cropped_rel
-            item["video_mask_sam2"] = sam2_rel
-        except Exception as exc:
-            print(f"[Warning] failed: {video_path} ({exc})")
-            item["video_mask_cropped"] = ""
-            item["video_mask_sam2"] = ""
-        output_rows.append(item)
-        write_jsonl(args.output_jsonl, output_rows)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", encoding="utf-8") as handle:
+        for row in merged:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    print(f"Done. output_jsonl={args.output_jsonl}")
+    report = {
+        "rule": (
+            "keep candidate unless both User Caption CE and strict Correct CE "
+            "prefer Base"
+        ),
+        "score_all": args.score_all,
+        "pairs_scored": len(score_keys),
+        "pairs_skipped": len(ordered_keys) - len(score_keys),
+        "base_selected": base_selected,
+        "fixes_vs_candidate": fixes,
+        "harms_vs_candidate": harms,
+        "candidate": summarize(candidate_rows),
+        "base": summarize(base_rows),
+        "merged": summarize(merged),
+    }
+    metrics_path = args.metrics_file or Path(f"{args.output}.metrics.json")
+    metrics_path.parent.mkdir(parents=True, exist_ok=True)
+    with metrics_path.open("w", encoding="utf-8") as handle:
+        json.dump(report, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
