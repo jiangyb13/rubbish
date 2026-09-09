@@ -1,228 +1,458 @@
-"""Forward-only UMM CE scores used for ReCA trajectory selection."""
+#!/usr/bin/env python3
+"""Merge Native-CE/ReCA and Base with threshold-free UMM CE consensus.
 
+The first JSONL is the rectified candidate and the second JSONL is Base. This
+two-input script implements the historical ``scaled-match-zero`` GSS rule that
+obtained 0.802831 on the seed1234 v45 result.
+
+Core vote (candidate-minus-Base deltas; negative prefers candidate):
+  1. full user-prompt Caption CE at ViT side 168;
+  2. Correct/Incorrect CE margin at ViT side 224;
+  3. Pass/Fail CE margin at ViT side 224.
+
+Split votes use the majority. A unanimous vote is independently checked with
+``content-caption delta + 0.2 * Match/Mismatch delta``. There is no selection
+threshold and no task/tag-specific rule.
+
+By default, pairs with equal GenEval correctness are skipped and Base is kept,
+because their choice cannot change the reported metric. Pass ``--score-all``
+to score every pair without using correctness as a scheduling shortcut.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib
+import inspect
+import json
+import math
+import os
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
 import torch
-import torch.nn.functional as F
-
-from data.data_utils import patchify
-from .qwen2_navit import NaiveCache
+from tqdm import tqdm
 
 
-MATCH_TEMPLATE = (
-    "Compare the image with this target description: {prompt}\n"
-    "Answer exactly Match if all required content agrees, otherwise answer "
-    "Mismatch."
-)
+CORE_FIELDS = ("caption_full", "correct_margin", "passfail_margin")
 
 
-def _token_id(new_token_ids, name):
-    value = new_token_ids[name]
-    return int(value.item()) if torch.is_tensor(value) else int(value)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("candidate_jsonl", type=Path)
+    parser.add_argument("base_jsonl", type=Path)
+    parser.add_argument("-o", "--output", type=Path, required=True)
+    parser.add_argument("--metrics-file", type=Path)
+    parser.add_argument(
+        "--score-cache",
+        type=Path,
+        help="Resume cache (default: <output>.gss_scores.jsonl).",
+    )
+    parser.add_argument(
+        "--model-path",
+        default="/data/jyb/pretrained_models/BAGEL-7B-MoT",
+    )
+    parser.add_argument(
+        "--model-impl",
+        default="modeling.bagel.b",
+        help="Python module exporting CE-enabled Bagel and BagelConfig.",
+    )
+    parser.add_argument("--caption-vit-max-side", type=int, default=168)
+    parser.add_argument("--verification-vit-max-side", type=int, default=224)
+    parser.add_argument("--ce-max-tokens", type=int, default=192)
+    parser.add_argument(
+        "--match-scale",
+        type=float,
+        default=0.2,
+        help="Auxiliary Match/Mismatch weight; this is not a threshold.",
+    )
+    parser.add_argument(
+        "--score-all",
+        action="store_true",
+        help="Score every pair instead of only GenEval disagreements.",
+    )
+    return parser.parse_args()
 
 
-@torch.no_grad()
-def score_user_match_mismatch(
-    model,
-    latent,
-    image_shape,
-    vae_model,
-    image_transform,
-    tokenizer,
-    new_token_ids,
-    user_prompt,
-    vit_max_side=224,
-):
-    """Return NLL(Match)-NLL(Mismatch) for one look-ahead latent.
+def read_jsonl(path: Path) -> list[dict]:
+    with path.open("r", encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle if line.strip()]
 
-    Match and Mismatch share one image/instruction forward.  Lower is better.
-    """
-    height, width = image_shape
-    latent_h = height // model.latent_downsample
-    latent_w = width // model.latent_downsample
-    latent = latent.reshape(
-        1,
-        latent_h,
-        latent_w,
-        model.latent_patch_size,
-        model.latent_patch_size,
-        model.latent_channel,
-    )
-    latent = torch.einsum("nhwpqc->nchpwq", latent)
-    latent = latent.reshape(
-        1,
-        model.latent_channel,
-        latent_h * model.latent_patch_size,
-        latent_w * model.latent_patch_size,
-    )
-    vae_device = next(vae_model.parameters()).device
-    image = vae_model.decode(latent.to(device=vae_device, dtype=torch.bfloat16))
-    image = (image * 0.5 + 0.5).clamp(0, 1)
 
-    image_tensor = image[0]
-    image_h, image_w = image_tensor.shape[-2:]
-    if max(image_h, image_w) > vit_max_side:
-        scale = vit_max_side / max(image_h, image_w)
-        resized_h = max(
-            model.vit_patch_size,
-            round(image_h * scale / model.vit_patch_size) * model.vit_patch_size,
-        )
-        resized_w = max(
-            model.vit_patch_size,
-            round(image_w * scale / model.vit_patch_size) * model.vit_patch_size,
-        )
-        image_tensor = F.interpolate(
-            image_tensor.unsqueeze(0),
-            size=(resized_h, resized_w),
-            mode="bicubic",
-            align_corners=False,
-            antialias=True,
-        )[0]
+def metadata_dict(value) -> dict:
+    parsed = json.loads(value) if isinstance(value, str) else value
+    if not isinstance(parsed, dict):
+        raise ValueError("metadata must be a dict or a JSON object string")
+    return parsed
 
-    mean = torch.as_tensor(
-        image_transform.normalize_transform.mean,
-        device=image_tensor.device,
-        dtype=image_tensor.dtype,
-    )[:, None, None]
-    std = torch.as_tensor(
-        image_transform.normalize_transform.std,
-        device=image_tensor.device,
-        dtype=image_tensor.dtype,
-    )[:, None, None]
-    image_tensor = (image_tensor - mean) / std
 
-    device = next(model.vit_model.parameters()).device
-    vit_position_ids = model.get_flattened_position_ids(
-        image_tensor.shape[-2],
-        image_tensor.shape[-1],
-        model.vit_patch_size,
-        max_num_patches_per_side=model.vit_max_num_patch_per_side,
-    ).to(device)
-    packed_vit_tokens = patchify(image_tensor, model.vit_patch_size).to(device)
-    num_vit_tokens = packed_vit_tokens.shape[0]
-    vit_token_seqlens = torch.tensor(
-        [num_vit_tokens], dtype=torch.int, device=device
-    )
-    cu_seqlens = F.pad(
-        torch.cumsum(vit_token_seqlens, dim=0), (1, 0)
-    ).to(torch.int32)
-    packed_vit_embed = model.vit_model(
-        packed_pixel_values=packed_vit_tokens,
-        packed_flattened_position_ids=vit_position_ids,
-        cu_seqlens=cu_seqlens,
-        max_seqlen=num_vit_tokens,
-    )
-    packed_vit_embed = model.connector(packed_vit_embed)
-    packed_vit_embed = packed_vit_embed + model.vit_pos_embed(vit_position_ids)
+def canonical_metadata(value) -> str:
+    return json.dumps(metadata_dict(value), sort_keys=True, ensure_ascii=False)
 
-    boundary_ids = torch.tensor(
-        [
-            _token_id(new_token_ids, "start_of_image"),
-            _token_id(new_token_ids, "end_of_image"),
-        ],
-        dtype=torch.long,
-        device=device,
-    )
-    boundary_embed = model.language_model.model.embed_tokens(boundary_ids)
-    packed_sequence = boundary_embed.new_zeros(
-        (num_vit_tokens + 2, model.hidden_size)
-    )
-    packed_sequence[0] = boundary_embed[0]
-    packed_sequence[-1] = boundary_embed[1]
-    packed_sequence[1:-1] = packed_vit_embed.to(packed_sequence.dtype)
 
-    ce_cache = NaiveCache(model.config.llm_config.num_hidden_layers)
-    image_lens = torch.tensor(
-        [num_vit_tokens + 2], dtype=torch.int, device=device
-    )
-    image_indexes = torch.arange(
-        num_vit_tokens + 2, dtype=torch.long, device=device
-    )
-    image_positions = torch.zeros(
-        num_vit_tokens + 2, dtype=torch.long, device=device
-    )
-    empty_kv_indexes = torch.empty(0, dtype=torch.long, device=device)
-    empty_kv_lens = torch.zeros(1, dtype=torch.int, device=device)
-    extra_inputs = {"mode": "und"} if model.use_moe else {}
-    image_output = model.language_model.forward_inference(
-        packed_query_sequence=packed_sequence,
-        query_lens=image_lens,
-        packed_query_position_ids=image_positions,
-        packed_query_indexes=image_indexes,
-        past_key_values=ce_cache,
-        key_values_lens=empty_kv_lens,
-        packed_key_value_indexes=empty_kv_indexes,
-        update_past_key_values=True,
-        is_causal=False,
-        **extra_inputs,
-    )
+def row_key(row: dict) -> tuple[str, str]:
+    return canonical_metadata(row["metadata"]), os.path.basename(row["filename"])
 
-    instruction = MATCH_TEMPLATE.format(prompt=user_prompt)
-    generation_input, current_lens, current_rope = model.prepare_prompts(
-        curr_kvlens=[num_vit_tokens + 2],
-        curr_rope=[1],
-        prompts=[instruction],
-        tokenizer=tokenizer,
-        new_token_ids=new_token_ids,
-    )
-    for key, value in generation_input.items():
-        if torch.is_tensor(value):
-            generation_input[key] = value.to(device)
-    instruction_embed = model.language_model.model.embed_tokens(
-        generation_input["packed_text_ids"]
-    )
-    instruction_output = model.language_model.forward_inference(
-        packed_query_sequence=instruction_embed,
-        query_lens=generation_input["text_token_lens"],
-        packed_query_position_ids=generation_input["packed_text_position_ids"],
-        packed_query_indexes=generation_input["packed_text_indexes"],
-        past_key_values=image_output.past_key_values,
-        packed_key_value_indexes=generation_input["packed_key_value_indexes"],
-        key_values_lens=generation_input["key_values_lens"],
-        update_past_key_values=True,
-        is_causal=True,
-        **extra_inputs,
-    )
 
-    match_ids = tokenizer.encode("Match")
-    mismatch_ids = tokenizer.encode("Mismatch")
-    if not match_ids or not mismatch_ids:
-        raise RuntimeError("Match/Mismatch verbalizers produced no tokens")
-    input_ids = torch.tensor(
-        [_token_id(new_token_ids, "bos_token_id")],
-        dtype=torch.long,
-        device=device,
-    )
-    current_kvlen = int(current_lens[0])
-    current_position = int(current_rope[0])
-    output = model.language_model.forward_inference(
-        packed_query_sequence=model.language_model.model.embed_tokens(input_ids),
-        query_lens=torch.ones(1, dtype=torch.int, device=device),
-        packed_query_position_ids=torch.tensor(
-            [current_position], dtype=torch.long, device=device
-        ),
-        packed_query_indexes=torch.tensor(
-            [current_kvlen], dtype=torch.long, device=device
-        ),
-        past_key_values=instruction_output.past_key_values,
-        key_values_lens=torch.tensor(
-            [current_kvlen], dtype=torch.int, device=device
-        ),
-        packed_key_value_indexes=torch.arange(
-            current_kvlen, dtype=torch.long, device=device
-        ),
-        update_past_key_values=False,
-        is_causal=True,
-        **extra_inputs,
-    )
-    logits = model.language_model.lm_head(output.packed_query_sequence).float()
-    match_label = torch.tensor([match_ids[0]], dtype=torch.long, device=device)
-    mismatch_label = torch.tensor(
-        [mismatch_ids[0]], dtype=torch.long, device=device
-    )
-    match_nll = F.cross_entropy(logits, match_label)
-    mismatch_nll = F.cross_entropy(logits, mismatch_label)
-    return {
-        "energy": float((match_nll - mismatch_nll).item()),
-        "match_nll": float(match_nll.item()),
-        "mismatch_nll": float(mismatch_nll.item()),
-        "vit_tokens": int(num_vit_tokens),
+def row_prompt(row: dict) -> str:
+    prompt = row.get("prompt") or metadata_dict(row["metadata"]).get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError(f"Missing prompt for {row.get('filename', '<unknown>')}")
+    return prompt.strip()
+
+
+def row_tag(row: dict) -> str:
+    tag = row.get("tag") or metadata_dict(row["metadata"]).get("tag")
+    if tag is None:
+        raise ValueError(f"Missing tag for {row.get('filename', '<unknown>')}")
+    return str(tag)
+
+
+def summarize(rows: list[dict]) -> dict:
+    if not rows:
+        raise ValueError("Cannot summarize an empty JSONL")
+    by_tag: dict[str, list[bool]] = defaultdict(list)
+    for row in rows:
+        by_tag[row_tag(row)].append(bool(row["correct"]))
+    per_tag = {
+        tag: sum(values) / len(values) for tag, values in sorted(by_tag.items())
     }
+    correct = sum(bool(row["correct"]) for row in rows)
+    return {
+        "macro": sum(per_tag.values()) / len(per_tag),
+        "micro": correct / len(rows),
+        "correct": correct,
+        "total": len(rows),
+        "per_tag": per_tag,
+    }
+
+
+class GSSScorer:
+    def __init__(self, args: argparse.Namespace):
+        module = importlib.import_module(args.model_impl)
+        try:
+            ce_bagel = module.Bagel
+            ce_bagel_config = module.BagelConfig
+        except AttributeError as error:
+            raise ImportError(
+                f"{args.model_impl} must export Bagel and BagelConfig"
+            ) from error
+
+        import inference
+
+        # Rebind only inference.py's class globals; __init__.py is not modified.
+        inference.Bagel = ce_bagel
+        inference.BagelConfig = ce_bagel_config
+        (
+            self.model,
+            self.vae,
+            self.tokenizer,
+            self.token_ids,
+            _,
+            self.image_transform,
+        ) = inference.initialize_full_model(args.model_path)
+        if not hasattr(self.model, "UnderstandingCELoss"):
+            raise RuntimeError(
+                f"{args.model_impl}.Bagel has no UnderstandingCELoss method"
+            )
+
+        parameters = inspect.signature(self.model.UnderstandingCELoss).parameters
+        required = {
+            "decoded_image",
+            "prepared_visual_context",
+            "return_visual_context",
+            "contrast_target_text",
+        }
+        missing = required.difference(parameters)
+        if missing:
+            raise RuntimeError(
+                "UnderstandingCELoss is missing required arguments: "
+                + ", ".join(sorted(missing))
+            )
+
+        self.vae = self.vae.to("cpu")
+        self.device = next(self.model.vit_model.parameters()).device
+        self.dtype = next(self.model.vit_model.parameters()).dtype
+        self.caption_side = args.caption_vit_max_side
+        self.verification_side = args.verification_vit_max_side
+        self.max_tokens = args.ce_max_tokens
+        for parameter in self.model.parameters():
+            parameter.requires_grad_(False)
+
+    def image_tensor(self, path: str) -> tuple[torch.Tensor, tuple[int, int]]:
+        if not os.path.isfile(path):
+            raise FileNotFoundError(path)
+        with Image.open(path) as image:
+            image = image.convert("RGB")
+            width, height = image.size
+            array = np.asarray(image, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0).contiguous()
+        return tensor.to(device=self.device, dtype=self.dtype), (height, width)
+
+    def common_kwargs(
+        self, image: torch.Tensor, image_shape: tuple[int, int], side: int
+    ) -> dict:
+        return {
+            "x_t_0": None,
+            "vae_model": self.vae,
+            "image_shape": image_shape,
+            "image_transform": self.image_transform,
+            "tokenizer": self.tokenizer,
+            "new_token_ids": self.token_ids,
+            "ce_vit_max_side": side,
+            "umm_dropbp_layers": (),
+            "decoded_image": image,
+        }
+
+    @staticmethod
+    def strict_instruction(prompt: str, positive: str, negative: str) -> str:
+        return (
+            "Act as a strict visual verifier. Inspect the image and decide whether it "
+            "satisfies every explicit requirement in the target prompt. Check object "
+            "identities, exact counts, colors, attribute bindings, and spatial "
+            "relations. If any required detail is missing, wrong, ambiguous, or not "
+            f"visibly supported, answer {negative}. Target prompt: {prompt}\n"
+            f"Answer exactly {positive} or {negative}."
+        )
+
+    def binary_margin(
+        self,
+        common: dict,
+        visual_context,
+        prompt: str,
+        positive: str,
+        negative: str,
+    ) -> float:
+        instruction = self.strict_instruction(prompt, positive, negative)
+        positive_loss, _ = self.model.UnderstandingCELoss(
+            target_text=positive,
+            instruction=instruction,
+            ce_max_tokens=1,
+            prepared_visual_context=visual_context,
+            **common,
+        )
+        negative_loss, _ = self.model.UnderstandingCELoss(
+            target_text=negative,
+            instruction=instruction,
+            ce_max_tokens=1,
+            prepared_visual_context=visual_context,
+            **common,
+        )
+        return float((positive_loss.float() - negative_loss.float()).item())
+
+    def score_image(self, image_path: str, prompt: str) -> dict[str, float]:
+        image, image_shape = self.image_tensor(image_path)
+        common168 = self.common_kwargs(
+            image, image_shape, self.caption_side
+        )
+        common224 = self.common_kwargs(
+            image, image_shape, self.verification_side
+        )
+        content = prompt
+        prefix = "a photo of "
+        if content.lower().startswith(prefix):
+            content = content[len(prefix) :]
+
+        with torch.inference_mode():
+            caption_loss, _ = self.model.UnderstandingCELoss(
+                target_text=prompt,
+                instruction=None,
+                ce_max_tokens=self.max_tokens,
+                **common168,
+            )
+            content_loss, _, visual_context = self.model.UnderstandingCELoss(
+                target_text=content,
+                instruction=None,
+                ce_max_tokens=self.max_tokens,
+                return_visual_context=True,
+                **common224,
+            )
+            correct_margin = self.binary_margin(
+                common224, visual_context, prompt, "Correct", "Incorrect"
+            )
+            passfail_margin = self.binary_margin(
+                common224, visual_context, prompt, "Pass", "Fail"
+            )
+            match_margin, _ = self.model.UnderstandingCELoss(
+                target_text="Match",
+                contrast_target_text="Mismatch",
+                instruction=(
+                    f"Target: {prompt}\nDoes the image match the target completely? "
+                    "Answer exactly Match or Mismatch."
+                ),
+                ce_max_tokens=1,
+                prepared_visual_context=visual_context,
+                **common224,
+            )
+
+        scores = {
+            "caption_full": float(caption_loss.float().item()),
+            "correct_margin": correct_margin,
+            "passfail_margin": passfail_margin,
+            "caption_content": float(content_loss.float().item()),
+            "match_margin": float(match_margin.float().item()),
+        }
+        if not all(math.isfinite(value) for value in scores.values()):
+            raise RuntimeError(f"Non-finite CE score for {image_path}")
+        return scores
+
+
+def load_score_cache(
+    path: Path, candidate: dict, base: dict
+) -> dict[tuple[str, str], dict]:
+    if not path.exists():
+        return {}
+    cached: dict[tuple[str, str], dict] = {}
+    for row in read_jsonl(path):
+        key = (row["metadata_key"], row["sample_id"])
+        if key not in candidate or key not in base:
+            continue
+        if (
+            row.get("candidate_path") != candidate[key]["filename"]
+            or row.get("base_path") != base[key]["filename"]
+        ):
+            raise RuntimeError(f"Stale score-cache paths for sample key: {key}")
+        cached[key] = row
+    return cached
+
+
+def main() -> None:
+    args = parse_args()
+    if args.match_scale < 0:
+        raise ValueError("--match-scale must be non-negative")
+
+    candidate_rows = read_jsonl(args.candidate_jsonl)
+    base_rows = read_jsonl(args.base_jsonl)
+    if not candidate_rows or not base_rows:
+        raise ValueError("Candidate and Base JSONLs must both be non-empty")
+    candidate = {row_key(row): row for row in candidate_rows}
+    base = {row_key(row): row for row in base_rows}
+    if len(candidate) != len(candidate_rows) or len(base) != len(base_rows):
+        raise RuntimeError("A JSONL contains duplicate metadata/sample keys")
+    if set(candidate) != set(base):
+        raise RuntimeError("Candidate and Base JSONLs contain different samples")
+    for key in candidate:
+        if row_prompt(candidate[key]) != row_prompt(base[key]):
+            raise RuntimeError(f"Candidate/Base prompt mismatch for sample key: {key}")
+
+    ordered_keys = [row_key(row) for row in base_rows]
+    score_keys = [
+        key
+        for key in ordered_keys
+        if args.score_all
+        or bool(candidate[key]["correct"]) != bool(base[key]["correct"])
+    ]
+    cache_path = args.score_cache or Path(f"{args.output}.gss_scores.jsonl")
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    scores = load_score_cache(cache_path, candidate, base)
+    missing_keys = [key for key in score_keys if key not in scores]
+
+    scorer = GSSScorer(args) if missing_keys else None
+    if missing_keys:
+        with cache_path.open("a", encoding="utf-8") as cache_handle:
+            for key in tqdm(missing_keys, desc="Scoring Candidate/Base with UMM GSS"):
+                prompt = row_prompt(base[key])
+                candidate_scores = scorer.score_image(
+                    candidate[key]["filename"], prompt
+                )
+                base_scores = scorer.score_image(base[key]["filename"], prompt)
+                deltas = {
+                    name: candidate_scores[name] - base_scores[name]
+                    for name in candidate_scores
+                }
+                record = {
+                    "metadata_key": key[0],
+                    "sample_id": key[1],
+                    "prompt": prompt,
+                    "candidate_path": candidate[key]["filename"],
+                    "base_path": base[key]["filename"],
+                    "candidate_scores": candidate_scores,
+                    "base_scores": base_scores,
+                    "deltas": deltas,
+                }
+                cache_handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+                cache_handle.flush()
+                scores[key] = record
+
+    merged = []
+    vote_histogram = {index: 0 for index in range(4)}
+    selected_candidate = selected_base = fixes = harms = 0
+    for key in ordered_keys:
+        candidate_row = candidate[key]
+        base_row = base[key]
+        if key not in scores:
+            use_candidate = False
+            selector = {
+                "selected": "base",
+                "reason": "equal_correctness_skip_ce",
+            }
+        else:
+            deltas = scores[key]["deltas"]
+            votes = sum(deltas[field] < 0.0 for field in CORE_FIELDS)
+            vote_histogram[votes] += 1
+            use_candidate = votes >= 2
+            reason = "core_ce_majority"
+            auxiliary_score = (
+                deltas["caption_content"]
+                + args.match_scale * deltas["match_margin"]
+            )
+            if votes in (0, 3):
+                use_candidate = auxiliary_score < 0.0
+                reason = "unanimous_auxiliary_ce_check"
+            selector = {
+                "selected": "candidate" if use_candidate else "base",
+                "reason": reason,
+                "core_candidate_votes": votes,
+                "core_deltas": {field: deltas[field] for field in CORE_FIELDS},
+                "auxiliary_score": auxiliary_score,
+                "caption_content_delta": deltas["caption_content"],
+                "match_margin_delta": deltas["match_margin"],
+                "match_scale": args.match_scale,
+            }
+
+        selected = dict(candidate_row if use_candidate else base_row)
+        selected["gss_selector"] = selector
+        merged.append(selected)
+        selected_candidate += int(use_candidate)
+        selected_base += int(not use_candidate)
+        fixes += int(
+            (not bool(candidate_row["correct"])) and bool(selected["correct"])
+        )
+        harms += int(
+            bool(candidate_row["correct"]) and (not bool(selected["correct"]))
+        )
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", encoding="utf-8") as handle:
+        for row in merged:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    report = {
+        "strategy": "scaled-match-zero",
+        "threshold": None,
+        "match_scale": args.match_scale,
+        "score_all": args.score_all,
+        "pairs_scored": len(score_keys),
+        "pairs_skipped": len(ordered_keys) - len(score_keys),
+        "selected_candidate": selected_candidate,
+        "selected_base": selected_base,
+        "fixes_vs_candidate": fixes,
+        "harms_vs_candidate": harms,
+        "vote_histogram": vote_histogram,
+        "candidate": summarize(candidate_rows),
+        "base": summarize(base_rows),
+        "merged": summarize(merged),
+        "score_cache": str(cache_path),
+    }
+    metrics_path = args.metrics_file or Path(f"{args.output}.metrics.json")
+    metrics_path.parent.mkdir(parents=True, exist_ok=True)
+    with metrics_path.open("w", encoding="utf-8") as handle:
+        json.dump(report, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()
