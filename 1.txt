@@ -1,458 +1,298 @@
-#!/usr/bin/env python3
-"""Merge Native-CE/ReCA and Base with threshold-free UMM CE consensus.
+"""视频 -> VAE 帧预处理 -> DistributedVAE embedding -> outdir + JSONL。
 
-The first JSONL is the rectified candidate and the second JSONL is Base. This
-two-input script implements the historical ``scaled-match-zero`` GSS rule that
-obtained 0.802831 on the seed1234 v45 result.
-
-Core vote (candidate-minus-Base deltas; negative prefers candidate):
-  1. full user-prompt Caption CE at ViT side 168;
-  2. Correct/Incorrect CE margin at ViT side 224;
-  3. Pass/Fail CE margin at ViT side 224.
-
-Split votes use the majority. A unanimous vote is independently checked with
-``content-caption delta + 0.2 * Match/Mismatch delta``. There is no selection
-threshold and no task/tag-specific rule.
-
-By default, pairs with equal GenEval correctness are skipped and Base is kept,
-because their choice cannot change the reported metric. Pass ``--score-all``
-to score every pair without using correctness as a scheduling shortcut.
+目前按 vae.py 的接口使用 DistributedVAE，未来可替换 build_encoder。
+所有分布式 rank 协作编码同一个视频，仅 rank 0 写文件。
+输出 .pt 是 encode(x)[0] 的结果（不额外采样 latent），排列为 [T,C,H,W]。
 """
-
-from __future__ import annotations
-
 import argparse
-import importlib
-import inspect
+import datetime
 import json
-import math
 import os
-from collections import defaultdict
-from pathlib import Path
-
-import numpy as np
-from PIL import Image
-import torch
-from tqdm import tqdm
-
-
-CORE_FIELDS = ("caption_full", "correct_margin", "passfail_margin")
+from pathlib import Path, PurePosixPath
+import pickle
+import subprocess
+import sys
+import tempfile
+from contextlib import contextmanager
 
 
-def parse_args() -> argparse.Namespace:
+VAE_TARGET_SIZES = {
+    "480p": {1.0: [512, 512], 1.5: [720, 480], 0.6667: [480, 720]},
+    "720p": {1.7778: [1072, 720]},
+    "400p": {0.5625: [592, 400]},
+    "640p": {1.0: [640, 640], 1.5: [960, 640], 0.6667: [640, 960]},
+    "560p": {1.0: [576, 576], 1.5: [840, 560], 0.6667: [560, 840]},
+    "320p": {1.0: [320, 320], 1.5: [480, 320], 0.6667: [320, 480]},
+    "240p": {1.0: [256, 256], 1.5: [360, 240], 0.6667: [240, 360]},
+}
+
+
+def load_video(video_path, max_frames_num=121, fps=24, image_size="480p", ffmpeg_dir=""):
+    """对齐 vae.py 的 ffmpeg-subprocess 分支，返回 RGB uint8 [T,H,W,C]。
+
+    时间范围、FPS、缩放裁剪和帧数截断与 VAE 一致；调用方归一化到 [-1,1]。
+    """
+    import numpy as np
+
+    if fps <= 0 or max_frames_num <= 0:
+        raise ValueError("fps and max_frames_num must be positive")
+    ffprobe = os.path.join(ffmpeg_dir, "ffprobe")
+    ffmpeg = os.path.join(ffmpeg_dir, "ffmpeg")
+
+    def probe(attribute):
+        return subprocess.check_output([
+            ffprobe, "-v", "error", "-select_streams", "v:0",
+            "-show_entries", f"stream={attribute}",
+            "-of", "default=noprint_wrappers=1:nokey=1", video_path,
+            "-loglevel", "quiet",
+        ], stderr=subprocess.STDOUT).decode("utf-8").strip()
+
+    duration = float(probe("duration"))
+    width, height = int(probe("width")), int(probe("height"))
+    target_sizes = VAE_TARGET_SIZES[image_size]
+    closest_ratio = min(target_sizes, key=lambda ratio: abs(ratio - height / width))
+    crop_h, crop_w = target_sizes[closest_ratio]
+    ratio = max(crop_h / height, crop_w / width)
+    resize_h, resize_w = int(np.ceil(height * ratio)), int(np.ceil(width * ratio))
+    end = min(duration, max_frames_num // fps + 1)
+    result = subprocess.run([
+        ffmpeg, "-ss", "0", "-to", str(end), "-i", video_path,
+        "-vf", f"fps={fps},scale={resize_w}:{resize_h}:flags=bilinear,crop=w={crop_w}:h={crop_h}",
+        "-vsync", "0", "-vcodec", "rawvideo", "-pix_fmt", "rgb24",
+        "-f", "image2pipe", "-",
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode:
+        raise ValueError(f"FFmpeg failed for {video_path}: {result.stderr.decode(errors='replace')}")
+    bytes_per_frame = crop_h * crop_w * 3
+    if len(result.stdout) % bytes_per_frame:
+        raise ValueError(f"Incomplete RGB frame from {video_path}")
+    frame_count = len(result.stdout) // bytes_per_frame
+    frame_count = min(frame_count - (frame_count - 1) % 8, max_frames_num)
+    if frame_count < 73:
+        raise ValueError(f"VAE requires at least 73 frames, got {frame_count}: {video_path}")
+    return np.frombuffer(result.stdout, dtype=np.uint8).reshape(-1, crop_h, crop_w, 3)[:frame_count]
+
+
+def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("candidate_jsonl", type=Path)
-    parser.add_argument("base_jsonl", type=Path)
-    parser.add_argument("-o", "--output", type=Path, required=True)
-    parser.add_argument("--metrics-file", type=Path)
-    parser.add_argument(
-        "--score-cache",
-        type=Path,
-        help="Resume cache (default: <output>.gss_scores.jsonl).",
-    )
-    parser.add_argument(
-        "--model-path",
-        default="/data/jyb/pretrained_models/BAGEL-7B-MoT",
-    )
-    parser.add_argument(
-        "--model-impl",
-        default="modeling.bagel.b",
-        help="Python module exporting CE-enabled Bagel and BagelConfig.",
-    )
-    parser.add_argument("--caption-vit-max-side", type=int, default=168)
-    parser.add_argument("--verification-vit-max-side", type=int, default=224)
-    parser.add_argument("--ce-max-tokens", type=int, default=192)
-    parser.add_argument(
-        "--match-scale",
-        type=float,
-        default=0.2,
-        help="Auxiliary Match/Mismatch weight; this is not a threshold.",
-    )
-    parser.add_argument(
-        "--score-all",
-        action="store_true",
-        help="Score every pair instead of only GenEval disagreements.",
-    )
-    return parser.parse_args()
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--jsonl_path", "--json_path", dest="json_path")
+    source.add_argument("--pkl_path")
+    parser.add_argument("--root_path", "--s3_data_root", default="")
+    parser.add_argument("--outdir", "--output_dir", "--save_path", dest="save_path", required=True)
+    parser.add_argument("--output_name", default="embeddings.jsonl")
+    parser.add_argument("--start_index", type=int, default=0)
+    parser.add_argument("--end_index", type=int, default=-1)
+    parser.add_argument("--fps", type=int, default=24)
+    parser.add_argument("--max_frames_limit", "--for_get_frames_num", type=int, default=121)
+    parser.add_argument("--image_size", choices=tuple(VAE_TARGET_SIZES), default="480p")
+    parser.add_argument("--ffmpeg_dir", default="", help="空值使用 PATH；与 VAE 保持同一 FFmpeg 版本")
+    parser.add_argument("--config_path", required=True)
+    parser.add_argument("--ckpt_path", required=True)
+    parser.add_argument("--project_root", default="", help="包含 mimogpt 的项目根目录")
+    parser.add_argument("--backend", choices=("nccl", "hccl", "gloo"), default=None)
+    parser.add_argument("--model_name", default="vae-1.2")
+    parser.add_argument("--using_tiling", default="0")
+    parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--width", type=int, default=480)
+    parser.add_argument("--max_frame", type=int, default=121)
+    parser.add_argument("--task", default="")
+    parser.add_argument("--dataset_name", default="one_video")
+    parser.add_argument("--global-seed", type=int, default=0)
+    parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument("--max_time", type=int, default=16)
+    parser.add_argument("--video_spec", default="")
+    parser.add_argument("--pre_type", default="tensor")
+    args = parser.parse_args()
+    if args.fps <= 0 or args.max_frames_limit < 73:
+        parser.error("fps 必须大于 0，max_frames_limit 必须至少为 73")
+    if args.start_index < 0 or args.end_index < -1:
+        parser.error("无效的数据切片范围")
+    if args.num_workers != 0:
+        parser.error("分布式协同编码当前要求 --num_workers 0")
+    if "://" in args.save_path:
+        parser.error("outdir 必须是本地目录")
+    if Path(args.output_name).name != args.output_name:
+        parser.error("output_name 必须是文件名")
+    # 与 vae.py 的 encoder 参数结构保持兼容。所有 rank 使用同一数据集。
+    args.gpus, args.global_rank = 1, 0
+    args.is_t2v = 1
+    args.is_i2v = args.is_i2v_mid = args.is_i2v_end = args.is_v2v = 0
+    args.bucket_path = ""
+    return args
 
 
-def read_jsonl(path: Path) -> list[dict]:
-    with path.open("r", encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+@contextmanager
+def local_file(path):
+    if path.startswith(("s3://", "obs://")):
+        import moxing as mox
+        with tempfile.TemporaryDirectory(prefix="vae_input_") as cache:
+            local = os.path.join(cache, path.rsplit("/", 1)[-1])
+            mox.file.copy(path, local)
+            yield local
+    else:
+        yield path
 
 
-def metadata_dict(value) -> dict:
-    parsed = json.loads(value) if isinstance(value, str) else value
-    if not isinstance(parsed, dict):
-        raise ValueError("metadata must be a dict or a JSON object string")
-    return parsed
+def feature_relative_path(video_fn):
+    """保留视频目录和扩展名，避免 a.mp4 与 a.avi 的特征重名。"""
+    path = PurePosixPath(video_fn)
+    if not video_fn or path.is_absolute() or ".." in path.parts or ":" in video_fn or "\\" in video_fn or not path.name:
+        raise ValueError(f"video_fn 必须为安全的相对路径: {video_fn!r}")
+    return str(PurePosixPath("video_latent") / (str(path) + ".pt"))
 
 
-def canonical_metadata(value) -> str:
-    return json.dumps(metadata_dict(value), sort_keys=True, ensure_ascii=False)
-
-
-def row_key(row: dict) -> tuple[str, str]:
-    return canonical_metadata(row["metadata"]), os.path.basename(row["filename"])
-
-
-def row_prompt(row: dict) -> str:
-    prompt = row.get("prompt") or metadata_dict(row["metadata"]).get("prompt")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError(f"Missing prompt for {row.get('filename', '<unknown>')}")
-    return prompt.strip()
-
-
-def row_tag(row: dict) -> str:
-    tag = row.get("tag") or metadata_dict(row["metadata"]).get("tag")
-    if tag is None:
-        raise ValueError(f"Missing tag for {row.get('filename', '<unknown>')}")
-    return str(tag)
-
-
-def summarize(rows: list[dict]) -> dict:
-    if not rows:
-        raise ValueError("Cannot summarize an empty JSONL")
-    by_tag: dict[str, list[bool]] = defaultdict(list)
-    for row in rows:
-        by_tag[row_tag(row)].append(bool(row["correct"]))
-    per_tag = {
-        tag: sum(values) / len(values) for tag, values in sorted(by_tag.items())
-    }
-    correct = sum(bool(row["correct"]) for row in rows)
-    return {
-        "macro": sum(per_tag.values()) / len(per_tag),
-        "micro": correct / len(rows),
-        "correct": correct,
-        "total": len(rows),
-        "per_tag": per_tag,
-    }
-
-
-class GSSScorer:
-    def __init__(self, args: argparse.Namespace):
-        module = importlib.import_module(args.model_impl)
-        try:
-            ce_bagel = module.Bagel
-            ce_bagel_config = module.BagelConfig
-        except AttributeError as error:
-            raise ImportError(
-                f"{args.model_impl} must export Bagel and BagelConfig"
-            ) from error
-
-        import inference
-
-        # Rebind only inference.py's class globals; __init__.py is not modified.
-        inference.Bagel = ce_bagel
-        inference.BagelConfig = ce_bagel_config
-        (
-            self.model,
-            self.vae,
-            self.tokenizer,
-            self.token_ids,
-            _,
-            self.image_transform,
-        ) = inference.initialize_full_model(args.model_path)
-        if not hasattr(self.model, "UnderstandingCELoss"):
-            raise RuntimeError(
-                f"{args.model_impl}.Bagel has no UnderstandingCELoss method"
-            )
-
-        parameters = inspect.signature(self.model.UnderstandingCELoss).parameters
-        required = {
-            "decoded_image",
-            "prepared_visual_context",
-            "return_visual_context",
-            "contrast_target_text",
-        }
-        missing = required.difference(parameters)
-        if missing:
-            raise RuntimeError(
-                "UnderstandingCELoss is missing required arguments: "
-                + ", ".join(sorted(missing))
-            )
-
-        self.vae = self.vae.to("cpu")
-        self.device = next(self.model.vit_model.parameters()).device
-        self.dtype = next(self.model.vit_model.parameters()).dtype
-        self.caption_side = args.caption_vit_max_side
-        self.verification_side = args.verification_vit_max_side
-        self.max_tokens = args.ce_max_tokens
-        for parameter in self.model.parameters():
-            parameter.requires_grad_(False)
-
-    def image_tensor(self, path: str) -> tuple[torch.Tensor, tuple[int, int]]:
-        if not os.path.isfile(path):
-            raise FileNotFoundError(path)
-        with Image.open(path) as image:
-            image = image.convert("RGB")
-            width, height = image.size
-            array = np.asarray(image, dtype=np.float32) / 255.0
-        tensor = torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0).contiguous()
-        return tensor.to(device=self.device, dtype=self.dtype), (height, width)
-
-    def common_kwargs(
-        self, image: torch.Tensor, image_shape: tuple[int, int], side: int
-    ) -> dict:
-        return {
-            "x_t_0": None,
-            "vae_model": self.vae,
-            "image_shape": image_shape,
-            "image_transform": self.image_transform,
-            "tokenizer": self.tokenizer,
-            "new_token_ids": self.token_ids,
-            "ce_vit_max_side": side,
-            "umm_dropbp_layers": (),
-            "decoded_image": image,
-        }
-
-    @staticmethod
-    def strict_instruction(prompt: str, positive: str, negative: str) -> str:
-        return (
-            "Act as a strict visual verifier. Inspect the image and decide whether it "
-            "satisfies every explicit requirement in the target prompt. Check object "
-            "identities, exact counts, colors, attribute bindings, and spatial "
-            "relations. If any required detail is missing, wrong, ambiguous, or not "
-            f"visibly supported, answer {negative}. Target prompt: {prompt}\n"
-            f"Answer exactly {positive} or {negative}."
-        )
-
-    def binary_margin(
-        self,
-        common: dict,
-        visual_context,
-        prompt: str,
-        positive: str,
-        negative: str,
-    ) -> float:
-        instruction = self.strict_instruction(prompt, positive, negative)
-        positive_loss, _ = self.model.UnderstandingCELoss(
-            target_text=positive,
-            instruction=instruction,
-            ce_max_tokens=1,
-            prepared_visual_context=visual_context,
-            **common,
-        )
-        negative_loss, _ = self.model.UnderstandingCELoss(
-            target_text=negative,
-            instruction=instruction,
-            ce_max_tokens=1,
-            prepared_visual_context=visual_context,
-            **common,
-        )
-        return float((positive_loss.float() - negative_loss.float()).item())
-
-    def score_image(self, image_path: str, prompt: str) -> dict[str, float]:
-        image, image_shape = self.image_tensor(image_path)
-        common168 = self.common_kwargs(
-            image, image_shape, self.caption_side
-        )
-        common224 = self.common_kwargs(
-            image, image_shape, self.verification_side
-        )
-        content = prompt
-        prefix = "a photo of "
-        if content.lower().startswith(prefix):
-            content = content[len(prefix) :]
-
-        with torch.inference_mode():
-            caption_loss, _ = self.model.UnderstandingCELoss(
-                target_text=prompt,
-                instruction=None,
-                ce_max_tokens=self.max_tokens,
-                **common168,
-            )
-            content_loss, _, visual_context = self.model.UnderstandingCELoss(
-                target_text=content,
-                instruction=None,
-                ce_max_tokens=self.max_tokens,
-                return_visual_context=True,
-                **common224,
-            )
-            correct_margin = self.binary_margin(
-                common224, visual_context, prompt, "Correct", "Incorrect"
-            )
-            passfail_margin = self.binary_margin(
-                common224, visual_context, prompt, "Pass", "Fail"
-            )
-            match_margin, _ = self.model.UnderstandingCELoss(
-                target_text="Match",
-                contrast_target_text="Mismatch",
-                instruction=(
-                    f"Target: {prompt}\nDoes the image match the target completely? "
-                    "Answer exactly Match or Mismatch."
-                ),
-                ce_max_tokens=1,
-                prepared_visual_context=visual_context,
-                **common224,
-            )
-
-        scores = {
-            "caption_full": float(caption_loss.float().item()),
-            "correct_margin": correct_margin,
-            "passfail_margin": passfail_margin,
-            "caption_content": float(content_loss.float().item()),
-            "match_margin": float(match_margin.float().item()),
-        }
-        if not all(math.isfinite(value) for value in scores.values()):
-            raise RuntimeError(f"Non-finite CE score for {image_path}")
-        return scores
-
-
-def load_score_cache(
-    path: Path, candidate: dict, base: dict
-) -> dict[tuple[str, str], dict]:
-    if not path.exists():
-        return {}
-    cached: dict[tuple[str, str], dict] = {}
-    for row in read_jsonl(path):
-        key = (row["metadata_key"], row["sample_id"])
-        if key not in candidate or key not in base:
-            continue
-        if (
-            row.get("candidate_path") != candidate[key]["filename"]
-            or row.get("base_path") != base[key]["filename"]
-        ):
-            raise RuntimeError(f"Stale score-cache paths for sample key: {key}")
-        cached[key] = row
-    return cached
-
-
-def main() -> None:
-    args = parse_args()
-    if args.match_scale < 0:
-        raise ValueError("--match-scale must be non-negative")
-
-    candidate_rows = read_jsonl(args.candidate_jsonl)
-    base_rows = read_jsonl(args.base_jsonl)
-    if not candidate_rows or not base_rows:
-        raise ValueError("Candidate and Base JSONLs must both be non-empty")
-    candidate = {row_key(row): row for row in candidate_rows}
-    base = {row_key(row): row for row in base_rows}
-    if len(candidate) != len(candidate_rows) or len(base) != len(base_rows):
-        raise RuntimeError("A JSONL contains duplicate metadata/sample keys")
-    if set(candidate) != set(base):
-        raise RuntimeError("Candidate and Base JSONLs contain different samples")
-    for key in candidate:
-        if row_prompt(candidate[key]) != row_prompt(base[key]):
-            raise RuntimeError(f"Candidate/Base prompt mismatch for sample key: {key}")
-
-    ordered_keys = [row_key(row) for row in base_rows]
-    score_keys = [
-        key
-        for key in ordered_keys
-        if args.score_all
-        or bool(candidate[key]["correct"]) != bool(base[key]["correct"])
-    ]
-    cache_path = args.score_cache or Path(f"{args.output}.gss_scores.jsonl")
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    scores = load_score_cache(cache_path, candidate, base)
-    missing_keys = [key for key in score_keys if key not in scores]
-
-    scorer = GSSScorer(args) if missing_keys else None
-    if missing_keys:
-        with cache_path.open("a", encoding="utf-8") as cache_handle:
-            for key in tqdm(missing_keys, desc="Scoring Candidate/Base with UMM GSS"):
-                prompt = row_prompt(base[key])
-                candidate_scores = scorer.score_image(
-                    candidate[key]["filename"], prompt
-                )
-                base_scores = scorer.score_image(base[key]["filename"], prompt)
-                deltas = {
-                    name: candidate_scores[name] - base_scores[name]
-                    for name in candidate_scores
-                }
-                record = {
-                    "metadata_key": key[0],
-                    "sample_id": key[1],
-                    "prompt": prompt,
-                    "candidate_path": candidate[key]["filename"],
-                    "base_path": base[key]["filename"],
-                    "candidate_scores": candidate_scores,
-                    "base_scores": base_scores,
-                    "deltas": deltas,
-                }
-                cache_handle.write(json.dumps(record, ensure_ascii=False) + "\n")
-                cache_handle.flush()
-                scores[key] = record
-
-    merged = []
-    vote_histogram = {index: 0 for index in range(4)}
-    selected_candidate = selected_base = fixes = harms = 0
-    for key in ordered_keys:
-        candidate_row = candidate[key]
-        base_row = base[key]
-        if key not in scores:
-            use_candidate = False
-            selector = {
-                "selected": "base",
-                "reason": "equal_correctness_skip_ce",
-            }
+def read_records(args):
+    with local_file(args.json_path or args.pkl_path) as path:
+        if args.json_path:
+            with open(path, encoding="utf-8") as stream:
+                rows = [json.loads(line) for line in stream if line.strip()]
         else:
-            deltas = scores[key]["deltas"]
-            votes = sum(deltas[field] < 0.0 for field in CORE_FIELDS)
-            vote_histogram[votes] += 1
-            use_candidate = votes >= 2
-            reason = "core_ce_majority"
-            auxiliary_score = (
-                deltas["caption_content"]
-                + args.match_scale * deltas["match_margin"]
-            )
-            if votes in (0, 3):
-                use_candidate = auxiliary_score < 0.0
-                reason = "unanimous_auxiliary_ce_check"
-            selector = {
-                "selected": "candidate" if use_candidate else "base",
-                "reason": reason,
-                "core_candidate_votes": votes,
-                "core_deltas": {field: deltas[field] for field in CORE_FIELDS},
-                "auxiliary_score": auxiliary_score,
-                "caption_content_delta": deltas["caption_content"],
-                "match_margin_delta": deltas["match_margin"],
-                "match_scale": args.match_scale,
-            }
+            with open(path, "rb") as stream:
+                rows = pickle.load(stream)
+    rows = rows[args.start_index:None if args.end_index == -1 else args.end_index]
+    records, seen = [], set()
+    for row in rows:
+        row = {"video_fn": row} if isinstance(row, str) else dict(row)
+        relative = feature_relative_path(row["video_fn"])
+        if relative in seen:
+            raise ValueError(f"重复视频输出路径: {relative}")
+        seen.add(relative)
+        records.append(row)
+    return records
 
-        selected = dict(candidate_row if use_candidate else base_row)
-        selected["gss_selector"] = selector
-        merged.append(selected)
-        selected_candidate += int(use_candidate)
-        selected_base += int(not use_candidate)
-        fixes += int(
-            (not bool(candidate_row["correct"])) and bool(selected["correct"])
-        )
-        harms += int(
-            bool(candidate_row["correct"]) and (not bool(selected["correct"]))
-        )
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("w", encoding="utf-8") as handle:
-        for row in merged:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+class VideoDataset:
+    def __init__(self, records, args):
+        self.records, self.args = records, args
 
-    report = {
-        "strategy": "scaled-match-zero",
-        "threshold": None,
-        "match_scale": args.match_scale,
-        "score_all": args.score_all,
-        "pairs_scored": len(score_keys),
-        "pairs_skipped": len(ordered_keys) - len(score_keys),
-        "selected_candidate": selected_candidate,
-        "selected_base": selected_base,
-        "fixes_vs_candidate": fixes,
-        "harms_vs_candidate": harms,
-        "vote_histogram": vote_histogram,
-        "candidate": summarize(candidate_rows),
-        "base": summarize(base_rows),
-        "merged": summarize(merged),
-        "score_cache": str(cache_path),
-    }
-    metrics_path = args.metrics_file or Path(f"{args.output}.metrics.json")
-    metrics_path.parent.mkdir(parents=True, exist_ok=True)
-    with metrics_path.open("w", encoding="utf-8") as handle:
-        json.dump(report, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    def __len__(self):
+        return len(self.records)
+
+    def __getitem__(self, index):
+        import torch
+        row = self.records[index]
+        args = self.args
+        path = os.path.join(args.root_path, row["video_fn"])
+        save_path = str(Path(args.save_path) / feature_relative_path(row["video_fn"]))
+        try:
+            with local_file(path) as local:
+                frames = load_video(local, args.max_frames_limit, args.fps, args.image_size, args.ffmpeg_dir)
+            # [T,H,W,C] uint8 -> [C,T,H,W] float32 in [-1,1].
+            tensor = torch.from_numpy(frames.copy()).permute(3, 0, 1, 2).float()
+            tensor = tensor / 127.5 - 1.0
+            return tensor, save_path, json.dumps(row, ensure_ascii=False)
+        except Exception as exc:
+            print(f"Failed to load {row['video_fn']}: {exc}", flush=True)
+            return "None"
+
+
+def build_encoder(args, dataloader):
+    # 保持 vae.py 的构造接口，后续在此替换 MiniMax encoder。
+    if args.project_root:
+        sys.path.insert(0, os.path.abspath(args.project_root))
+    from mimogpt.models.modules.ldm.encoder.distributed_vae import DistributedVAE
+    return DistributedVAE(args, dataloader=dataloader)
+
+
+def save_embedding(embedding, row, outdir, manifest):
+    import torch
+    relative = feature_relative_path(row["video_fn"])
+    destination = Path(outdir) / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # 不覆盖已有特征；写完特征后才追加索引。
+    with destination.open("xb") as stream:
+        torch.save(embedding, stream)
+    result = dict(row)
+    result["vae_fn"] = relative
+    result["4_vae_feature_shape"] = list(embedding.shape)
+    result["4_vae_feature_length"] = embedding.shape[0]
+    manifest.write(json.dumps(result, ensure_ascii=False) + "\n")
+    manifest.flush()
+    return result
+
+
+def run_inference(args):
+    import torch
+    import torch.distributed as dist
+    from torch.utils.data import DataLoader
+    npu_available = False
+    try:
+        import torch_npu
+        npu_available = torch.npu.is_available()
+        if npu_available:
+            from torch_npu.contrib import transfer_to_npu
+    except ImportError:
+        pass
+    args.rank = int(os.environ.get("RANK", "0"))
+    args.world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    args.local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    args.backend = args.backend or ("hccl" if npu_available else "nccl")
+    device = torch.device(f"{'npu' if npu_available else 'cuda'}:{args.local_rank}")
+    if npu_available:
+        torch.npu.set_device(device)
+    else:
+        torch.cuda.set_device(device)
+    torch.manual_seed(args.global_seed)
+    records = read_records(args)
+    dataloader = DataLoader(VideoDataset(records, args), batch_size=1,
+                            shuffle=False, num_workers=0, drop_last=False)
+    outdir = Path(args.save_path)
+    manifest = None
+    with tempfile.TemporaryDirectory(prefix="vae_dist_") as rendezvous:
+        init_method = "env://" if "RANK" in os.environ else Path(rendezvous, "init").as_uri()
+        dist.init_process_group(args.backend, init_method=init_method,
+                                rank=args.rank, world_size=args.world_size,
+                                timeout=datetime.timedelta(hours=2))
+        try:
+            error = None
+            if args.rank == 0:
+                try:
+                    outdir.mkdir(parents=True, exist_ok=True)
+                    for row in records:
+                        if (outdir / feature_relative_path(row["video_fn"])).exists():
+                            raise FileExistsError(feature_relative_path(row["video_fn"]))
+                    manifest = (outdir / args.output_name).open("x", encoding="utf-8")
+                except Exception as exc:
+                    error = str(exc)
+            status = [error]
+            dist.broadcast_object_list(status, src=0)
+            if status[0] is not None:
+                raise RuntimeError(f"Output initialization failed: {status[0]}")
+            encoder = build_encoder(args, dataloader)
+            saved, skipped = 0, 0
+            for batch in dataloader:
+                failed = isinstance(batch[0], str) and batch[0] == "None"
+                flag = torch.tensor([int(failed)], device=device)
+                dist.all_reduce(flag)
+                if flag.item():
+                    skipped += 1
+                    continue
+                row = json.loads(batch[2][0])
+                x = batch[0].to(device=device, dtype=torch.bfloat16)
+                with torch.no_grad():
+                    moments = encoder.encode(x)[0]
+                    embedding = moments.detach().to(device="cpu", dtype=torch.bfloat16)
+                    embedding = embedding.permute(0, 2, 1, 3, 4)[0].contiguous()
+                status = [None]
+                if args.rank == 0:
+                    try:
+                        save_embedding(embedding, row, outdir, manifest)
+                    except Exception as exc:
+                        status[0] = str(exc)
+                dist.broadcast_object_list(status, src=0)
+                if status[0] is not None:
+                    raise RuntimeError(f"Saving {row['video_fn']} failed: {status[0]}")
+                saved += 1
+                if args.rank == 0:
+                    print(f"Saved {saved}/{len(records)}: {row['video_fn']}", flush=True)
+            if args.rank == 0:
+                print(f"Finished: saved={saved}, skipped={skipped}, index={outdir / args.output_name}")
+        finally:
+            if manifest is not None:
+                manifest.close()
+            dist.destroy_process_group()
 
 
 if __name__ == "__main__":
-    main()
+    run_inference(parse_args())
