@@ -853,3 +853,6 @@ class Bagel(PreTrainedModel):
             extra_p = prompt.rstrip('. ') + '. ' + extra_p
             print(f'understanding_ce ideal prompt: {extra_p}')
         return self.UnderstandingCELoss(x_t_0=img_latent, target_text=extra_p, vae_model=vae_model, image_shape=image_shapes, image_transform=image_transform, tokenizer=tokenizer, new_token_ids=new_token_ids, ce_max_tokens=192, ce_vit_max_side=168)
+
+
+
