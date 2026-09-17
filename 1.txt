@@ -62,6 +62,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Validate pairing and print disagreement counts without loading Bagel.",
     )
+    parser.add_argument('--target-mode', choices=('user', 'reflection'), default='user', help='reflection: generate one repair description from Base, shared by both candidates.')
     parser.add_argument('--outdir', default='merge_ce_results', help='One merged JSONL per strategy plus comparison.json.')
     parser.add_argument('--replay-scored-jsonl', help='CPU-only replay of an earlier scored merged JSONL; retains historical score provenance.')
     return parser.parse_args()
@@ -662,21 +663,57 @@ def choose_strategy(base, method, strategy):
     return 'method' if decisions[strategy] else 'base'
 
 
+def reflection_pairs(pairs, scorer, cache_path, score_all=False):
+    class ReflectionGenerator:
+        @property
+        def cache_identity(self):
+            return {**scorer.cache_identity, 'purpose':'shared_base_repair_reflection_v1',
+                    'reflection_max_tokens':scorer.reflection_max_tokens}
+        def __call__(self, filename, prompt):
+            with scorer.Image.open(filename) as image:
+                image=scorer.ImageOps.exif_transpose(image).convert('RGB')
+                with scorer.torch.no_grad(), scorer.torch.autocast(device_type='cuda', dtype=scorer.torch.bfloat16):
+                    text, fallback=scorer._v1_reflection(image,prompt)
+            if fallback: raise ValueError('Invalid reflection; refusing to silently use User prompt')
+            return {'reflection':text,'user_prompt':prompt,'base_filename':filename}
+    generator=ReflectionGenerator();cache=JsonlScoreCache(cache_path)
+    transformed=[];references={}
+    for key,base,method in pairs:
+        b,m=dict(base),dict(method)
+        if score_all or b['correct']!=m['correct']:
+            record,hit=cache.get_or_score(base,generator)
+            b['prompt']=m['prompt']=record['reflection']
+            references[(b['filename'],m['filename'])]=record['reflection']
+            print('Reflection:',base['filename'],'cached='+str(hit),record['reflection'],flush=True)
+        transformed.append((key,b,m))
+    return transformed,references
+
+
 def main():
     args = parse_args()
     pairs, counts = analyze_pairs(read_jsonl(Path(args.base_jsonl)), read_jsonl(Path(args.method_jsonl)))
     print('Pair analysis:', counts, flush=True)
     if args.analyze_only: return
     out = Path(args.outdir); out.mkdir(parents=True, exist_ok=True)
+    def output_name(strategy):
+        if args.target_mode=='user': return strategy
+        return 'reflection_ce' if strategy=='prompt_ce' else 'reflection_'+strategy
+    manifest=out/'target_mode.json'
+    if manifest.exists() and json.loads(manifest.read_text())['target_mode']!=args.target_mode:
+        raise ValueError('Use a separate outdir for each target mode')
+    if not args.replay_scored_jsonl:
+        manifest.write_text(json.dumps({'target_mode':args.target_mode}))
     protected = {Path(args.base_jsonl).resolve(), Path(args.method_jsonl).resolve()}
     if args.replay_scored_jsonl: protected.add(Path(args.replay_scored_jsonl).resolve())
-    outputs = [out/(n+'.jsonl') for n in STRATEGIES]+[out/'comparison.json',out/'scored.jsonl',out/'scored.jsonl.summary.json']
+    outputs = [out/(output_name(n)+'.jsonl') for n in STRATEGIES]+[out/'comparison.json',out/'scored.jsonl',out/'scored.jsonl.summary.json',out/'reflections.jsonl']
     cachepath = Path(args.score_cache) if args.score_cache else out/'scores.jsonl'
     if len({p.resolve() for p in outputs+[cachepath]}) != len(outputs)+1 or any(p.resolve() in protected for p in outputs+[cachepath]):
         raise ValueError('Input/output/cache paths overlap')
     if args.replay_scored_jsonl:
         source=Path(args.replay_scored_jsonl)
         scored=read_jsonl(source)
+        modes={r.get('merge_ce_target_mode','user') for r in scored}
+        if modes!={args.target_mode}: raise ValueError('Replay target mode mismatch')
         provenance={'mode':'historical_score_replay','source':str(source.resolve()),
             'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
             'note':'No new bagel_ce.py inference; scores retain their original model and resolution.'}
@@ -685,7 +722,16 @@ def main():
     else:
         scorer=BagelPromptCEScorer(args.model,args.device,args.max_latent_size,
             args.ce_max_tokens,args.ce_vit_max_side,args.reflection_max_tokens,'vote',args.backend)
-        scored, stats=select_rows(pairs,scorer,JsonlScoreCache(cachepath),'vote',args.score_all)
+        scoring_pairs=pairs;references={}
+        if args.target_mode=='reflection':
+            scoring_pairs,references=reflection_pairs(pairs,scorer,out/'reflections.jsonl',args.score_all)
+        scored, stats=select_rows(scoring_pairs,scorer,JsonlScoreCache(cachepath),'vote',args.score_all)
+        originals={(b['filename'],m['filename']):b['prompt'] for _,b,m in pairs}
+        for row in scored:
+            pair=(row['ce_merge_base_filename'],row['ce_merge_method_filename'])
+            row['prompt']=originals[pair]
+            row['merge_ce_target_mode']=args.target_mode
+            row['merge_ce_reference_text']=references.get(pair, originals[pair] if args.target_mode=='user' else None)
         provenance={'mode':'fresh_scoring','cache_identity':scorer.cache_identity,'stats':stats}
         write_jsonl(scored,out/'scored.jsonl')
         (out/'scored.jsonl.summary.json').write_text(json.dumps(provenance,indent=2))
@@ -707,19 +753,20 @@ def main():
         for strategy in STRATEGIES:
             source=choose_strategy(bs,ms,strategy) if bs is not None and ms is not None else 'base'
             row=dict(method if source=='method' else base)
-            row.update(merge_ce_strategy=strategy,merge_ce_selected=source,
+            row.update(merge_ce_strategy=output_name(strategy),merge_ce_selected=source,
+                merge_ce_target_mode=args.target_mode,merge_ce_reference_text=r.get('merge_ce_reference_text'),
                 merge_ce_base_filename=base['filename'],merge_ce_method_filename=method['filename'])
             selected[strategy].append(row)
     for strategy, rows in selected.items():
-        results[strategy]=geneval_summary(rows)
-        write_jsonl(rows,out/(strategy+'.jsonl'))
+        results[output_name(strategy)]=geneval_summary(rows)
+        write_jsonl(rows,out/(output_name(strategy)+'.jsonl'))
     report={'base':geneval_summary([b for _,b,_ in pairs]),
         'method':geneval_summary([m for _,_,m in pairs]),'strategies':results,
-        'provenance':provenance,'score_all':args.score_all,'pair_counts':counts,
+        'target_mode':args.target_mode,'reflection_policy':'one shared repair description generated from Base' if args.target_mode=='reflection' else None,'provenance':provenance,'score_all':args.score_all,'pair_counts':counts,
         'note':'Fusion weights/thresholds were explored on seed1234 repair K3; they are not independently validated. Default same-correctness skipping preserves GenEval metrics only, not a deployment selection or speed benchmark.',
         'fusion_definition':'A=base prompt CE-method prompt CE; B=method Match margin-base Match margin; Match margin=CE(Mismatch)-CE(Match). Select method when weighted advantage exceeds threshold, else base.'}
     (out/'comparison.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
-    for strategy in STRATEGIES: print(f"{strategy}: {results[strategy]['overall_score']*100:.4f}")
+    for strategy in STRATEGIES: print(f"{output_name(strategy)}: {results[output_name(strategy)]['overall_score']*100:.4f}")
     print('Results:',out.resolve())
 
 
