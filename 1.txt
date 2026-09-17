@@ -1,298 +1,727 @@
-"""视频 -> VAE 帧预处理 -> DistributedVAE embedding -> outdir + JSONL。
+#!/usr/bin/env python3
+"""Compare nine GSS policies using modeling.bagel.bagel_ce.
 
-目前按 vae.py 的接口使用 DistributedVAE，未来可替换 build_encoder。
-所有分布式 rank 协作编码同一个视频，仅 rank 0 写文件。
-输出 .pt 是 encode(x)[0] 的结果（不额外采样 latent），排列为 [T,C,H,W]。
+Score both images once (five CE targets each), then emit one JSONL per policy.
+Default ViT max side: 336. Same-correctness skipping is for metrics only;
+use --score-all for label-independent image selection. CPU historical replay:
+--replay-scored-jsonl PREVIOUS_MERGED.jsonl. Fusion thresholds were explored on
+seed1234 repair K3 and require independent validation.
 """
+
+from __future__ import annotations
+
 import argparse
-import datetime
+import hashlib
+import inspect
+import math
 import json
 import os
-from pathlib import Path, PurePosixPath
-import pickle
-import subprocess
+import re
 import sys
-import tempfile
-from contextlib import contextmanager
+from collections import OrderedDict
+from pathlib import Path
+from typing import Any
 
 
-VAE_TARGET_SIZES = {
-    "480p": {1.0: [512, 512], 1.5: [720, 480], 0.6667: [480, 720]},
-    "720p": {1.7778: [1072, 720]},
-    "400p": {0.5625: [592, 400]},
-    "640p": {1.0: [640, 640], 1.5: [960, 640], 0.6667: [640, 960]},
-    "560p": {1.0: [576, 576], 1.5: [840, 560], 0.6667: [560, 840]},
-    "320p": {1.0: [320, 320], 1.5: [480, 320], 0.6667: [320, 480]},
-    "240p": {1.0: [256, 256], 1.5: [360, 240], 0.6667: [240, 360]},
-}
+PROJECT_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+NESTED_IMAGE_PATTERN = re.compile(r"(?:^|/)(\d+)/samples/(\d+)\.png$")
+FLAT_IMAGE_PATTERN = re.compile(r"(?:^|/)prompt_(\d+)_sample_(\d+)\.png$")
 
 
-def load_video(video_path, max_frames_num=121, fps=24, image_size="480p", ffmpeg_dir=""):
-    """对齐 vae.py 的 ffmpeg-subprocess 分支，返回 RGB uint8 [T,H,W,C]。
-
-    时间范围、FPS、缩放裁剪和帧数截断与 VAE 一致；调用方归一化到 [-1,1]。
-    """
-    import numpy as np
-
-    if fps <= 0 or max_frames_num <= 0:
-        raise ValueError("fps and max_frames_num must be positive")
-    ffprobe = os.path.join(ffmpeg_dir, "ffprobe")
-    ffmpeg = os.path.join(ffmpeg_dir, "ffmpeg")
-
-    def probe(attribute):
-        return subprocess.check_output([
-            ffprobe, "-v", "error", "-select_streams", "v:0",
-            "-show_entries", f"stream={attribute}",
-            "-of", "default=noprint_wrappers=1:nokey=1", video_path,
-            "-loglevel", "quiet",
-        ], stderr=subprocess.STDOUT).decode("utf-8").strip()
-
-    duration = float(probe("duration"))
-    width, height = int(probe("width")), int(probe("height"))
-    target_sizes = VAE_TARGET_SIZES[image_size]
-    closest_ratio = min(target_sizes, key=lambda ratio: abs(ratio - height / width))
-    crop_h, crop_w = target_sizes[closest_ratio]
-    ratio = max(crop_h / height, crop_w / width)
-    resize_h, resize_w = int(np.ceil(height * ratio)), int(np.ceil(width * ratio))
-    end = min(duration, max_frames_num // fps + 1)
-    result = subprocess.run([
-        ffmpeg, "-ss", "0", "-to", str(end), "-i", video_path,
-        "-vf", f"fps={fps},scale={resize_w}:{resize_h}:flags=bilinear,crop=w={crop_w}:h={crop_h}",
-        "-vsync", "0", "-vcodec", "rawvideo", "-pix_fmt", "rgb24",
-        "-f", "image2pipe", "-",
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode:
-        raise ValueError(f"FFmpeg failed for {video_path}: {result.stderr.decode(errors='replace')}")
-    bytes_per_frame = crop_h * crop_w * 3
-    if len(result.stdout) % bytes_per_frame:
-        raise ValueError(f"Incomplete RGB frame from {video_path}")
-    frame_count = len(result.stdout) // bytes_per_frame
-    frame_count = min(frame_count - (frame_count - 1) % 8, max_frames_num)
-    if frame_count < 73:
-        raise ValueError(f"VAE requires at least 73 frames, got {frame_count}: {video_path}")
-    return np.frombuffer(result.stdout, dtype=np.uint8).reshape(-1, crop_h, crop_w, 3)[:frame_count]
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Select between evaluated base/method images using Bagel UMM voting, "
+            "then report the merged Geneval score."
+        )
+    )
+    parser.add_argument("base_jsonl", help="Geneval JSONL for baseline images.")
+    parser.add_argument("method_jsonl", help="Geneval JSONL for method images.")
+    parser.add_argument("--model", default="/data/jyb/pretrained_models/BAGEL-7B-MoT", help="Local BAGEL checkpoint directory.")
+    parser.add_argument("--backend", choices=("local",), default="local")
+    parser.add_argument("--score-all", action="store_true", help="Score every pair without using correct labels to skip pairs.")
+    parser.add_argument("--device", default="cuda:0", help="CUDA device used by the UMM scorer.")
+    parser.add_argument("--max-latent-size", type=int, default=64)
+    parser.add_argument("--ce-max-tokens", type=int, default=192)
+    parser.add_argument("--ce-vit-max-side", type=int, default=336)
+    parser.add_argument(
+        "--reflection-max-tokens",
+        type=int,
+        default=112,
+        help="Maximum generation length for the v1 reflection (default: 112).",
+    )
+    parser.add_argument(
+        "--score-cache",
+        default=None,
+        help="Resume-safe score JSONL; defaults to OUTDIR/scores.jsonl.",
+    )
+    parser.add_argument(
+        "--analyze-only",
+        action="store_true",
+        help="Validate pairing and print disagreement counts without loading Bagel.",
+    )
+    parser.add_argument('--outdir', default='merge_ce_results', help='One merged JSONL per strategy plus comparison.json.')
+    parser.add_argument('--replay-scored-jsonl', help='CPU-only replay of an earlier scored merged JSONL; retains historical score provenance.')
+    return parser.parse_args()
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--jsonl_path", "--json_path", dest="json_path")
-    source.add_argument("--pkl_path")
-    parser.add_argument("--root_path", "--s3_data_root", default="")
-    parser.add_argument("--outdir", "--output_dir", "--save_path", dest="save_path", required=True)
-    parser.add_argument("--output_name", default="embeddings.jsonl")
-    parser.add_argument("--start_index", type=int, default=0)
-    parser.add_argument("--end_index", type=int, default=-1)
-    parser.add_argument("--fps", type=int, default=24)
-    parser.add_argument("--max_frames_limit", "--for_get_frames_num", type=int, default=121)
-    parser.add_argument("--image_size", choices=tuple(VAE_TARGET_SIZES), default="480p")
-    parser.add_argument("--ffmpeg_dir", default="", help="空值使用 PATH；与 VAE 保持同一 FFmpeg 版本")
-    parser.add_argument("--config_path", required=True)
-    parser.add_argument("--ckpt_path", required=True)
-    parser.add_argument("--project_root", default="", help="包含 mimogpt 的项目根目录")
-    parser.add_argument("--backend", choices=("nccl", "hccl", "gloo"), default=None)
-    parser.add_argument("--model_name", default="vae-1.2")
-    parser.add_argument("--using_tiling", default="0")
-    parser.add_argument("--height", type=int, default=720)
-    parser.add_argument("--width", type=int, default=480)
-    parser.add_argument("--max_frame", type=int, default=121)
-    parser.add_argument("--task", default="")
-    parser.add_argument("--dataset_name", default="one_video")
-    parser.add_argument("--global-seed", type=int, default=0)
-    parser.add_argument("--num_workers", type=int, default=0)
-    parser.add_argument("--max_time", type=int, default=16)
-    parser.add_argument("--video_spec", default="")
-    parser.add_argument("--pre_type", default="tensor")
-    args = parser.parse_args()
-    if args.fps <= 0 or args.max_frames_limit < 73:
-        parser.error("fps 必须大于 0，max_frames_limit 必须至少为 73")
-    if args.start_index < 0 or args.end_index < -1:
-        parser.error("无效的数据切片范围")
-    if args.num_workers != 0:
-        parser.error("分布式协同编码当前要求 --num_workers 0")
-    if "://" in args.save_path:
-        parser.error("outdir 必须是本地目录")
-    if Path(args.output_name).name != args.output_name:
-        parser.error("output_name 必须是文件名")
-    # 与 vae.py 的 encoder 参数结构保持兼容。所有 rank 使用同一数据集。
-    args.gpus, args.global_rank = 1, 0
-    args.is_t2v = 1
-    args.is_i2v = args.is_i2v_mid = args.is_i2v_end = args.is_v2v = 0
-    args.bucket_path = ""
-    return args
+def read_jsonl(path: Path) -> list[dict]:
+    rows = []
+    with path.open(encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"{path}:{line_number}: invalid JSON") from error
+            if not isinstance(row, dict):
+                raise ValueError(f"{path}:{line_number}: expected a JSON object")
+            if "metadata" in row:
+                meta = metadata_dict(row["metadata"])
+                row.setdefault("prompt", meta.get("prompt"))
+                row.setdefault("tag", meta.get("tag"))
+            missing = {"filename", "prompt", "correct", "tag", "metadata"} - row.keys()
+            if missing:
+                raise ValueError(f"{path}:{line_number}: missing fields {sorted(missing)}")
+            if not isinstance(row["correct"], bool):
+                raise ValueError(f"{path}:{line_number}: 'correct' must be true or false")
+            rows.append(row)
+    if not rows:
+        raise ValueError(f"{path}: no result rows found")
+    return rows
 
 
-@contextmanager
-def local_file(path):
-    if path.startswith(("s3://", "obs://")):
-        import moxing as mox
-        with tempfile.TemporaryDirectory(prefix="vae_input_") as cache:
-            local = os.path.join(cache, path.rsplit("/", 1)[-1])
-            mox.file.copy(path, local)
-            yield local
-    else:
-        yield path
-
-
-def feature_relative_path(video_fn):
-    """保留视频目录和扩展名，避免 a.mp4 与 a.avi 的特征重名。"""
-    path = PurePosixPath(video_fn)
-    if not video_fn or path.is_absolute() or ".." in path.parts or ":" in video_fn or "\\" in video_fn or not path.name:
-        raise ValueError(f"video_fn 必须为安全的相对路径: {video_fn!r}")
-    return str(PurePosixPath("video_latent") / (str(path) + ".pt"))
-
-
-def read_records(args):
-    with local_file(args.json_path or args.pkl_path) as path:
-        if args.json_path:
-            with open(path, encoding="utf-8") as stream:
-                rows = [json.loads(line) for line in stream if line.strip()]
-        else:
-            with open(path, "rb") as stream:
-                rows = pickle.load(stream)
-    rows = rows[args.start_index:None if args.end_index == -1 else args.end_index]
-    records, seen = [], set()
-    for row in rows:
-        row = {"video_fn": row} if isinstance(row, str) else dict(row)
-        relative = feature_relative_path(row["video_fn"])
-        if relative in seen:
-            raise ValueError(f"重复视频输出路径: {relative}")
-        seen.add(relative)
-        records.append(row)
-    return records
-
-
-class VideoDataset:
-    def __init__(self, records, args):
-        self.records, self.args = records, args
-
-    def __len__(self):
-        return len(self.records)
-
-    def __getitem__(self, index):
-        import torch
-        row = self.records[index]
-        args = self.args
-        path = os.path.join(args.root_path, row["video_fn"])
-        save_path = str(Path(args.save_path) / feature_relative_path(row["video_fn"]))
-        try:
-            with local_file(path) as local:
-                frames = load_video(local, args.max_frames_limit, args.fps, args.image_size, args.ffmpeg_dir)
-            # [T,H,W,C] uint8 -> [C,T,H,W] float32 in [-1,1].
-            tensor = torch.from_numpy(frames.copy()).permute(3, 0, 1, 2).float()
-            tensor = tensor / 127.5 - 1.0
-            return tensor, save_path, json.dumps(row, ensure_ascii=False)
-        except Exception as exc:
-            print(f"Failed to load {row['video_fn']}: {exc}", flush=True)
-            return "None"
-
-
-def build_encoder(args, dataloader):
-    # 保持 vae.py 的构造接口，后续在此替换 MiniMax encoder。
-    if args.project_root:
-        sys.path.insert(0, os.path.abspath(args.project_root))
-    from mimogpt.models.modules.ldm.encoder.distributed_vae import DistributedVAE
-    return DistributedVAE(args, dataloader=dataloader)
-
-
-def save_embedding(embedding, row, outdir, manifest):
-    import torch
-    relative = feature_relative_path(row["video_fn"])
-    destination = Path(outdir) / relative
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    # 不覆盖已有特征；写完特征后才追加索引。
-    with destination.open("xb") as stream:
-        torch.save(embedding, stream)
-    result = dict(row)
-    result["vae_fn"] = relative
-    result["4_vae_feature_shape"] = list(embedding.shape)
-    result["4_vae_feature_length"] = embedding.shape[0]
-    manifest.write(json.dumps(result, ensure_ascii=False) + "\n")
-    manifest.flush()
+def metadata_dict(value):
+    result = json.loads(value) if isinstance(value, str) else value
+    if not isinstance(result, dict):
+        raise ValueError("metadata must be a dict or JSON object string")
     return result
 
 
-def run_inference(args):
-    import torch
-    import torch.distributed as dist
-    from torch.utils.data import DataLoader
-    npu_available = False
-    try:
-        import torch_npu
-        npu_available = torch.npu.is_available()
-        if npu_available:
-            from torch_npu.contrib import transfer_to_npu
-    except ImportError:
-        pass
-    args.rank = int(os.environ.get("RANK", "0"))
-    args.world_size = int(os.environ.get("WORLD_SIZE", "1"))
-    args.local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    args.backend = args.backend or ("hccl" if npu_available else "nccl")
-    device = torch.device(f"{'npu' if npu_available else 'cuda'}:{args.local_rank}")
-    if npu_available:
-        torch.npu.set_device(device)
+def sample_key(row: dict) -> tuple[str, int]:
+    filename = str(row["filename"]).replace("\\", "/")
+    for pattern in (NESTED_IMAGE_PATTERN, FLAT_IMAGE_PATTERN):
+        match = pattern.search(filename)
+        if match:
+            sample = int(match.group(2))
+            break
     else:
+        stem = Path(filename).stem
+        if not stem.isdigit():
+            raise ValueError(f"Cannot extract sample index from {filename!r}")
+        sample = int(stem)
+    # Local prompt-directory indices can differ between subsets and full sets.
+    return json.dumps(metadata_dict(row["metadata"]), sort_keys=True, ensure_ascii=False), sample
+
+
+def index_rows(rows: list[dict], label: str) -> dict[tuple[str, int], dict]:
+    indexed = {}
+    for row in rows:
+        key = sample_key(row)
+        if key in indexed:
+            raise ValueError(f"{label}: duplicate sample key {key}")
+        indexed[key] = row
+    return indexed
+
+
+def validate_pair(base_row: dict, method_row: dict, key: tuple[str, int]) -> None:
+    for field in ("prompt", "tag", "metadata"):
+        if (metadata_dict(base_row[field]) != metadata_dict(method_row[field]) if field == "metadata" else base_row[field] != method_row[field]):
+            raise ValueError(f"Sample {key}: base/method field {field!r} does not match")
+
+
+def analyze_pairs(base_rows: list[dict], method_rows: list[dict]) -> tuple[list[tuple[tuple[str, int], dict, dict]], dict]:
+    base_index = index_rows(base_rows, "base")
+    method_index = index_rows(method_rows, "method")
+    base_keys = set(base_index)
+    method_keys = set(method_index)
+    if base_keys != method_keys:
+        missing_method = sorted(base_keys - method_keys)[:10]
+        missing_base = sorted(method_keys - base_keys)[:10]
+        raise ValueError(
+            f"Result keys differ: missing_method={missing_method}, missing_base={missing_base}"
+        )
+
+    pairs = []
+    counts = {
+        "total": len(base_keys),
+        "same_true": 0,
+        "same_false": 0,
+        "disagreements": 0,
+        "base_true_method_false": 0,
+        "base_false_method_true": 0,
+    }
+    for key in sorted(base_keys):
+        base_row = base_index[key]
+        method_row = method_index[key]
+        validate_pair(base_row, method_row, key)
+        pairs.append((key, base_row, method_row))
+        if base_row["correct"] == method_row["correct"]:
+            counts["same_true" if base_row["correct"] else "same_false"] += 1
+        else:
+            counts["disagreements"] += 1
+            direction = "base_true_method_false" if base_row["correct"] else "base_false_method_true"
+            counts[direction] += 1
+    return pairs, counts
+
+
+class BagelPromptCEScorer:
+    """Load Bagel and produce independent image/prompt compatibility scores."""
+
+    def __init__(
+        self,
+        model_source: str,
+        device_name: str,
+        max_latent_size: int,
+        ce_max_tokens: int,
+        ce_vit_max_side: int,
+        reflection_max_tokens: int,
+        selection_strategy: str,
+        backend: str = "local",
+    ):
+        import torch
+        from PIL import Image, ImageOps
+
+
+        if backend == "local":
+            requested = torch.device(device_name)
+            if requested.type != "cuda":
+                raise ValueError("--device must be a CUDA device")
+            visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+            index = requested.index or 0
+            os.environ["CUDA_VISIBLE_DEVICES"] = visible.split(",")[index] if visible else str(index)
+            device_name = "cuda:0"
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA is required for Bagel UMM CE scoring")
+        device = torch.device(device_name)
+        if device.type != "cuda":
+            raise ValueError("--device must be a CUDA device such as cuda:0")
         torch.cuda.set_device(device)
-    torch.manual_seed(args.global_seed)
-    records = read_records(args)
-    dataloader = DataLoader(VideoDataset(records, args), batch_size=1,
-                            shuffle=False, num_workers=0, drop_last=False)
-    outdir = Path(args.save_path)
-    manifest = None
-    with tempfile.TemporaryDirectory(prefix="vae_dist_") as rendezvous:
-        init_method = "env://" if "RANK" in os.environ else Path(rendezvous, "init").as_uri()
-        dist.init_process_group(args.backend, init_method=init_method,
-                                rank=args.rank, world_size=args.world_size,
-                                timeout=datetime.timedelta(hours=2))
-        try:
-            error = None
-            if args.rank == 0:
+
+        self.backend = backend
+        self.model_source = str(Path(model_source).expanduser().resolve()) if backend == "local" else model_source
+        self.max_latent_size = max_latent_size
+        if backend == "nebula":
+            from GenEval.gen_reca_nebula import initialize_inferencer, resolve_model_source
+            model_path = resolve_model_source(model_source)
+            init_args = argparse.Namespace(model=str(model_path), max_latent_size=max_latent_size)
+            self.inferencer = initialize_inferencer(init_args, device)
+        else:
+            if max_latent_size != 64:
+                raise ValueError("The local backend supports max-latent-size=64 only")
+            for name in list(os.environ):
+                if name.startswith("BAGEL_"):
+                    del os.environ[name]
+            import inference
+            from modeling.bagel import bagel_ce
+            from types import SimpleNamespace
+            inference.Bagel = bagel_ce.Bagel
+            inference.BagelConfig = bagel_ce.BagelConfig
+            model, vae, tokenizer, token_ids, _, transform = inference.initialize_full_model(self.model_source)
+            vae = vae.to('cpu')
+            device = next(model.vit_model.parameters()).device
+            self.local = SimpleNamespace(model=model, vae=vae, tokenizer=tokenizer,
+                token_ids=token_ids, image_transform=transform, device=device,
+                dtype=next(model.vit_model.parameters()).dtype)
+            self.inferencer = SimpleNamespace(model=model, vit_transform=transform,
+                tokenizer=tokenizer, new_token_ids=token_ids)
+            for parameter in model.parameters(): parameter.requires_grad_(False)
+        self.model = self.inferencer.model
+        self.device = device
+        self.ce_max_tokens = ce_max_tokens
+        self.ce_vit_max_side = ce_vit_max_side
+        self.reflection_max_tokens = reflection_max_tokens
+        self.model.eval()
+        self.selection_strategy = selection_strategy
+        self.torch = torch
+        self.Image = Image
+        self.ImageOps = ImageOps
+
+    @property
+    def cache_identity(self) -> dict:
+        return {**self._score_identity(), "backend": self.backend,
+                "model_source": self.model_source, "max_latent_size": self.max_latent_size,
+                "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "model_impl": "modeling.bagel.bagel_ce",
+                "model_impl_sha256": hashlib.sha256((PROJECT_ROOT/'modeling/bagel/bagel_ce.py').read_bytes()).hexdigest(),
+                "checkpoint_stat": [(str(p), p.stat().st_size, p.stat().st_mtime_ns)
+                    for p in sorted(Path(self.model_source).glob("*.safetensors"))]}
+
+    def _score_identity(self) -> dict:
+        if self.selection_strategy == "reflection_yes_no":
+            return {
+                "version": "bagel-v1-reflection-yes-no-v1",
+                "selection_strategy": "reflection_yes_no",
+                "ce_max_tokens": self.ce_max_tokens,
+                "ce_vit_max_side": self.ce_vit_max_side,
+                "reflection_max_tokens": self.reflection_max_tokens,
+            }
+        # yes_no and vote compute the same full score set, so they deliberately
+        # share cache keys. This lets selection policies be replayed without
+        # running Bagel again.
+        score_mode = "ce" if self.selection_strategy == "ce" else "vote"
+        return {
+            "version": "bagel-ce-vote-v2",
+            "selection_strategy": score_mode,
+            "ce_max_tokens": self.ce_max_tokens,
+            "ce_vit_max_side": self.ce_vit_max_side,
+        }
+
+    def _loss(self, image, target_text: str, instruction: str | None = None) -> float:
+        if self.backend == "local":
+            import numpy as np
+            tensor = self.torch.from_numpy(np.asarray(image, dtype=np.float32).copy() / 255).permute(2, 0, 1).unsqueeze(0)
+            tensor = tensor.to(device=self.local.device, dtype=self.local.dtype)
+            common = dict(x_t_0=None, vae_model=self.local.vae,
+                image_shape=(image.height, image.width), image_transform=self.local.image_transform,
+                tokenizer=self.local.tokenizer, new_token_ids=self.local.token_ids,
+                ce_vit_max_side=self.ce_vit_max_side)
+            # Adapt the legacy latent-only interface in this scorer process only.
+            # All downstream ViT preprocessing and CE remain the model's own code.
+            # Feed decoded RGB directly, avoiding lossy VAE encode/decode.
+            if 'decoded_image' in inspect.signature(self.model.UnderstandingCELoss).parameters:
+                common['decoded_image'] = tensor
+                loss, _ = self.model.UnderstandingCELoss(target_text=target_text,
+                    instruction=instruction, ce_max_tokens=self.ce_max_tokens, **common)
+            else:
+                old = self.model._decode_reca_latent_to_tensor
                 try:
-                    outdir.mkdir(parents=True, exist_ok=True)
-                    for row in records:
-                        if (outdir / feature_relative_path(row["video_fn"])).exists():
-                            raise FileExistsError(feature_relative_path(row["video_fn"]))
-                    manifest = (outdir / args.output_name).open("x", encoding="utf-8")
-                except Exception as exc:
-                    error = str(exc)
-            status = [error]
-            dist.broadcast_object_list(status, src=0)
-            if status[0] is not None:
-                raise RuntimeError(f"Output initialization failed: {status[0]}")
-            encoder = build_encoder(args, dataloader)
-            saved, skipped = 0, 0
-            for batch in dataloader:
-                failed = isinstance(batch[0], str) and batch[0] == "None"
-                flag = torch.tensor([int(failed)], device=device)
-                dist.all_reduce(flag)
-                if flag.item():
-                    skipped += 1
-                    continue
-                row = json.loads(batch[2][0])
-                x = batch[0].to(device=device, dtype=torch.bfloat16)
-                with torch.no_grad():
-                    moments = encoder.encode(x)[0]
-                    embedding = moments.detach().to(device="cpu", dtype=torch.bfloat16)
-                    embedding = embedding.permute(0, 2, 1, 3, 4)[0].contiguous()
-                status = [None]
-                if args.rank == 0:
-                    try:
-                        save_embedding(embedding, row, outdir, manifest)
-                    except Exception as exc:
-                        status[0] = str(exc)
-                dist.broadcast_object_list(status, src=0)
-                if status[0] is not None:
-                    raise RuntimeError(f"Saving {row['video_fn']} failed: {status[0]}")
-                saved += 1
-                if args.rank == 0:
-                    print(f"Saved {saved}/{len(records)}: {row['video_fn']}", flush=True)
-            if args.rank == 0:
-                print(f"Finished: saved={saved}, skipped={skipped}, index={outdir / args.output_name}")
-        finally:
-            if manifest is not None:
-                manifest.close()
-            dist.destroy_process_group()
+                    self.model._decode_reca_latent_to_tensor = lambda *args, **kwargs: tensor
+                    loss, _ = self.model.UnderstandingCELoss(target_text=target_text,
+                        instruction=instruction, ce_max_tokens=self.ce_max_tokens, **common)
+                finally:
+                    self.model._decode_reca_latent_to_tensor = old
+            value = float(loss.detach().cpu())
+            if not math.isfinite(value): raise ValueError("Non-finite CE score")
+            return value
+        loss, _ = self.model.UnderstandingImageCELoss(
+            image=image,
+            target_text=target_text,
+            image_transform=self.inferencer.vit_transform,
+            tokenizer=self.inferencer.tokenizer,
+            new_token_ids=self.inferencer.new_token_ids,
+            ce_max_tokens=self.ce_max_tokens,
+            ce_vit_max_side=self.ce_vit_max_side,
+            instruction=instruction,
+            debug=False,
+        )
+        return float(loss.detach().cpu())
+
+    def _v1_reflection(self, image, prompt: str) -> tuple[str, bool]:
+        instruction = (
+            f"User request: '{prompt}'. Look at the draft and consider what needs to change "
+            "to fulfill the request. Then describe the image after those changes in one or "
+            "two concise sentences. Bind each requested property to its object and make "
+            "unclear requested details recognizable. Preserve compatible visible details. "
+            "Output only the resulting image description, about 30 to 50 words."
+        )
+        reflection = self.model.chat(
+            tokenizer=self.inferencer.tokenizer,
+            new_token_ids=self.inferencer.new_token_ids,
+            image_transform=self.inferencer.vit_transform,
+            images=[image],
+            prompt=instruction,
+            max_length=self.reflection_max_tokens,
+            do_sample=False,
+            **({"debug": False} if "debug" in inspect.signature(self.model.chat).parameters else {}),
+        ).strip()
+        fallback = not reflection or "键" in reflection
+        return (prompt if fallback else reflection), fallback
+
+    def __call__(self, image_path: str, prompt: str) -> dict[str, Any]:
+        path = Path(image_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Image does not exist: {path}")
+        with self.Image.open(path) as image_file:
+            image = self.ImageOps.exif_transpose(image_file).convert("RGB")
+            with self.torch.no_grad(), self.torch.autocast(
+                device_type="cuda", enabled=True, dtype=self.torch.bfloat16
+            ):
+                prompt_ce = self._loss(image, prompt)
+                scores = {"prompt_ce": prompt_ce}
+                if self.selection_strategy == "ce":
+                    return scores
+
+                if self.selection_strategy == "reflection_yes_no":
+                    reflection, reflection_fallback = self._v1_reflection(image, prompt)
+                    reflection_instruction = (
+                        "Examine the image carefully. Decide whether the image fully satisfies "
+                        "every detail in the reference description below. Answer only Yes or No. "
+                        f"Reference description: {reflection!r}"
+                    )
+                    reflection_yes_ce = self._loss(image, "Yes", reflection_instruction)
+                    reflection_no_ce = self._loss(image, "No", reflection_instruction)
+                    scores.update(
+                        {
+                            "reflection_text": reflection,
+                            "reflection_fallback_to_user_prompt": reflection_fallback,
+                            "reflection_yes_ce": reflection_yes_ce,
+                            "reflection_no_ce": reflection_no_ce,
+                            "reflection_yes_margin": reflection_no_ce - reflection_yes_ce,
+                        }
+                    )
+                    return scores
+
+                global_instruction = (
+                    "Examine the image carefully. Decide whether it fully satisfies every part "
+                    f"of this prompt: {prompt!r}. Consider objects, counts, colors, attributes, "
+                    "and spatial relationships. Answer only Yes or No."
+                )
+                global_yes_ce = self._loss(image, "Yes", global_instruction)
+                global_no_ce = self._loss(image, "No", global_instruction)
+
+                match_instruction = (
+                    "Compare the image with the complete prompt below. They Match only if every "
+                    "requested object, count, color, attribute, and spatial relationship is "
+                    f"satisfied. Prompt: {prompt!r}. Answer only Match or Mismatch."
+                )
+                match_ce = self._loss(image, "Match", match_instruction)
+                mismatch_ce = self._loss(image, "Mismatch", match_instruction)
+                scores.update(
+                    {
+                        "global_yes_ce": global_yes_ce,
+                        "global_no_ce": global_no_ce,
+                        "global_yes_margin": global_no_ce - global_yes_ce,
+                        "match_ce": match_ce,
+                        "mismatch_ce": mismatch_ce,
+                        "match_margin": mismatch_ce - match_ce,
+                    }
+                )
+        return scores
 
 
-if __name__ == "__main__":
-    run_inference(parse_args())
+class JsonlScoreCache:
+    """Append-only score cache that tolerates an interrupted final line."""
+
+    def __init__(self, path: Path | None):
+        self.path = path
+        self.scores: dict[str, dict[str, Any]] = {}
+        if path is None or not path.exists():
+            return
+        raw = path.read_bytes()
+        offset = 0
+        lines = raw.splitlines(keepends=True)
+        for index, line in enumerate(lines):
+            if not line.strip():
+                offset += len(line)
+                continue
+            try:
+                record = json.loads(line)
+                self.scores[record["cache_key"]] = record["scores"]
+            except (ValueError, KeyError, TypeError):
+                if index != len(lines)-1:
+                    raise ValueError(f"Corrupt cache line {index+1}: {path}")
+                with path.open("r+b") as handle: handle.truncate(offset)
+                print(f"Truncated interrupted cache tail: {path}", flush=True)
+                break
+            offset += len(line)
+        else:
+            if raw and not raw.endswith(b"\n"):
+                with path.open("ab") as handle: handle.write(b"\n")
+
+    @staticmethod
+    def make_key(row: dict, scorer: BagelPromptCEScorer) -> str:
+        payload = {
+            "filename": str(Path(row["filename"]).resolve()),
+            "image_sha256": hashlib.sha256(Path(row["filename"]).read_bytes()).hexdigest(),
+            "prompt": row["prompt"],
+            **scorer.cache_identity,
+        }
+        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    def get_or_score(self, row: dict, scorer: BagelPromptCEScorer) -> tuple[dict[str, Any], bool]:
+        cache_key = self.make_key(row, scorer)
+        cached = self.scores.get(cache_key)
+        if cached is not None:
+            return cached, True
+        scores = scorer(row["filename"], row["prompt"])
+        self.scores[cache_key] = scores
+        if self.path is not None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            record = {
+                "cache_key": cache_key,
+                "filename": row["filename"],
+                "scores": scores,
+            }
+            with self.path.open("a", encoding="utf-8") as file:
+                file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                file.flush()
+                os.fsync(file.fileno())
+        return scores, False
+
+
+def voter_choices(base_scores: dict[str, Any], method_scores: dict[str, Any]) -> dict[str, str]:
+    """Return one base/method choice from each independently phrased voter."""
+    return {
+        "prompt_ce": "method"
+        if method_scores["prompt_ce"] < base_scores["prompt_ce"]
+        else "base",
+        "global_yes_no": "method"
+        if method_scores["global_yes_margin"] > base_scores["global_yes_margin"]
+        else "base",
+        "match_mismatch": "method"
+        if method_scores["match_margin"] > base_scores["match_margin"]
+        else "base",
+    }
+
+
+def majority_choice(votes: dict[str, str]) -> tuple[str, dict[str, int]]:
+    counts = {
+        "base": sum(choice == "base" for choice in votes.values()),
+        "method": sum(choice == "method" for choice in votes.values()),
+    }
+    # Three voters cannot normally tie; base is the deterministic fallback.
+    selected = "method" if counts["method"] > counts["base"] else "base"
+    return selected, counts
+
+
+def select_rows(
+    pairs: list[tuple[tuple[str, int], dict, dict]],
+    scorer: BagelPromptCEScorer,
+    score_cache: JsonlScoreCache,
+    selection_strategy: str,
+    score_all: bool = False,
+) -> tuple[list[dict], dict]:
+    selected_rows = []
+    stats = {
+        "ce_scored_pairs": 0,
+        "selected_base": 0,
+        "selected_method": 0,
+        "disagreement_selected_base": 0,
+        "disagreement_selected_method": 0,
+        "ties_selected_base": 0,
+        "cache_hits": 0,
+        "cache_misses": 0,
+        "voter_stats": {},
+    }
+    disagreement_number = 0
+    disagreement_total = sum(score_all or base["correct"] != method["correct"] for _, base, method in pairs)
+    for key, base_row, method_row in pairs:
+        same_correctness = base_row["correct"] == method_row["correct"]
+        if same_correctness and not score_all:
+            selected_source = "base"
+            selected = dict(base_row)
+            base_ce = method_ce = None
+            base_scores = method_scores = None
+            votes = {}
+            vote_counts = {}
+            reason = "same_geneval_result_ce_skipped"
+        else:
+            disagreement_number += 1
+            print(
+                f"[CE {disagreement_number}/{disagreement_total}] sample={key} scoring base",
+                flush=True,
+            )
+            base_scores, base_cached = score_cache.get_or_score(base_row, scorer)
+            print(
+                f"[CE {disagreement_number}/{disagreement_total}] sample={key} scoring method",
+                flush=True,
+            )
+            method_scores, method_cached = score_cache.get_or_score(method_row, scorer)
+            stats["cache_hits"] += int(base_cached) + int(method_cached)
+            stats["cache_misses"] += int(not base_cached) + int(not method_cached)
+            base_ce = base_scores["prompt_ce"]
+            method_ce = method_scores["prompt_ce"]
+            stats["ce_scored_pairs"] += 1
+            if selection_strategy in {"vote", "yes_no"}:
+                votes = voter_choices(base_scores, method_scores)
+                if selection_strategy == "vote":
+                    selected_source, vote_counts = majority_choice(votes)
+                    reason = "bagel_three_voter_majority"
+                else:
+                    selected_source = votes["global_yes_no"]
+                    vote_counts = {
+                        "base": sum(choice == "base" for choice in votes.values()),
+                        "method": sum(choice == "method" for choice in votes.values()),
+                    }
+                    reason = "bagel_global_yes_no"
+            elif selection_strategy == "reflection_yes_no":
+                votes = {
+                    "reflection_yes_no": "method"
+                    if method_scores["reflection_yes_margin"]
+                    > base_scores["reflection_yes_margin"]
+                    else "base"
+                }
+                selected_source = votes["reflection_yes_no"]
+                vote_counts = {
+                    "base": int(selected_source == "base"),
+                    "method": int(selected_source == "method"),
+                }
+                reason = "bagel_v1_reflection_yes_no"
+            else:
+                votes = {"prompt_ce": "method" if method_ce < base_ce else "base"}
+                vote_counts = {
+                    "base": sum(choice == "base" for choice in votes.values()),
+                    "method": sum(choice == "method" for choice in votes.values()),
+                }
+                selected_source = votes["prompt_ce"]
+                reason = "lower_user_prompt_ce"
+                if method_ce == base_ce:
+                    stats["ties_selected_base"] += 1
+            selected = dict(method_row if selected_source == "method" else base_row)
+            if not same_correctness:
+                stats[f"disagreement_selected_{selected_source}"] += 1
+            expected_source = "base" if base_row["correct"] else "method"
+            for voter, choice in (votes.items() if not same_correctness else []):
+                voter_stat = stats["voter_stats"].setdefault(voter, {"correct": 0, "total": 0})
+                voter_stat["total"] += 1
+                voter_stat["correct"] += int(choice == expected_source)
+            print(
+                f"[CE {disagreement_number}/{disagreement_total}] sample={key} "
+                f"base_ce={base_ce:.6g} method_ce={method_ce:.6g} "
+                f"votes={votes} selected={selected_source}",
+                flush=True,
+            )
+
+        stats[f"selected_{selected_source}"] += 1
+        selected.update(
+            {
+                "ce_merge_selected": selected_source,
+                "ce_merge_reason": reason,
+                "ce_merge_base_filename": base_row["filename"],
+                "ce_merge_method_filename": method_row["filename"],
+                "ce_merge_base_correct": base_row["correct"],
+                "ce_merge_method_correct": method_row["correct"],
+                "ce_merge_base_ce": base_ce,
+                "ce_merge_method_ce": method_ce,
+                "ce_merge_base_scores": base_scores,
+                "ce_merge_method_scores": method_scores,
+                "ce_merge_votes": votes,
+                "ce_merge_vote_counts": vote_counts,
+            }
+        )
+        selected_rows.append(selected)
+    return selected_rows, stats
+
+
+def geneval_summary(rows: list[dict]) -> dict:
+    task_values: OrderedDict[str, list[bool]] = OrderedDict()
+    prompt_values: dict[str, list[bool]] = {}
+    for row in rows:
+        task_values.setdefault(row["tag"], []).append(row["correct"])
+        metadata_key = json.dumps(metadata_dict(row["metadata"]), sort_keys=True)
+        prompt_values.setdefault(metadata_key, []).append(row["correct"])
+
+    task_scores = {
+        tag: sum(values) / len(values)
+        for tag, values in task_values.items()
+    }
+    return {
+        "total_images": len(rows),
+        "total_prompts": len(prompt_values),
+        "correct_image_rate": sum(row["correct"] for row in rows) / len(rows),
+        "correct_prompt_rate": sum(any(values) for values in prompt_values.values()) / len(prompt_values),
+        "task_scores": task_scores,
+        "overall_score": sum(task_scores.values()) / len(task_scores),
+    }
+
+
+def print_summary(summary: dict) -> None:
+    print("\nMerged Geneval summary")
+    print("======================")
+    print(f"Total images: {summary['total_images']}")
+    print(f"Total prompts: {summary['total_prompts']}")
+    print(f"% correct images: {summary['correct_image_rate']:.2%}")
+    print(f"% correct prompts: {summary['correct_prompt_rate']:.2%}")
+    print("Task breakdown:")
+    for tag, score in summary["task_scores"].items():
+        print(f"  {tag:<16} = {score:.2%}")
+    print(f"Overall score (avg. over tasks): {summary['overall_score']:.5f}")
+
+
+def write_jsonl(rows: list[dict], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8") as file:
+        for row in rows:
+            file.write(json.dumps(row, ensure_ascii=False) + "\n")
+    temporary.replace(path)
+
+
+STRATEGIES = ('prompt_ce', 'yes_no', 'match', 'majority', 'unanimous', 'any_vote',
+              'fusion_60_40', 'fusion_80_20_t075', 'fusion_70_30_tm025')
+
+
+def choose_strategy(base, method, strategy):
+    a = base['prompt_ce'] - method['prompt_ce']
+    y = method['global_yes_margin'] - base['global_yes_margin']
+    b = method['match_margin'] - base['match_margin']
+    if not all(math.isfinite(v) for v in (a,y,b)): raise ValueError('Non-finite score')
+    votes = int(a>0)+int(y>0)+int(b>0)
+    decisions = {
+        'prompt_ce': a>0, 'yes_no': y>0, 'match': b>0,
+        'majority': votes>=2, 'unanimous': votes==3, 'any_vote': votes>=1,
+        'fusion_60_40': .6*a+.4*b>0,
+        'fusion_80_20_t075': .8*a+.2*b>.075,
+        'fusion_70_30_tm025': .7*a+.3*b>-.025,
+    }
+    return 'method' if decisions[strategy] else 'base'
+
+
+def main():
+    args = parse_args()
+    pairs, counts = analyze_pairs(read_jsonl(Path(args.base_jsonl)), read_jsonl(Path(args.method_jsonl)))
+    print('Pair analysis:', counts, flush=True)
+    if args.analyze_only: return
+    out = Path(args.outdir); out.mkdir(parents=True, exist_ok=True)
+    protected = {Path(args.base_jsonl).resolve(), Path(args.method_jsonl).resolve()}
+    if args.replay_scored_jsonl: protected.add(Path(args.replay_scored_jsonl).resolve())
+    outputs = [out/(n+'.jsonl') for n in STRATEGIES]+[out/'comparison.json',out/'scored.jsonl',out/'scored.jsonl.summary.json']
+    cachepath = Path(args.score_cache) if args.score_cache else out/'scores.jsonl'
+    if len({p.resolve() for p in outputs+[cachepath]}) != len(outputs)+1 or any(p.resolve() in protected for p in outputs+[cachepath]):
+        raise ValueError('Input/output/cache paths overlap')
+    if args.replay_scored_jsonl:
+        source=Path(args.replay_scored_jsonl)
+        scored=read_jsonl(source)
+        provenance={'mode':'historical_score_replay','source':str(source.resolve()),
+            'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
+            'note':'No new bagel_ce.py inference; scores retain their original model and resolution.'}
+        old_summary=Path(str(source)+'.summary.json')
+        if old_summary.exists(): provenance['original_summary']=json.loads(old_summary.read_text())
+    else:
+        scorer=BagelPromptCEScorer(args.model,args.device,args.max_latent_size,
+            args.ce_max_tokens,args.ce_vit_max_side,args.reflection_max_tokens,'vote',args.backend)
+        scored, stats=select_rows(pairs,scorer,JsonlScoreCache(cachepath),'vote',args.score_all)
+        provenance={'mode':'fresh_scoring','cache_identity':scorer.cache_identity,'stats':stats}
+        write_jsonl(scored,out/'scored.jsonl')
+        (out/'scored.jsonl.summary.json').write_text(json.dumps(provenance,indent=2))
+    indexed={}
+    for row in scored:
+        k=(row['ce_merge_base_filename'],row['ce_merge_method_filename'])
+        if k in indexed: raise ValueError('Duplicate replay pair')
+        indexed[k]=row
+    if len(indexed)!=len(pairs): raise ValueError('Replay pair count mismatch')
+    results={}; selected={s:[] for s in STRATEGIES}
+    for _,base,method in pairs:
+        r=indexed[(base['filename'],method['filename'])]
+        if r['prompt']!=base['prompt'] or r['ce_merge_base_correct']!=base['correct'] or r['ce_merge_method_correct']!=method['correct']:
+            raise ValueError('Replay prompt or labels mismatch')
+        bs,ms=r['ce_merge_base_scores'],r['ce_merge_method_scores']
+        if bs is None or ms is None:
+            if base['correct']!=method['correct'] or args.score_all:
+                raise ValueError('Missing required scores in replay')
+        for strategy in STRATEGIES:
+            source=choose_strategy(bs,ms,strategy) if bs is not None and ms is not None else 'base'
+            row=dict(method if source=='method' else base)
+            row.update(merge_ce_strategy=strategy,merge_ce_selected=source,
+                merge_ce_base_filename=base['filename'],merge_ce_method_filename=method['filename'])
+            selected[strategy].append(row)
+    for strategy, rows in selected.items():
+        results[strategy]=geneval_summary(rows)
+        write_jsonl(rows,out/(strategy+'.jsonl'))
+    report={'base':geneval_summary([b for _,b,_ in pairs]),
+        'method':geneval_summary([m for _,_,m in pairs]),'strategies':results,
+        'provenance':provenance,'score_all':args.score_all,'pair_counts':counts,
+        'note':'Fusion weights/thresholds were explored on seed1234 repair K3; they are not independently validated. Default same-correctness skipping preserves GenEval metrics only, not a deployment selection or speed benchmark.',
+        'fusion_definition':'A=base prompt CE-method prompt CE; B=method Match margin-base Match margin; Match margin=CE(Mismatch)-CE(Match). Select method when weighted advantage exceeds threshold, else base.'}
+    (out/'comparison.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
+    for strategy in STRATEGIES: print(f"{strategy}: {results[strategy]['overall_score']*100:.4f}")
+    print('Results:',out.resolve())
+
+
+if __name__ == '__main__':
+    main()
