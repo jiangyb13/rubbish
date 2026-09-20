@@ -7,16 +7,16 @@ Example (use an otherwise idle GPU):
 
 Ours calls InterleaveInferencer.resc_for_gen directly. No reflection, gradient,
 image-transform, or target-reuse patches are installed. UiG/TiR use Bagel as
-both generator and understanding model. This is a speed benchmark, not an
+both generator and understanding model. UiG/TiR workflows, prompts and RNG
+helpers are embedded; only the Bagel project, weights and input JSONL are needed.
+This is a speed benchmark, not an
 assertion that shared-backend outputs equal the official reproduction outputs.
 """
 import argparse
 import contextlib
 import hashlib
 import importlib
-import importlib.util
 import json
-import logging
 import math
 import os
 from pathlib import Path
@@ -26,6 +26,105 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 METHODS = ('base', 'think', 'ours', 'uig', 'tir')
+
+
+# Embedded protocol snapshots (no runtime dependency on either paper repository):
+# UiG QC-LY/UiG c96430bad5f734efcaf850b4e93775d928f4aeb2, evaluation/edit flow.
+# TiR hafeezkhan909/Test-time-Image-Refinement b7bf34fd4061c84c2c36131291f7b3b416dbb197,
+# released Qwen prompt; Bagel is the understanding backend here.
+UIG_EVALUATION_PROMPT = 'Please carefully examine this generated image and compare it with the original prompt: "{original_prompt}"\n\nAnalyze the following aspects:\n1. Does the image accurately represent the main subject described in the prompt?\n2. Are the visual details (clothing, environment, style, etc.) consistent with the prompt?\n3. Is the overall mood and atmosphere matching the intended description?\n4. Are there any missing elements or incorrect interpretations?\n\nIf the image matches the prompt well, respond with: "MATCH: The image successfully represents the prompt."\n\nIf there are discrepancies, respond with: "EDIT_NEEDED: [specific editing instructions]"\nFor example: "EDIT_NEEDED: The character should be wearing a red dress instead of blue, and the background should be a forest not a city."\n\nPlease be specific about what needs to be changed:'
+
+
+def capture():
+    """Capture full RNG streams; kept local so rng_replay.py is not required."""
+    import random
+    import numpy as np
+    import torch
+    return {'python': random.getstate(), 'numpy': np.random.get_state(),
+            'torch': torch.get_rng_state().clone(),
+            'cuda': [state.clone() for state in torch.cuda.get_rng_state_all()]}
+
+
+def restore(state):
+    import random
+    import numpy as np
+    import torch
+    random.setstate(state['python'])
+    np.random.set_state(state['numpy'])
+    torch.set_rng_state(state['torch'])
+    torch.cuda.set_rng_state_all(state['cuda'])
+
+
+def tir_prompt(original_prompt, history):
+    last_prompt = history[-1] if history else original_prompt
+    history_text = ''
+    if history:
+        history_text = '### Previous Prompt Refinements:\n' + ''.join(
+            f'- Refinement {i+1}: "{prompt}"\n' for i, prompt in enumerate(history))
+    return f"""\n                    ### Evaluation Task:\n                    You are an **Image Improvement Assistant**. Your job is to help make the image more aligned with the ORIGINAL prompt.\n\n                    ### **Given Inputs:**  \n                    1. **Original User Prompt:**  \n                    - {original_prompt}  \n\n                    2. **Last Used Prompt:**\n                    - {last_prompt}\n\n                    3. **Prompt History:**\n                    {history_text}\n\n                    4. **Current Image Analysis:**\n                    - Look at the image and identify what aspects DIFFER from what the ORIGINAL prompt requested\n                    - Analyze what essential elements from the ORIGINAL prompt are missing or incorrectly represented\n                    - Ignore image quality issues like noise, blurriness, or artifacts\n                    \n                    ### **Your Task:**  \n                    1. Create a NEW PROMPT that will help generate an image that better matches the ORIGINAL prompt\n                    2. Your new prompt should be a modification of the last used prompt\n                    3. Focus on fixing what's missing or incorrectly represented in the current image\n                    4. The goal is to get progressively closer to fulfilling the ORIGINAL prompt\n                    \n                    ### **Decision Process:**\n                    1. If the image ALREADY closely represents the ORIGINAL prompt:\n                    \n                    DECISION: "True"\n                    REFINED PROMPT: "<An enhanced version of the last prompt that maintains alignment>"\n\n                    2. If the image DOES NOT adequately represent the ORIGINAL prompt:\n                    \n                    DECISION: "False"\n                    REFINED PROMPT: "<Your NEW prompt that addresses the specific misalignments>"\n\n                    Follow this exact output format:\n                    DECISION: "True" or "False"\n                    REFINED PROMPT: "<Your new prompt here>"\n                    """
+
+
+def parse_tir(raw):
+    decision = prompt = None
+    for line in raw.splitlines():
+        if line.startswith('DECISION:'):
+            decision = line.replace('DECISION:', '').strip().strip('"')
+        elif line.startswith('REFINED PROMPT:'):
+            prompt = line.replace('REFINED PROMPT:', '').strip().strip('"')
+    if decision not in ('True', 'False') or not prompt or prompt == 'None':
+        raise ValueError(f'Malformed TiR response: {raw!r}')
+    return decision == 'True', prompt
+
+
+def run_uig(call, prompt, common, max_edits, think_max_tokens):
+    """Native Bagel calls with the released UiG evaluation/edit protocol."""
+    image = call(text=prompt, **common)['image']
+    history, raw_responses, iterations, edits = [], [], 0, 0
+    editing = dict(common, cfg_img_scale=2., cfg_interval=[0., 1.],
+                   cfg_renorm_type='text_channel')
+    for iteration in range(max_edits):
+        raw = call(image=image, text=UIG_EVALUATION_PROMPT.format(original_prompt=prompt),
+                   understanding_output=True, think=True, do_sample=False,
+                   max_think_token_n=think_max_tokens)['text']
+        raw_responses.append(raw)
+        # Preserve released parser exactly, including MATCH: precedence.
+        if 'MATCH:' in raw:
+            needs_editing, instructions = False, ''
+        elif 'EDIT_NEEDED:' in raw:
+            needs_editing, instructions = True, raw.split('EDIT_NEEDED:')[1].strip()
+        else:
+            needs_editing, instructions = True, raw
+        history.append(dict(iteration=iteration + 1, needs_editing=needs_editing,
+                            instructions=instructions))
+        if not needs_editing:
+            break
+        if instructions:
+            image = call(image=image, text=instructions, think=True, do_sample=False,
+                         max_think_token_n=think_max_tokens, **editing)['image']
+            edits += 1
+        iterations = iteration + 1
+    return image, dict(evaluation_history=history, raw_responses=raw_responses,
+                       iterations=iterations, edits=edits)
+
+
+def run_tir(call, prompt, common, rounds, max_tokens):
+    """Compute all TiR rounds, selecting first matching draft or the last image."""
+    image = call(text=prompt, think=False, **common)['image']
+    history, decisions, raw_responses = [], [], []
+    chosen = None
+    for _ in range(rounds):
+        raw = call(image=image, text=tir_prompt(prompt, history), understanding_output=True,
+                   think=False, do_sample=False, max_think_token_n=max_tokens)['text']
+        matched, rewritten = parse_tir(raw)
+        if matched and chosen is None:
+            chosen = image.copy()
+        history.append(rewritten)
+        decisions.append(matched)
+        raw_responses.append(raw)
+        image = call(text=rewritten, think=False, **common)['image']
+    if chosen is not None:
+        image = chosen
+    return image, dict(prompt_history=history, decisions=decisions, raw_responses=raw_responses)
 
 
 def arguments():
@@ -50,8 +149,6 @@ def arguments():
     p.add_argument('--uig-max-edits', type=int, default=4)
     p.add_argument('--tir-rounds', type=int, default=2)
     p.add_argument('--tir-max-tokens', type=int, default=128)
-    p.add_argument('--uig-root', type=Path, default=Path('/data/jyb/paper_reproductions/UiG'))
-    p.add_argument('--tir-root', type=Path, default=Path('/data/jyb/paper_reproductions/TIR'))
     p.add_argument('--save-images', action='store_true')
     p.add_argument('--allow-shared-gpu', action='store_true', help='Allow other GPU processes; timing may be contaminated')
     p.add_argument('--dry-run', action='store_true', help='Validate inputs and show manifest without importing torch or loading a model')
@@ -130,8 +227,6 @@ def benchmark(a, selected):
         others = [int(x.strip()) for x in query.stdout.splitlines() if x.strip().isdigit() and int(x.strip()) != os.getpid()]
         if others:
             raise RuntimeError(f'GPU {a.device} has active processes {others}; use an idle GPU or --allow-shared-gpu')
-    sys.path.insert(0, str(ROOT / 'scripts/paper_repro'))
-    from rng_replay import capture, restore
     import inference
     from inferencer import InterleaveInferencer
     backend = importlib.import_module('modeling.bagel.' + a.model_impl)
@@ -163,38 +258,6 @@ def benchmark(a, selected):
         with torch.no_grad():
             return inf(**kwargs)
 
-    pipeline = None
-    if 'uig' in a.methods:
-        spec = importlib.util.spec_from_file_location('speed_official_uig', a.uig_root / 'uni_reasoner.py')
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        class Adapter:
-            def __call__(self, **kwargs):
-                return call(**kwargs)
-        pipeline = module.UiGReasoner(Adapter(), logging.getLogger('speed.uig'))
-        for name in ('generation_hyper', 'generation_hyper_think', 'editing_hyper'):
-            getattr(pipeline, name).update(num_timesteps=a.steps, image_shapes=(a.resolution, a.resolution))
-        for name in ('understanding_hyper', 'generation_hyper_think', 'editing_hyper'):
-            getattr(pipeline, name)['max_think_token_n'] = a.think_max_tokens
-    if 'tir' in a.methods:
-        import run_bagel
-        run_bagel.T = a.tir_root
-        # Parse the released prompt once; don't count repeated file/AST parsing as model time.
-        import ast
-        tree = ast.parse((a.tir_root / 'src/qwen_integration.py').read_text())
-        templates = [n for n in ast.walk(tree) if isinstance(n, ast.JoinedStr) and
-                     any(isinstance(c, ast.Constant) and '### Evaluation Task:' in str(c.value) for c in n.values)]
-        if len(templates) != 4:
-            raise RuntimeError('Unexpected released TiR prompt structure')
-        compiled = [compile(ast.Expression(n), 'tir_prompt', 'eval') for n in templates]
-        def tir_prompt(prompt, history):
-            env = dict(original_prompt=prompt, last_prompt=history[-1] if history else prompt,
-                       history_text=('### Previous Prompt Refinements:\n' + ''.join(
-                           f'- Refinement {i+1}: "{p}"\n' for i, p in enumerate(history))) if history else '')
-            texts = [eval(c, {'__builtins__': {}}, env) for c in compiled]
-            assert len(set(texts)) == 1
-            return texts[0]
-
     def run(method, prompt):
         inference.setup_seeds(a.seed)
         active['state'] = capture()
@@ -214,28 +277,9 @@ def benchmark(a, selected):
                                    update_scale=a.update_scale, use_save_pic=False, **common)
             image = out['image']
         elif method == 'uig':
-            out = pipeline.generate_image_with_pipeline(prompt, max_iterations=a.uig_max_edits,
-                    save_intermediate=False, decompose_prompt=False, think=False,
-                    prompt_dir=str(a.uig_root / 'prompts'))
-            image = out['final_image']
-            detail.update(evaluation_history=out['evaluation_history'], iterations=out['iterations'])
+            image, detail = run_uig(call, prompt, common, a.uig_max_edits, a.think_max_tokens)
         else:
-            image = call(text=prompt, think=False, **common)['image']
-            history, decisions, raw_responses = [], [], []
-            chosen = None
-            for _ in range(a.tir_rounds):
-                raw = call(image=image, text=tir_prompt(prompt, history), understanding_output=True,
-                           think=False, do_sample=False, max_think_token_n=a.tir_max_tokens)['text']
-                matched, rewritten = run_bagel.parse_tir(raw)
-                if matched and chosen is None:
-                    chosen = image.copy()
-                history.append(rewritten)
-                decisions.append(matched)
-                raw_responses.append(raw)
-                image = call(text=rewritten, think=False, **common)['image']
-            if chosen is not None:
-                image = chosen
-            detail.update(prompt_history=history, decisions=decisions, raw_responses=raw_responses)
+            image, detail = run_tir(call, prompt, common, a.tir_rounds, a.tir_max_tokens)
         torch.cuda.synchronize()
         seconds = time.perf_counter() - start
         return image, dict(seconds=seconds, peak_allocated_gib=torch.cuda.max_memory_allocated() / 2**30,
@@ -279,7 +323,7 @@ def main():
         raise RuntimeError(f'Output directory is not empty: {a.outdir}; choose a new directory')
     a.outdir.mkdir(parents=True, exist_ok=True)
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(a).items()}
-    config.update(ours_interface='InterleaveInferencer.resc_for_gen -> gen_image_reca; native backend algorithm',
+    config.update(embedded_protocols={'uig_commit':'c96430bad5f734efcaf850b4e93775d928f4aeb2', 'tir_commit':'b7bf34fd4061c84c2c36131291f7b3b416dbb197'}, ours_interface='InterleaveInferencer.resc_for_gen -> gen_image_reca; native backend algorithm',
                   timing='CUDA-synchronized end-to-end; includes initial generation and all rounds; excludes loading, warmup, disk image saving',
                   seed_protocol='One image per prompt/method; reset seed before each sample; replay same RNG at every diffusion noise construction. Not the four-continuous-images full evaluation protocol.',
                   tir_selection='Compute all requested refinement rounds; select first matched pre-refinement image, else final image',
