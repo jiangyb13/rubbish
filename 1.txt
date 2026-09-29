@@ -1,774 +1,251 @@
-#!/usr/bin/env python3
-"""Compare nine GSS policies using modeling.bagel.bagel_ce.
-
-Score both images once (five CE targets each), then emit one JSONL per policy.
-Default ViT max side: 336. Same-correctness skipping is for metrics only;
-use --score-all for label-independent image selection. CPU historical replay:
---replay-scored-jsonl PREVIOUS_MERGED.jsonl. Fusion thresholds were explored on
-seed1234 repair K3 and require independent validation.
-"""
-
-from __future__ import annotations
-
-import argparse
-import hashlib
-import inspect
-import math
-import json
+import torch
 import os
-import re
+try:
+    import torch_npu
+
+    torch_npu.npu.set_compile_mode(jit_compile=False)
+    torch_npu.npu.allow_internal_format = False
+    from torch_npu.contrib import transfer_to_npu
+
+    torch_npu.npu.set_per_process_memory_fraction(0.9)
+    os.environ["COMBINED_ENABLE"] = "1"
+    os.environ["INF_NAN_MODE_ENABLE"] = "1"
+    os.environ['TOKENIZERS_PARALLELISM'] = "false"
+    os.environ['NCCL_IB_TIMEOUT'] = "18"
+    os.environ['HCCL_OP_BASE_FFTS_MODE_ENABLE'] = "true"
+
+    os.environ["MOX_SILENT_MODE"] = "1"
+    # for moxing download acceleration
+    os.environ["MOX_FILE_LARGE_FILE_METHOD"] = "1"
+    os.environ["HCCL_IF_BASE_PORT"] = "30000"
+    # enable FFTS+
+    os.environ["ASCEND_ENHANCE_ENABLE"] = "1"
+    # reduce dequeue wait time
+    os.environ["TASK_QUEUE_ENABLE"] = "2"
+    os.environ["PYTORCH_NPU_ALLOC_CONF"] = "expandable_segments:True"
+except:
+    pass
+import argparse
+import moxing as mox
+import os
+import time
 import sys
-from collections import OrderedDict
-from pathlib import Path
-from typing import Any
+import psutil
+import subprocess
+import copy
+import json
+
+def cmd_exec(cmd, just_print=False):
+    t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print("\n{}:INFO:{}".format(t, cmd))
+    if not just_print:
+        os.system(cmd)
+
+def count_lines(jsonl_path):
+    with open(jsonl_path, "r", encoding="utf-8") as f:
+        return sum(1 for _ in f)
+
+def get_rank_slice(total_num, rank_id, world_size):
+    base = total_num // world_size
+    remainder = total_num % world_size
+
+    if rank_id < remainder:
+        stidx = rank_id * (base + 1)
+        edidx = stidx + base + 1
+    else:
+        stidx = remainder * (base + 1) + (rank_id - remainder) * base
+        edidx = stidx + base
+
+    return stidx, edidx
+
+exec_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+# project_path = os.path.join(exec_path, '..')
+project_path = exec_path
+sys.path.insert(0, project_path)
+os.chdir(project_path)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--init_method', type=str, default='')
+parser.add_argument('--script', type=str, default='qwen_caption.py')
+# parser.add_argument('--config_file', type=str, default='webvid-10m.yaml')
+parser.add_argument('--start_index', type=str, default='0')
+parser.add_argument('--end_index', type=str, default='0')
+parser.add_argument('--num_per', type=int, default=2)
+parser.add_argument('--num_pro', type=int, default=8)# 进程数
+parser.add_argument('--batch_size', type=int, default=8)
+parser.add_argument('--train_url', type=str, default=None)
+parser.add_argument('--s3_data_root', type=str,default='s3://bucket-6824-huanan/code/l60037260/video_50/')
+parser.add_argument('--s3_in_cross_pair_face_data_root', type=str,default='s3://bucket-6824-huanan/code/l60037260/video_50/')
+parser.add_argument('--s3_first_frame_data_root', type=str,default='s3://bucket-6824-huanan/code/l60037260/video_50/')
+parser.add_argument("--output_dir", help="Directory to save the model results JSON.", default="s3://bucket-6824-huanan/code/l60037260/video_50_res/")
+parser.add_argument('--start_index_zero', type=int, default=0)
+parser.add_argument('--start_index_one', type=int, default=0)
+parser.add_argument('--start_index_two', type=int, default=0)
+parser.add_argument('--start_index_three', type=int, default=0)
+parser.add_argument('--start_index_four', type=int, default=0)
+parser.add_argument('--start_index_five', type=int, default=0)
+parser.add_argument('--start_index_six', type=int, default=0)
+parser.add_argument('--start_index_seven', type=int, default=0)
+parser.add_argument('--end_index_zero', type=int, default=0)
+parser.add_argument('--end_index_one', type=int, default=0)
+parser.add_argument('--end_index_two', type=int, default=0)
+parser.add_argument('--end_index_three', type=int, default=0)
+parser.add_argument('--end_index_four', type=int, default=0)
+parser.add_argument('--end_index_five', type=int, default=0)
+parser.add_argument('--end_index_six', type=int, default=0)
+parser.add_argument('--end_index_seven', type=int, default=0)
+parser.add_argument('--input_index_mode', dest='input_index_mode', action='store_true', help='whether to vid_out png format vid_outs')
+parser.add_argument('--pkl_path', type=str, default='')
+parser.add_argument('--jsonl_path', type=str, default='')
+parser.add_argument("--model_dir", default="")
+
+args = parser.parse_args()
+
+# ===== 临时调试：确认 ModelArts 把 qwen_caption.py 放在哪里 =====
+print("\n========== DEBUG FILE PATH ==========")
+print("当前工作目录 cwd:", os.getcwd())
+print("当前启动脚本:", os.path.abspath(__file__))
+
+os.system(
+    "find /home/ma-user/modelarts/user-job-dir "
+    "-name 'qwen_caption.py' -print"
+)
+print("=====================================\n")
+# ========================================================
+
+procmd = 'ASCEND_RT_VISIBLE_DEVICES'
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(PROJECT_ROOT))
+tios_nps = os.getenv("RANK_ID")
+print(f"这是RANK_ID：{tios_nps}")
+rank_id = int(os.getenv("RANK_ID"))  # global_rank
+device_id = int(os.getenv("DEVICE_ID"))  # local_rank
+world_size = int(os.getenv("RANK_SIZE"))  # world_size
+print('rank_id: ', rank_id, 'device_id: ', device_id, 'world size: ', world_size)
 
-NESTED_IMAGE_PATTERN = re.compile(r"(?:^|/)(\d+)/samples/(\d+)\.png$")
-FLAT_IMAGE_PATTERN = re.compile(r"(?:^|/)prompt_(\d+)_sample_(\d+)\.png$")
+# sample_npu = (int(args.end_index) - int(args.start_index)) / world_size
+# stidx = int(rank_id * sample_npu)+int(args.start_index)
+# edidx = int((rank_id + 1) * sample_npu)+int(args.start_index)
+# breakpoint()
+if device_id == 0:
+    mox.file.copy_parallel(args.model_dir, 'qwen_models')
+    jsonl_path = os.path.basename(args.jsonl_path)
+    jsonl_path = os.path.join('/cache/', jsonl_path)
+    mox.file.copy(args.jsonl_path, jsonl_path)
+else:
+    jsonl_path = os.path.basename(args.jsonl_path)
+    jsonl_path = os.path.join('/cache/', jsonl_path)
 
+running_cnt = 0
+while True:
+    running_cnt_fn = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'rank_{}.txt'.format(rank_id))
+    if mox.file.exists(running_cnt_fn):
+        running_cnt += 1
+    else:
+        break
+print('RUNNING CNT:', running_cnt)
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Select between evaluated base/method images using Bagel UMM voting, "
-            "then report the merged Geneval score."
-        )
-    )
-    parser.add_argument("base_jsonl", help="Geneval JSONL for baseline images.")
-    parser.add_argument("method_jsonl", help="Geneval JSONL for method images.")
-    parser.add_argument("--model", default="/data/jyb/pretrained_models/BAGEL-7B-MoT", help="Local BAGEL checkpoint directory.")
-    parser.add_argument("--backend", choices=("local",), default="local")
-    parser.add_argument("--score-all", action="store_true", help="Score every pair without using correct labels to skip pairs.")
-    parser.add_argument("--device", default="cuda:0", help="CUDA device used by the UMM scorer.")
-    parser.add_argument("--max-latent-size", type=int, default=64)
-    parser.add_argument("--ce-max-tokens", type=int, default=192)
-    parser.add_argument("--ce-vit-max-side", type=int, default=336)
-    parser.add_argument(
-        "--reflection-max-tokens",
-        type=int,
-        default=112,
-        help="Maximum generation length for the v1 reflection (default: 112).",
-    )
-    parser.add_argument(
-        "--score-cache",
-        default=None,
-        help="Resume-safe score JSONL; defaults to OUTDIR/scores.jsonl.",
-    )
-    parser.add_argument(
-        "--analyze-only",
-        action="store_true",
-        help="Validate pairing and print disagreement counts without loading Bagel.",
-    )
-    parser.add_argument('--target-mode', choices=('user', 'reflection'), default='user', help='reflection: generate one repair description from Base, shared by both candidates.')
-    parser.add_argument('--outdir', default='merge_ce_results', help='One merged JSONL per strategy plus comparison.json.')
-    parser.add_argument('--replay-scored-jsonl', help='CPU-only replay of an earlier scored merged JSONL; retains historical score provenance.')
-    return parser.parse_args()
+# for multi node synchronization
+s3_rank_id_fn = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'rank_{}.txt'.format(rank_id))
+if mox.file.exists(s3_rank_id_fn):
+    mox.file.remove(s3_rank_id_fn, recursive=False)
+    time.sleep(10)
+mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
 
+while not mox.file.exists(s3_rank_id_fn):
+    mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
 
-def read_jsonl(path: Path) -> list[dict]:
-    rows = []
-    with path.open(encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"{path}:{line_number}: invalid JSON") from error
-            if not isinstance(row, dict):
-                raise ValueError(f"{path}:{line_number}: expected a JSON object")
-            if "metadata" in row:
-                meta = metadata_dict(row["metadata"])
-                row.setdefault("prompt", meta.get("prompt"))
-                row.setdefault("tag", meta.get("tag"))
-            missing = {"filename", "prompt", "correct", "tag", "metadata"} - row.keys()
-            if missing:
-                raise ValueError(f"{path}:{line_number}: missing fields {sorted(missing)}")
-            if not isinstance(row["correct"], bool):
-                raise ValueError(f"{path}:{line_number}: 'correct' must be true or false")
-            rows.append(row)
-    if not rows:
-        raise ValueError(f"{path}: no result rows found")
-    return rows
-
-
-def metadata_dict(value):
-    result = json.loads(value) if isinstance(value, str) else value
-    if not isinstance(result, dict):
-        raise ValueError("metadata must be a dict or JSON object string")
-    return result
-
-
-def sample_key(row: dict) -> tuple[str, int]:
-    filename = str(row["filename"]).replace("\\", "/")
-    for pattern in (NESTED_IMAGE_PATTERN, FLAT_IMAGE_PATTERN):
-        match = pattern.search(filename)
-        if match:
-            sample = int(match.group(2))
+print("waiting!!!!!!")
+while True:
+    all_rank_exist = True
+    for rank_item in range(world_size):
+        rank_fn_item = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'rank_{}.txt'.format(rank_item))
+        if not mox.file.exists(rank_fn_item):
+            all_rank_exist = False
+            if device_id == 0:
+                cmd_exec(
+                    "missing file: {}, wait.".format(rank_fn_item), just_print=True
+                )
             break
+    if all_rank_exist:
+        break
     else:
-        stem = Path(filename).stem
-        if not stem.isdigit():
-            raise ValueError(f"Cannot extract sample index from {filename!r}")
-        sample = int(stem)
-    # Local prompt-directory indices can differ between subsets and full sets.
-    return json.dumps(metadata_dict(row["metadata"]), sort_keys=True, ensure_ascii=False), sample
+        time.sleep(20)  # delay 20 sec
 
+total_num = count_lines(jsonl_path)
 
-def index_rows(rows: list[dict], label: str) -> dict[tuple[str, int], dict]:
-    indexed = {}
-    for row in rows:
-        key = sample_key(row)
-        if key in indexed:
-            raise ValueError(f"{label}: duplicate sample key {key}")
-        indexed[key] = row
-    return indexed
+num_groups = max(world_size // 4, 1) 
+group_id = rank_id // 4     
 
+stidx, edidx = get_rank_slice(total_num, group_id, num_groups)
+# breakpoint()
+if device_id % 4 == 0:
+    # cmd = f"NPU_VISIBLE_DEVICES={device_id},{device_id + 1},{device_id + 2},{device_id + 3}  {procmd}={device_id},{device_id + 1},{device_id + 2},{device_id + 3} python {args.script} --start_index {stidx} --end_index {edidx} --s3_data_root {args.s3_data_root}  --output_dir {args.output_dir} --jsonl_path {jsonl_path} "
+    # qwen_caption.py 与当前 inference_npus_new.py 位于同一目录
+    script_path = os.path.join(exec_path, args.script)
 
-def validate_pair(base_row: dict, method_row: dict, key: tuple[str, int]) -> None:
-    for field in ("prompt", "tag", "metadata"):
-        if (metadata_dict(base_row[field]) != metadata_dict(method_row[field]) if field == "metadata" else base_row[field] != method_row[field]):
-            raise ValueError(f"Sample {key}: base/method field {field!r} does not match")
+    # print("当前工作目录:", os.getcwd())
+    # print("当前 launcher 路径:", os.path.abspath(__file__))
+    # print("qwen_caption 路径:", script_path)
+    # print("qwen_caption 是否存在:", os.path.isfile(script_path))
 
+    cmd = (
+        f"NPU_VISIBLE_DEVICES={device_id},{device_id + 1},{device_id + 2},{device_id + 3} "
+        f"{procmd}={device_id},{device_id + 1},{device_id + 2},{device_id + 3} "
+        f"python {script_path} "
+        f"--start_index {stidx} "
+        f"--end_index {edidx} "
+        f"--s3_data_root {args.s3_data_root} "
+        f"--s3_in_cross_pair_face_data_root {args.s3_in_cross_pair_face_data_root} "
+        f"--s3_first_frame_data_root {args.s3_first_frame_data_root} "
+        f"--output_dir {args.output_dir} "
+        f"--jsonl_path {jsonl_path}"
+    )
+else:
+    cmd = ""
 
-def analyze_pairs(base_rows: list[dict], method_rows: list[dict]) -> tuple[list[tuple[tuple[str, int], dict, dict]], dict]:
-    base_index = index_rows(base_rows, "base")
-    method_index = index_rows(method_rows, "method")
-    base_keys = set(base_index)
-    method_keys = set(method_index)
-    if base_keys != method_keys:
-        missing_method = sorted(base_keys - method_keys)[:10]
-        missing_base = sorted(method_keys - base_keys)[:10]
-        raise ValueError(
-            f"Result keys differ: missing_method={missing_method}, missing_base={missing_base}"
-        )
+# print(cmd)
+# print("当前tios_nps:",tios_nps)
 
-    pairs = []
-    counts = {
-        "total": len(base_keys),
-        "same_true": 0,
-        "same_false": 0,
-        "disagreements": 0,
-        "base_true_method_false": 0,
-        "base_false_method_true": 0,
-    }
-    for key in sorted(base_keys):
-        base_row = base_index[key]
-        method_row = method_index[key]
-        validate_pair(base_row, method_row, key)
-        pairs.append((key, base_row, method_row))
-        if base_row["correct"] == method_row["correct"]:
-            counts["same_true" if base_row["correct"] else "same_false"] += 1
-        else:
-            counts["disagreements"] += 1
-            direction = "base_true_method_false" if base_row["correct"] else "base_false_method_true"
-            counts[direction] += 1
-    return pairs, counts
+# k_tmp = int(tios_nps)%8
+# print("当前tios_nps%8:",k_tmp)
+# print("睡眠时间：",180*int(k_tmp))
+# time.sleep(180*int(k_tmp))
 
+if device_id % 4 == 0:
+    print(f"rank id: {rank_id}, device id: {device_id}, 运行: {cmd}")
+    os.system(cmd)
+else:
+    leader_rank = rank_id - (device_id % 4)
+    leader_finish_file = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', f'finish_rank_{leader_rank}.txt')
+    print(f"组员卡 {rank_id} 进入等待，等待 Leader 卡 {leader_rank} 完成...")
+    
+    while not mox.file.exists(leader_finish_file):
+        time.sleep(15)
 
-class BagelPromptCEScorer:
-    """Load Bagel and produce independent image/prompt compatibility scores."""
+# for multi node synchronization
+s3_rank_id_fn = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'finish_rank_{}.txt'.format(rank_id))
+if mox.file.exists(s3_rank_id_fn):
+    mox.file.remove(s3_rank_id_fn, recursive=False)
+    time.sleep(10)
+mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
 
-    def __init__(
-        self,
-        model_source: str,
-        device_name: str,
-        max_latent_size: int,
-        ce_max_tokens: int,
-        ce_vit_max_side: int,
-        reflection_max_tokens: int,
-        selection_strategy: str,
-        backend: str = "local",
-    ):
-        import torch
-        from PIL import Image, ImageOps
+while not mox.file.exists(s3_rank_id_fn):
+    mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
 
-
-        if backend == "local":
-            requested = torch.device(device_name)
-            if requested.type != "cuda":
-                raise ValueError("--device must be a CUDA device")
-            visible = os.environ.get("CUDA_VISIBLE_DEVICES")
-            index = requested.index or 0
-            os.environ["CUDA_VISIBLE_DEVICES"] = visible.split(",")[index] if visible else str(index)
-            device_name = "cuda:0"
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is required for Bagel UMM CE scoring")
-        device = torch.device(device_name)
-        if device.type != "cuda":
-            raise ValueError("--device must be a CUDA device such as cuda:0")
-        torch.cuda.set_device(device)
-
-        self.backend = backend
-        self.model_source = str(Path(model_source).expanduser().resolve()) if backend == "local" else model_source
-        self.max_latent_size = max_latent_size
-        if backend == "nebula":
-            from GenEval.gen_reca_nebula import initialize_inferencer, resolve_model_source
-            model_path = resolve_model_source(model_source)
-            init_args = argparse.Namespace(model=str(model_path), max_latent_size=max_latent_size)
-            self.inferencer = initialize_inferencer(init_args, device)
-        else:
-            if max_latent_size != 64:
-                raise ValueError("The local backend supports max-latent-size=64 only")
-            for name in list(os.environ):
-                if name.startswith("BAGEL_"):
-                    del os.environ[name]
-            import inference
-            from modeling.bagel import bagel_ce
-            from types import SimpleNamespace
-            inference.Bagel = bagel_ce.Bagel
-            inference.BagelConfig = bagel_ce.BagelConfig
-            model, vae, tokenizer, token_ids, _, transform = inference.initialize_full_model(self.model_source)
-            vae = vae.to('cpu')
-            device = next(model.vit_model.parameters()).device
-            self.local = SimpleNamespace(model=model, vae=vae, tokenizer=tokenizer,
-                token_ids=token_ids, image_transform=transform, device=device,
-                dtype=next(model.vit_model.parameters()).dtype)
-            self.inferencer = SimpleNamespace(model=model, vit_transform=transform,
-                tokenizer=tokenizer, new_token_ids=token_ids)
-            for parameter in model.parameters(): parameter.requires_grad_(False)
-        self.model = self.inferencer.model
-        self.device = device
-        self.ce_max_tokens = ce_max_tokens
-        self.ce_vit_max_side = ce_vit_max_side
-        self.reflection_max_tokens = reflection_max_tokens
-        self.model.eval()
-        self.selection_strategy = selection_strategy
-        self.torch = torch
-        self.Image = Image
-        self.ImageOps = ImageOps
-
-    @property
-    def cache_identity(self) -> dict:
-        return {**self._score_identity(), "backend": self.backend,
-                "model_source": self.model_source, "max_latent_size": self.max_latent_size,
-                "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "model_impl": "modeling.bagel.bagel_ce",
-                "model_impl_sha256": hashlib.sha256((PROJECT_ROOT/'modeling/bagel/bagel_ce.py').read_bytes()).hexdigest(),
-                "checkpoint_stat": [(str(p), p.stat().st_size, p.stat().st_mtime_ns)
-                    for p in sorted(Path(self.model_source).glob("*.safetensors"))]}
-
-    def _score_identity(self) -> dict:
-        if self.selection_strategy == "reflection_yes_no":
-            return {
-                "version": "bagel-v1-reflection-yes-no-v1",
-                "selection_strategy": "reflection_yes_no",
-                "ce_max_tokens": self.ce_max_tokens,
-                "ce_vit_max_side": self.ce_vit_max_side,
-                "reflection_max_tokens": self.reflection_max_tokens,
-            }
-        # yes_no and vote compute the same full score set, so they deliberately
-        # share cache keys. This lets selection policies be replayed without
-        # running Bagel again.
-        score_mode = "ce" if self.selection_strategy == "ce" else "vote"
-        return {
-            "version": "bagel-ce-vote-v2",
-            "selection_strategy": score_mode,
-            "ce_max_tokens": self.ce_max_tokens,
-            "ce_vit_max_side": self.ce_vit_max_side,
-        }
-
-    def _loss(self, image, target_text: str, instruction: str | None = None) -> float:
-        if self.backend == "local":
-            import numpy as np
-            tensor = self.torch.from_numpy(np.asarray(image, dtype=np.float32).copy() / 255).permute(2, 0, 1).unsqueeze(0)
-            tensor = tensor.to(device=self.local.device, dtype=self.local.dtype)
-            common = dict(x_t_0=None, vae_model=self.local.vae,
-                image_shape=(image.height, image.width), image_transform=self.local.image_transform,
-                tokenizer=self.local.tokenizer, new_token_ids=self.local.token_ids,
-                ce_vit_max_side=self.ce_vit_max_side)
-            # Adapt the legacy latent-only interface in this scorer process only.
-            # All downstream ViT preprocessing and CE remain the model's own code.
-            # Feed decoded RGB directly, avoiding lossy VAE encode/decode.
-            if 'decoded_image' in inspect.signature(self.model.UnderstandingCELoss).parameters:
-                common['decoded_image'] = tensor
-                loss, _ = self.model.UnderstandingCELoss(target_text=target_text,
-                    instruction=instruction, ce_max_tokens=self.ce_max_tokens, **common)
-            else:
-                old = self.model._decode_reca_latent_to_tensor
-                try:
-                    self.model._decode_reca_latent_to_tensor = lambda *args, **kwargs: tensor
-                    loss, _ = self.model.UnderstandingCELoss(target_text=target_text,
-                        instruction=instruction, ce_max_tokens=self.ce_max_tokens, **common)
-                finally:
-                    self.model._decode_reca_latent_to_tensor = old
-            value = float(loss.detach().cpu())
-            if not math.isfinite(value): raise ValueError("Non-finite CE score")
-            return value
-        loss, _ = self.model.UnderstandingImageCELoss(
-            image=image,
-            target_text=target_text,
-            image_transform=self.inferencer.vit_transform,
-            tokenizer=self.inferencer.tokenizer,
-            new_token_ids=self.inferencer.new_token_ids,
-            ce_max_tokens=self.ce_max_tokens,
-            ce_vit_max_side=self.ce_vit_max_side,
-            instruction=instruction,
-            debug=False,
-        )
-        return float(loss.detach().cpu())
-
-    def _v1_reflection(self, image, prompt: str) -> tuple[str, bool]:
-        instruction = (
-            f"User request: '{prompt}'. Look at the draft and consider what needs to change "
-            "to fulfill the request. Then describe the image after those changes in one or "
-            "two concise sentences. Bind each requested property to its object and make "
-            "unclear requested details recognizable. Preserve compatible visible details. "
-            "Output only the resulting image description, about 30 to 50 words."
-        )
-        reflection = self.model.chat(
-            tokenizer=self.inferencer.tokenizer,
-            new_token_ids=self.inferencer.new_token_ids,
-            image_transform=self.inferencer.vit_transform,
-            images=[image],
-            prompt=instruction,
-            max_length=self.reflection_max_tokens,
-            do_sample=False,
-            **({"debug": False} if "debug" in inspect.signature(self.model.chat).parameters else {}),
-        ).strip()
-        fallback = not reflection or "键" in reflection
-        return (prompt if fallback else reflection), fallback
-
-    def __call__(self, image_path: str, prompt: str) -> dict[str, Any]:
-        path = Path(image_path)
-        if not path.is_file():
-            raise FileNotFoundError(f"Image does not exist: {path}")
-        with self.Image.open(path) as image_file:
-            image = self.ImageOps.exif_transpose(image_file).convert("RGB")
-            with self.torch.no_grad(), self.torch.autocast(
-                device_type="cuda", enabled=True, dtype=self.torch.bfloat16
-            ):
-                prompt_ce = self._loss(image, prompt)
-                scores = {"prompt_ce": prompt_ce}
-                if self.selection_strategy == "ce":
-                    return scores
-
-                if self.selection_strategy == "reflection_yes_no":
-                    reflection, reflection_fallback = self._v1_reflection(image, prompt)
-                    reflection_instruction = (
-                        "Examine the image carefully. Decide whether the image fully satisfies "
-                        "every detail in the reference description below. Answer only Yes or No. "
-                        f"Reference description: {reflection!r}"
-                    )
-                    reflection_yes_ce = self._loss(image, "Yes", reflection_instruction)
-                    reflection_no_ce = self._loss(image, "No", reflection_instruction)
-                    scores.update(
-                        {
-                            "reflection_text": reflection,
-                            "reflection_fallback_to_user_prompt": reflection_fallback,
-                            "reflection_yes_ce": reflection_yes_ce,
-                            "reflection_no_ce": reflection_no_ce,
-                            "reflection_yes_margin": reflection_no_ce - reflection_yes_ce,
-                        }
-                    )
-                    return scores
-
-                global_instruction = (
-                    "Examine the image carefully. Decide whether it fully satisfies every part "
-                    f"of this prompt: {prompt!r}. Consider objects, counts, colors, attributes, "
-                    "and spatial relationships. Answer only Yes or No."
+print("waiting!!!!!!")
+while True:
+    all_rank_exist = True
+    for rank_item in range(world_size):
+        rank_fn_item = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'finish_rank_{}.txt'.format(rank_item))
+        if not mox.file.exists(rank_fn_item):
+            all_rank_exist = False
+            if device_id == 0:
+                cmd_exec(
+                    "missing file: {}, wait.".format(rank_fn_item), just_print=True
                 )
-                global_yes_ce = self._loss(image, "Yes", global_instruction)
-                global_no_ce = self._loss(image, "No", global_instruction)
-
-                match_instruction = (
-                    "Compare the image with the complete prompt below. They Match only if every "
-                    "requested object, count, color, attribute, and spatial relationship is "
-                    f"satisfied. Prompt: {prompt!r}. Answer only Match or Mismatch."
-                )
-                match_ce = self._loss(image, "Match", match_instruction)
-                mismatch_ce = self._loss(image, "Mismatch", match_instruction)
-                scores.update(
-                    {
-                        "global_yes_ce": global_yes_ce,
-                        "global_no_ce": global_no_ce,
-                        "global_yes_margin": global_no_ce - global_yes_ce,
-                        "match_ce": match_ce,
-                        "mismatch_ce": mismatch_ce,
-                        "match_margin": mismatch_ce - match_ce,
-                    }
-                )
-        return scores
-
-
-class JsonlScoreCache:
-    """Append-only score cache that tolerates an interrupted final line."""
-
-    def __init__(self, path: Path | None):
-        self.path = path
-        self.scores: dict[str, dict[str, Any]] = {}
-        if path is None or not path.exists():
-            return
-        raw = path.read_bytes()
-        offset = 0
-        lines = raw.splitlines(keepends=True)
-        for index, line in enumerate(lines):
-            if not line.strip():
-                offset += len(line)
-                continue
-            try:
-                record = json.loads(line)
-                self.scores[record["cache_key"]] = record["scores"]
-            except (ValueError, KeyError, TypeError):
-                if index != len(lines)-1:
-                    raise ValueError(f"Corrupt cache line {index+1}: {path}")
-                with path.open("r+b") as handle: handle.truncate(offset)
-                print(f"Truncated interrupted cache tail: {path}", flush=True)
-                break
-            offset += len(line)
-        else:
-            if raw and not raw.endswith(b"\n"):
-                with path.open("ab") as handle: handle.write(b"\n")
-
-    @staticmethod
-    def make_key(row: dict, scorer: BagelPromptCEScorer) -> str:
-        payload = {
-            "filename": str(Path(row["filename"]).resolve()),
-            "image_sha256": hashlib.sha256(Path(row["filename"]).read_bytes()).hexdigest(),
-            "prompt": row["prompt"],
-            **scorer.cache_identity,
-        }
-        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-    def get_or_score(self, row: dict, scorer: BagelPromptCEScorer) -> tuple[dict[str, Any], bool]:
-        cache_key = self.make_key(row, scorer)
-        cached = self.scores.get(cache_key)
-        if cached is not None:
-            return cached, True
-        scores = scorer(row["filename"], row["prompt"])
-        self.scores[cache_key] = scores
-        if self.path is not None:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            record = {
-                "cache_key": cache_key,
-                "filename": row["filename"],
-                "scores": scores,
-            }
-            with self.path.open("a", encoding="utf-8") as file:
-                file.write(json.dumps(record, ensure_ascii=False) + "\n")
-                file.flush()
-                os.fsync(file.fileno())
-        return scores, False
-
-
-def voter_choices(base_scores: dict[str, Any], method_scores: dict[str, Any]) -> dict[str, str]:
-    """Return one base/method choice from each independently phrased voter."""
-    return {
-        "prompt_ce": "method"
-        if method_scores["prompt_ce"] < base_scores["prompt_ce"]
-        else "base",
-        "global_yes_no": "method"
-        if method_scores["global_yes_margin"] > base_scores["global_yes_margin"]
-        else "base",
-        "match_mismatch": "method"
-        if method_scores["match_margin"] > base_scores["match_margin"]
-        else "base",
-    }
-
-
-def majority_choice(votes: dict[str, str]) -> tuple[str, dict[str, int]]:
-    counts = {
-        "base": sum(choice == "base" for choice in votes.values()),
-        "method": sum(choice == "method" for choice in votes.values()),
-    }
-    # Three voters cannot normally tie; base is the deterministic fallback.
-    selected = "method" if counts["method"] > counts["base"] else "base"
-    return selected, counts
-
-
-def select_rows(
-    pairs: list[tuple[tuple[str, int], dict, dict]],
-    scorer: BagelPromptCEScorer,
-    score_cache: JsonlScoreCache,
-    selection_strategy: str,
-    score_all: bool = False,
-) -> tuple[list[dict], dict]:
-    selected_rows = []
-    stats = {
-        "ce_scored_pairs": 0,
-        "selected_base": 0,
-        "selected_method": 0,
-        "disagreement_selected_base": 0,
-        "disagreement_selected_method": 0,
-        "ties_selected_base": 0,
-        "cache_hits": 0,
-        "cache_misses": 0,
-        "voter_stats": {},
-    }
-    disagreement_number = 0
-    disagreement_total = sum(score_all or base["correct"] != method["correct"] for _, base, method in pairs)
-    for key, base_row, method_row in pairs:
-        same_correctness = base_row["correct"] == method_row["correct"]
-        if same_correctness and not score_all:
-            selected_source = "base"
-            selected = dict(base_row)
-            base_ce = method_ce = None
-            base_scores = method_scores = None
-            votes = {}
-            vote_counts = {}
-            reason = "same_geneval_result_ce_skipped"
-        else:
-            disagreement_number += 1
-            print(
-                f"[CE {disagreement_number}/{disagreement_total}] sample={key} scoring base",
-                flush=True,
-            )
-            base_scores, base_cached = score_cache.get_or_score(base_row, scorer)
-            print(
-                f"[CE {disagreement_number}/{disagreement_total}] sample={key} scoring method",
-                flush=True,
-            )
-            method_scores, method_cached = score_cache.get_or_score(method_row, scorer)
-            stats["cache_hits"] += int(base_cached) + int(method_cached)
-            stats["cache_misses"] += int(not base_cached) + int(not method_cached)
-            base_ce = base_scores["prompt_ce"]
-            method_ce = method_scores["prompt_ce"]
-            stats["ce_scored_pairs"] += 1
-            if selection_strategy in {"vote", "yes_no"}:
-                votes = voter_choices(base_scores, method_scores)
-                if selection_strategy == "vote":
-                    selected_source, vote_counts = majority_choice(votes)
-                    reason = "bagel_three_voter_majority"
-                else:
-                    selected_source = votes["global_yes_no"]
-                    vote_counts = {
-                        "base": sum(choice == "base" for choice in votes.values()),
-                        "method": sum(choice == "method" for choice in votes.values()),
-                    }
-                    reason = "bagel_global_yes_no"
-            elif selection_strategy == "reflection_yes_no":
-                votes = {
-                    "reflection_yes_no": "method"
-                    if method_scores["reflection_yes_margin"]
-                    > base_scores["reflection_yes_margin"]
-                    else "base"
-                }
-                selected_source = votes["reflection_yes_no"]
-                vote_counts = {
-                    "base": int(selected_source == "base"),
-                    "method": int(selected_source == "method"),
-                }
-                reason = "bagel_v1_reflection_yes_no"
-            else:
-                votes = {"prompt_ce": "method" if method_ce < base_ce else "base"}
-                vote_counts = {
-                    "base": sum(choice == "base" for choice in votes.values()),
-                    "method": sum(choice == "method" for choice in votes.values()),
-                }
-                selected_source = votes["prompt_ce"]
-                reason = "lower_user_prompt_ce"
-                if method_ce == base_ce:
-                    stats["ties_selected_base"] += 1
-            selected = dict(method_row if selected_source == "method" else base_row)
-            if not same_correctness:
-                stats[f"disagreement_selected_{selected_source}"] += 1
-            expected_source = "base" if base_row["correct"] else "method"
-            for voter, choice in (votes.items() if not same_correctness else []):
-                voter_stat = stats["voter_stats"].setdefault(voter, {"correct": 0, "total": 0})
-                voter_stat["total"] += 1
-                voter_stat["correct"] += int(choice == expected_source)
-            print(
-                f"[CE {disagreement_number}/{disagreement_total}] sample={key} "
-                f"base_ce={base_ce:.6g} method_ce={method_ce:.6g} "
-                f"votes={votes} selected={selected_source}",
-                flush=True,
-            )
-
-        stats[f"selected_{selected_source}"] += 1
-        selected.update(
-            {
-                "ce_merge_selected": selected_source,
-                "ce_merge_reason": reason,
-                "ce_merge_base_filename": base_row["filename"],
-                "ce_merge_method_filename": method_row["filename"],
-                "ce_merge_base_correct": base_row["correct"],
-                "ce_merge_method_correct": method_row["correct"],
-                "ce_merge_base_ce": base_ce,
-                "ce_merge_method_ce": method_ce,
-                "ce_merge_base_scores": base_scores,
-                "ce_merge_method_scores": method_scores,
-                "ce_merge_votes": votes,
-                "ce_merge_vote_counts": vote_counts,
-            }
-        )
-        selected_rows.append(selected)
-    return selected_rows, stats
-
-
-def geneval_summary(rows: list[dict]) -> dict:
-    task_values: OrderedDict[str, list[bool]] = OrderedDict()
-    prompt_values: dict[str, list[bool]] = {}
-    for row in rows:
-        task_values.setdefault(row["tag"], []).append(row["correct"])
-        metadata_key = json.dumps(metadata_dict(row["metadata"]), sort_keys=True)
-        prompt_values.setdefault(metadata_key, []).append(row["correct"])
-
-    task_scores = {
-        tag: sum(values) / len(values)
-        for tag, values in task_values.items()
-    }
-    return {
-        "total_images": len(rows),
-        "total_prompts": len(prompt_values),
-        "correct_image_rate": sum(row["correct"] for row in rows) / len(rows),
-        "correct_prompt_rate": sum(any(values) for values in prompt_values.values()) / len(prompt_values),
-        "task_scores": task_scores,
-        "overall_score": sum(task_scores.values()) / len(task_scores),
-    }
-
-
-def print_summary(summary: dict) -> None:
-    print("\nMerged Geneval summary")
-    print("======================")
-    print(f"Total images: {summary['total_images']}")
-    print(f"Total prompts: {summary['total_prompts']}")
-    print(f"% correct images: {summary['correct_image_rate']:.2%}")
-    print(f"% correct prompts: {summary['correct_prompt_rate']:.2%}")
-    print("Task breakdown:")
-    for tag, score in summary["task_scores"].items():
-        print(f"  {tag:<16} = {score:.2%}")
-    print(f"Overall score (avg. over tasks): {summary['overall_score']:.5f}")
-
-
-def write_jsonl(rows: list[dict], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    with temporary.open("w", encoding="utf-8") as file:
-        for row in rows:
-            file.write(json.dumps(row, ensure_ascii=False) + "\n")
-    temporary.replace(path)
-
-
-STRATEGIES = ('prompt_ce', 'yes_no', 'match', 'majority', 'unanimous', 'any_vote',
-              'fusion_60_40', 'fusion_80_20_t075', 'fusion_70_30_tm025')
-
-
-def choose_strategy(base, method, strategy):
-    a = base['prompt_ce'] - method['prompt_ce']
-    y = method['global_yes_margin'] - base['global_yes_margin']
-    b = method['match_margin'] - base['match_margin']
-    if not all(math.isfinite(v) for v in (a,y,b)): raise ValueError('Non-finite score')
-    votes = int(a>0)+int(y>0)+int(b>0)
-    decisions = {
-        'prompt_ce': a>0, 'yes_no': y>0, 'match': b>0,
-        'majority': votes>=2, 'unanimous': votes==3, 'any_vote': votes>=1,
-        'fusion_60_40': .6*a+.4*b>0,
-        'fusion_80_20_t075': .8*a+.2*b>.075,
-        'fusion_70_30_tm025': .7*a+.3*b>-.025,
-    }
-    return 'method' if decisions[strategy] else 'base'
-
-
-def reflection_pairs(pairs, scorer, cache_path, score_all=False):
-    class ReflectionGenerator:
-        @property
-        def cache_identity(self):
-            return {**scorer.cache_identity, 'purpose':'shared_base_repair_reflection_v1',
-                    'reflection_max_tokens':scorer.reflection_max_tokens}
-        def __call__(self, filename, prompt):
-            with scorer.Image.open(filename) as image:
-                image=scorer.ImageOps.exif_transpose(image).convert('RGB')
-                with scorer.torch.no_grad(), scorer.torch.autocast(device_type='cuda', dtype=scorer.torch.bfloat16):
-                    text, fallback=scorer._v1_reflection(image,prompt)
-            if fallback: raise ValueError('Invalid reflection; refusing to silently use User prompt')
-            return {'reflection':text,'user_prompt':prompt,'base_filename':filename}
-    generator=ReflectionGenerator();cache=JsonlScoreCache(cache_path)
-    transformed=[];references={}
-    for key,base,method in pairs:
-        b,m=dict(base),dict(method)
-        if score_all or b['correct']!=m['correct']:
-            record,hit=cache.get_or_score(base,generator)
-            b['prompt']=m['prompt']=record['reflection']
-            references[(b['filename'],m['filename'])]=record['reflection']
-            print('Reflection:',base['filename'],'cached='+str(hit),record['reflection'],flush=True)
-        transformed.append((key,b,m))
-    return transformed,references
-
-
-def main():
-    args = parse_args()
-    pairs, counts = analyze_pairs(read_jsonl(Path(args.base_jsonl)), read_jsonl(Path(args.method_jsonl)))
-    print('Pair analysis:', counts, flush=True)
-    if args.analyze_only: return
-    out = Path(args.outdir); out.mkdir(parents=True, exist_ok=True)
-    def output_name(strategy):
-        if args.target_mode=='user': return strategy
-        return 'reflection_ce' if strategy=='prompt_ce' else 'reflection_'+strategy
-    manifest=out/'target_mode.json'
-    if manifest.exists() and json.loads(manifest.read_text())['target_mode']!=args.target_mode:
-        raise ValueError('Use a separate outdir for each target mode')
-    if not args.replay_scored_jsonl:
-        manifest.write_text(json.dumps({'target_mode':args.target_mode}))
-    protected = {Path(args.base_jsonl).resolve(), Path(args.method_jsonl).resolve()}
-    if args.replay_scored_jsonl: protected.add(Path(args.replay_scored_jsonl).resolve())
-    outputs = [out/(output_name(n)+'.jsonl') for n in STRATEGIES]+[out/'comparison.json',out/'scored.jsonl',out/'scored.jsonl.summary.json',out/'reflections.jsonl']
-    cachepath = Path(args.score_cache) if args.score_cache else out/'scores.jsonl'
-    if len({p.resolve() for p in outputs+[cachepath]}) != len(outputs)+1 or any(p.resolve() in protected for p in outputs+[cachepath]):
-        raise ValueError('Input/output/cache paths overlap')
-    if args.replay_scored_jsonl:
-        source=Path(args.replay_scored_jsonl)
-        scored=read_jsonl(source)
-        modes={r.get('merge_ce_target_mode','user') for r in scored}
-        if modes!={args.target_mode}: raise ValueError('Replay target mode mismatch')
-        provenance={'mode':'historical_score_replay','source':str(source.resolve()),
-            'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
-            'note':'No new bagel_ce.py inference; scores retain their original model and resolution.'}
-        old_summary=Path(str(source)+'.summary.json')
-        if old_summary.exists(): provenance['original_summary']=json.loads(old_summary.read_text())
+            break
+    if all_rank_exist:
+        break
     else:
-        scorer=BagelPromptCEScorer(args.model,args.device,args.max_latent_size,
-            args.ce_max_tokens,args.ce_vit_max_side,args.reflection_max_tokens,'vote',args.backend)
-        scoring_pairs=pairs;references={}
-        if args.target_mode=='reflection':
-            scoring_pairs,references=reflection_pairs(pairs,scorer,out/'reflections.jsonl',args.score_all)
-        scored, stats=select_rows(scoring_pairs,scorer,JsonlScoreCache(cachepath),'vote',args.score_all)
-        originals={(b['filename'],m['filename']):b['prompt'] for _,b,m in pairs}
-        for row in scored:
-            pair=(row['ce_merge_base_filename'],row['ce_merge_method_filename'])
-            row['prompt']=originals[pair]
-            row['merge_ce_target_mode']=args.target_mode
-            row['merge_ce_reference_text']=references.get(pair, originals[pair] if args.target_mode=='user' else None)
-        provenance={'mode':'fresh_scoring','cache_identity':scorer.cache_identity,'stats':stats}
-        write_jsonl(scored,out/'scored.jsonl')
-        (out/'scored.jsonl.summary.json').write_text(json.dumps(provenance,indent=2))
-    indexed={}
-    for row in scored:
-        k=(row['ce_merge_base_filename'],row['ce_merge_method_filename'])
-        if k in indexed: raise ValueError('Duplicate replay pair')
-        indexed[k]=row
-    if len(indexed)!=len(pairs): raise ValueError('Replay pair count mismatch')
-    results={}; selected={s:[] for s in STRATEGIES}
-    for _,base,method in pairs:
-        r=indexed[(base['filename'],method['filename'])]
-        if r['prompt']!=base['prompt'] or r['ce_merge_base_correct']!=base['correct'] or r['ce_merge_method_correct']!=method['correct']:
-            raise ValueError('Replay prompt or labels mismatch')
-        bs,ms=r['ce_merge_base_scores'],r['ce_merge_method_scores']
-        if bs is None or ms is None:
-            if base['correct']!=method['correct'] or args.score_all:
-                raise ValueError('Missing required scores in replay')
-        for strategy in STRATEGIES:
-            source=choose_strategy(bs,ms,strategy) if bs is not None and ms is not None else 'base'
-            row=dict(method if source=='method' else base)
-            row.update(merge_ce_strategy=output_name(strategy),merge_ce_selected=source,
-                merge_ce_target_mode=args.target_mode,merge_ce_reference_text=r.get('merge_ce_reference_text'),
-                merge_ce_base_filename=base['filename'],merge_ce_method_filename=method['filename'])
-            selected[strategy].append(row)
-    for strategy, rows in selected.items():
-        results[output_name(strategy)]=geneval_summary(rows)
-        write_jsonl(rows,out/(output_name(strategy)+'.jsonl'))
-    report={'base':geneval_summary([b for _,b,_ in pairs]),
-        'method':geneval_summary([m for _,_,m in pairs]),'strategies':results,
-        'target_mode':args.target_mode,'reflection_policy':'one shared repair description generated from Base' if args.target_mode=='reflection' else None,'provenance':provenance,'score_all':args.score_all,'pair_counts':counts,
-        'note':'Fusion weights/thresholds were explored on seed1234 repair K3; they are not independently validated. Default same-correctness skipping preserves GenEval metrics only, not a deployment selection or speed benchmark.',
-        'fusion_definition':'A=base prompt CE-method prompt CE; B=method Match margin-base Match margin; Match margin=CE(Mismatch)-CE(Match). Select method when weighted advantage exceeds threshold, else base.'}
-    (out/'comparison.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
-    for strategy in STRATEGIES: print(f"{output_name(strategy)}: {results[output_name(strategy)]['overall_score']*100:.4f}")
-    print('Results:',out.resolve())
-
-
-if __name__ == '__main__':
-    main()
+        time.sleep(20)  # delay 20 sec
