@@ -1,24 +1,251 @@
-def _video_part_from_cluster_dir(self):
-    cluster_dir = os.path.abspath(self.config.person_clusters_dir)
+import torch
+import os
+try:
+    import torch_npu
 
-    if os.path.basename(cluster_dir) != "person_clusters":
-        return None, None
+    torch_npu.npu.set_compile_mode(jit_compile=False)
+    torch_npu.npu.allow_internal_format = False
+    from torch_npu.contrib import transfer_to_npu
 
-    video_dir = os.path.dirname(cluster_dir)
+    torch_npu.npu.set_per_process_memory_fraction(0.9)
+    os.environ["COMBINED_ENABLE"] = "1"
+    os.environ["INF_NAN_MODE_ENABLE"] = "1"
+    os.environ['TOKENIZERS_PARALLELISM'] = "false"
+    os.environ['NCCL_IB_TIMEOUT'] = "18"
+    os.environ['HCCL_OP_BASE_FFTS_MODE_ENABLE'] = "true"
 
-    return os.path.basename(video_dir), None
+    os.environ["MOX_SILENT_MODE"] = "1"
+    # for moxing download acceleration
+    os.environ["MOX_FILE_LARGE_FILE_METHOD"] = "1"
+    os.environ["HCCL_IF_BASE_PORT"] = "30000"
+    # enable FFTS+
+    os.environ["ASCEND_ENHANCE_ENABLE"] = "1"
+    # reduce dequeue wait time
+    os.environ["TASK_QUEUE_ENABLE"] = "2"
+    os.environ["PYTORCH_NPU_ALLOC_CONF"] = "expandable_segments:True"
+except:
+    pass
+import argparse
+import moxing as mox
+import os
+import time
+import sys
+import psutil
+import subprocess
+import copy
+import json
+
+def cmd_exec(cmd, just_print=False):
+    t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print("\n{}:INFO:{}".format(t, cmd))
+    if not just_print:
+        os.system(cmd)
+
+def count_lines(jsonl_path):
+    with open(jsonl_path, "r", encoding="utf-8") as f:
+        return sum(1 for _ in f)
+
+def get_rank_slice(total_num, rank_id, world_size):
+    base = total_num // world_size
+    remainder = total_num % world_size
+
+    if rank_id < remainder:
+        stidx = rank_id * (base + 1)
+        edidx = stidx + base + 1
+    else:
+        stidx = remainder * (base + 1) + (rank_id - remainder) * base
+        edidx = stidx + base
+
+    return stidx, edidx
+
+exec_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+# project_path = os.path.join(exec_path, '..')
+project_path = exec_path
+sys.path.insert(0, project_path)
+os.chdir(project_path)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--init_method', type=str, default='')
+parser.add_argument('--script', type=str, default='qwen_caption.py')
+# parser.add_argument('--config_file', type=str, default='webvid-10m.yaml')
+parser.add_argument('--start_index', type=str, default='0')
+parser.add_argument('--end_index', type=str, default='0')
+parser.add_argument('--num_per', type=int, default=2)
+parser.add_argument('--num_pro', type=int, default=8)# 进程数
+parser.add_argument('--batch_size', type=int, default=8)
+parser.add_argument('--train_url', type=str, default=None)
+parser.add_argument('--s3_data_root', type=str,default='s3://bucket-6824-huanan/code/l60037260/video_50/')
+parser.add_argument('--s3_in_cross_pair_face_data_root', type=str,default='s3://bucket-6824-huanan/code/l60037260/video_50/')
+parser.add_argument('--s3_first_frame_data_root', type=str,default='s3://bucket-6824-huanan/code/l60037260/video_50/')
+parser.add_argument("--output_dir", help="Directory to save the model results JSON.", default="s3://bucket-6824-huanan/code/l60037260/video_50_res/")
+parser.add_argument('--start_index_zero', type=int, default=0)
+parser.add_argument('--start_index_one', type=int, default=0)
+parser.add_argument('--start_index_two', type=int, default=0)
+parser.add_argument('--start_index_three', type=int, default=0)
+parser.add_argument('--start_index_four', type=int, default=0)
+parser.add_argument('--start_index_five', type=int, default=0)
+parser.add_argument('--start_index_six', type=int, default=0)
+parser.add_argument('--start_index_seven', type=int, default=0)
+parser.add_argument('--end_index_zero', type=int, default=0)
+parser.add_argument('--end_index_one', type=int, default=0)
+parser.add_argument('--end_index_two', type=int, default=0)
+parser.add_argument('--end_index_three', type=int, default=0)
+parser.add_argument('--end_index_four', type=int, default=0)
+parser.add_argument('--end_index_five', type=int, default=0)
+parser.add_argument('--end_index_six', type=int, default=0)
+parser.add_argument('--end_index_seven', type=int, default=0)
+parser.add_argument('--input_index_mode', dest='input_index_mode', action='store_true', help='whether to vid_out png format vid_outs')
+parser.add_argument('--pkl_path', type=str, default='')
+parser.add_argument('--jsonl_path', type=str, default='')
+parser.add_argument("--model_dir", default="")
+
+args = parser.parse_args()
+
+# ===== 临时调试：确认 ModelArts 把 qwen_caption.py 放在哪里 =====
+print("\n========== DEBUG FILE PATH ==========")
+print("当前工作目录 cwd:", os.getcwd())
+print("当前启动脚本:", os.path.abspath(__file__))
+
+os.system(
+    "find /home/ma-user/modelarts/user-job-dir "
+    "-name 'qwen_caption.py' -print"
+)
+print("=====================================\n")
+# ========================================================
+
+procmd = 'ASCEND_RT_VISIBLE_DEVICES'
 
 
-if self.config.one_shot_process_dir:
-    video, part = self._video_part_from_cluster_dir()
+tios_nps = os.getenv("RANK_ID")
+print(f"这是RANK_ID：{tios_nps}")
+rank_id = int(os.getenv("RANK_ID"))  # global_rank
+device_id = int(os.getenv("DEVICE_ID"))  # local_rank
+world_size = int(os.getenv("RANK_SIZE"))  # world_size
+print('rank_id: ', rank_id, 'device_id: ', device_id, 'world size: ', world_size)
 
-    if video:
-        return os.path.join(
-            self.config.one_shot_process_dir,
-            video,
-            str(item["shot_key"]),
-            f"id_{item['obj_id']}",
-            "features",
-            "face_feature",
-            f"{int(item['frame_idx'])}.npy",
-        )
+# sample_npu = (int(args.end_index) - int(args.start_index)) / world_size
+# stidx = int(rank_id * sample_npu)+int(args.start_index)
+# edidx = int((rank_id + 1) * sample_npu)+int(args.start_index)
+# breakpoint()
+if device_id == 0:
+    mox.file.copy_parallel(args.model_dir, 'qwen_models')
+    jsonl_path = os.path.basename(args.jsonl_path)
+    jsonl_path = os.path.join('/cache/', jsonl_path)
+    mox.file.copy(args.jsonl_path, jsonl_path)
+else:
+    jsonl_path = os.path.basename(args.jsonl_path)
+    jsonl_path = os.path.join('/cache/', jsonl_path)
+
+running_cnt = 0
+while True:
+    running_cnt_fn = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'rank_{}.txt'.format(rank_id))
+    if mox.file.exists(running_cnt_fn):
+        running_cnt += 1
+    else:
+        break
+print('RUNNING CNT:', running_cnt)
+
+# for multi node synchronization
+s3_rank_id_fn = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'rank_{}.txt'.format(rank_id))
+if mox.file.exists(s3_rank_id_fn):
+    mox.file.remove(s3_rank_id_fn, recursive=False)
+    time.sleep(10)
+mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
+
+while not mox.file.exists(s3_rank_id_fn):
+    mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
+
+print("waiting!!!!!!")
+while True:
+    all_rank_exist = True
+    for rank_item in range(world_size):
+        rank_fn_item = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'rank_{}.txt'.format(rank_item))
+        if not mox.file.exists(rank_fn_item):
+            all_rank_exist = False
+            if device_id == 0:
+                cmd_exec(
+                    "missing file: {}, wait.".format(rank_fn_item), just_print=True
+                )
+            break
+    if all_rank_exist:
+        break
+    else:
+        time.sleep(20)  # delay 20 sec
+
+total_num = count_lines(jsonl_path)
+
+num_groups = max(world_size // 4, 1) 
+group_id = rank_id // 4     
+
+stidx, edidx = get_rank_slice(total_num, group_id, num_groups)
+# breakpoint()
+if device_id % 4 == 0:
+    # cmd = f"NPU_VISIBLE_DEVICES={device_id},{device_id + 1},{device_id + 2},{device_id + 3}  {procmd}={device_id},{device_id + 1},{device_id + 2},{device_id + 3} python {args.script} --start_index {stidx} --end_index {edidx} --s3_data_root {args.s3_data_root}  --output_dir {args.output_dir} --jsonl_path {jsonl_path} "
+    # qwen_caption.py 与当前 inference_npus_new.py 位于同一目录
+    script_path = os.path.join(exec_path, args.script)
+
+    # print("当前工作目录:", os.getcwd())
+    # print("当前 launcher 路径:", os.path.abspath(__file__))
+    # print("qwen_caption 路径:", script_path)
+    # print("qwen_caption 是否存在:", os.path.isfile(script_path))
+
+    cmd = (
+        f"NPU_VISIBLE_DEVICES={device_id},{device_id + 1},{device_id + 2},{device_id + 3} "
+        f"{procmd}={device_id},{device_id + 1},{device_id + 2},{device_id + 3} "
+        f"python {script_path} "
+        f"--start_index {stidx} "
+        f"--end_index {edidx} "
+        f"--s3_data_root {args.s3_data_root} "
+        f"--s3_in_cross_pair_face_data_root {args.s3_in_cross_pair_face_data_root} "
+        f"--s3_first_frame_data_root {args.s3_first_frame_data_root} "
+        f"--output_dir {args.output_dir} "
+        f"--jsonl_path {jsonl_path}"
+    )
+else:
+    cmd = ""
+
+# print(cmd)
+# print("当前tios_nps:",tios_nps)
+
+# k_tmp = int(tios_nps)%8
+# print("当前tios_nps%8:",k_tmp)
+# print("睡眠时间：",180*int(k_tmp))
+# time.sleep(180*int(k_tmp))
+
+if device_id % 4 == 0:
+    print(f"rank id: {rank_id}, device id: {device_id}, 运行: {cmd}")
+    os.system(cmd)
+else:
+    leader_rank = rank_id - (device_id % 4)
+    leader_finish_file = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', f'finish_rank_{leader_rank}.txt')
+    print(f"组员卡 {rank_id} 进入等待，等待 Leader 卡 {leader_rank} 完成...")
+    
+    while not mox.file.exists(leader_finish_file):
+        time.sleep(15)
+
+# for multi node synchronization
+s3_rank_id_fn = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'finish_rank_{}.txt'.format(rank_id))
+if mox.file.exists(s3_rank_id_fn):
+    mox.file.remove(s3_rank_id_fn, recursive=False)
+    time.sleep(10)
+mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
+
+while not mox.file.exists(s3_rank_id_fn):
+    mox.file.write(s3_rank_id_fn, "{}".format(rank_id))
+
+print("waiting!!!!!!")
+while True:
+    all_rank_exist = True
+    for rank_item in range(world_size):
+        rank_fn_item = os.path.join(args.train_url, f'ranks_running_cnt{running_cnt}', 'finish_rank_{}.txt'.format(rank_item))
+        if not mox.file.exists(rank_fn_item):
+            all_rank_exist = False
+            if device_id == 0:
+                cmd_exec(
+                    "missing file: {}, wait.".format(rank_fn_item), just_print=True
+                )
+            break
+    if all_rank_exist:
+        break
+    else:
+        time.sleep(20)  # delay 20 sec
