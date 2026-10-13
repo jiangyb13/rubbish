@@ -1,7 +1,6 @@
-python /mnt/nfs/data/yibo/MiniMax_huawei/infer_acc_lora_cloud.py \
-  --rank 0 \
-  --num_ranks 1 \
+python infer_acc_lora_cloud.py \
   --visible_devices 0,1,2,3,4,5,6,7 \
+  --run_id minimax_h3_job_001 \
   --input_jsonl s3://你的桶/data/input.jsonl \
   --first_frame_s3_root s3://你的桶/first_frames/ \
   --reference_s3_root s3://你的桶/references/ \
