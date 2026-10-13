@@ -1,16 +1,195 @@
-python infer_acc_lora_cloud.py \
-  --visible_devices 0,1,2,3,4,5,6,7 \
-  --run_id minimax_h3_job_001 \
-  --input_jsonl s3://你的桶/data/input.jsonl \
-  --first_frame_s3_root s3://你的桶/first_frames/ \
-  --reference_s3_root s3://你的桶/references/ \
-  --model_s3_path s3://你的桶/models/MiniMax-H3/ \
-  --acc_lora_s3_path s3://你的桶/models/MiniMax-H3-Acc-LoRAs/ \
-  --train_url s3://你的桶/outputs/acc_run1/ \
-  --result_jsonl_name results.jsonl \
-  --cache_root /cache \
-  --device_type npu \
-  --num_frames 124 \
-  --ref_image_short_edge 512 \
-  --transformer_entry_memory_gib 14 \
-  --ff_chunk_size 1024
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/modular_pipelines/modular_pipeline.py", line 1145, in __call__
+    pipeline, state = block(pipeline, state)
+                      ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/modular_pipelines/minimax_h3/denoise.py", line 265, in __call__
+    components, block_state = self.loop_step(components, block_state, i=i, t=t)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/modular_pipelines/modular_pipeline.py", line 1515, in loop_step
+    components, state = block(components, state, **kwargs)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/modular_pipelines/minimax_h3/denoise.py", line 121, in __call__
+    block_state.noise_pred, block_state.audio_noise_pred = transformer(
+                                                           ^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1845, in _call_impl
+    return inner()
+           ^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1793, in inner
+    result = forward_call(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/accelerate/hooks.py", line 175, in new_forward
+    output = module._old_forward(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/utils/peft_utils.py", line 323, in wrapper
+    result = forward_fn(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 653, in forward
+    hidden_states = block(hidden_states, temb, adaln_indices, rotary_emb)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/accelerate/hooks.py", line 175, in new_forward
+    output = module._old_forward(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+    ff_output = self.ff(norm_hidden_states)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/accelerate/hooks.py", line 175, in new_forward
+    output = module._old_forward(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/models/attention.py", line 1741, in forward
+    hidden_states = module(hidden_states)
+                    ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/accelerate/hooks.py", line 175, in new_forward
+    output = module._old_forward(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/diffusers/models/activations.py", line 144, in forward
+    hidden_states = self.proj(hidden_states)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/accelerate/hooks.py", line 175, in new_forward
+    output = module._old_forward(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/work/jwx1416454/MiniMax-H3-Acc-LoRAs/minimax_h3_pdd.py", line 117, in forward
+    return out + self.scaling * update.to(out.dtype)
+           ~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RuntimeError: NPU out of memory. Tried to allocate 2.18 GiB (NPU 4; 29.49 GiB total capacity; 25.80 GiB already allocated; 25.80 GiB current active; 1.27 GiB free; 27.73 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.
+[ERROR] 2026-10-13-18:59:11 (PID:2810893, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ma-user MiniMax_huawei]$bash assets/run_acc_lora_gpu.sh 
+rank=0: records [0, 1), total=1
+rank=0: resume skipped=0, pending=1, total=1
+Loading one model replica across devices 0..7
+Reference image short edge: 512
+Loading checkpoint shards: 100%|##########| 3/3 [00:00<00:00, 21.55it/s]
+Loading checkpoint shards: 100%|##########| 14/14 [00:00<00:00, 61.99it/s]
+/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/utils/weight_norm.py:143: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+Loading weights: 100%|##########| 1058/1058 [00:00<00:00, 3656.37it/s]
+Loaded PDD LoRA: /home/ma-user/work/jwx1416454/MiniMax-H3-Acc-LoRAs/MiniMax-H3-Ref2VA-Acc-8Step.safetensors (728 tensors, grid=32, block=4, nfe=8)
+Chunked 52 DiT feed-forward modules: 1024 tokens/chunk
+DiT weight budgets: {3: '14GiB', 4: '18GiB', 5: '18GiB', 6: '18GiB'}; additional memory is needed for activations
+Text device map: {'model.visual': 'npu:0', 'model.language_model.embed_tokens': 'npu:0', 'model.language_model.layers.0': 'npu:0', 'model.language_model.layers.1': 'npu:0', 'model.language_model.layers.2': 'npu:0', 'model.language_model.layers.3': 'npu:0', 'model.language_model.layers.4': 'npu:0', 'model.language_model.layers.5': 'npu:0', 'model.language_model.layers.6': 'npu:0', 'model.language_model.layers.7': 'npu:0', 'model.language_model.layers.8': 'npu:0', 'model.language_model.layers.9': 'npu:0', 'model.language_model.layers.10': 'npu:0', 'model.language_model.layers.11': 'npu:0', 'model.language_model.layers.12': 'npu:0', 'model.language_model.layers.13': 'npu:0', 'model.language_model.layers.14': 'npu:0', 'model.language_model.layers.15': 'npu:1', 'model.language_model.layers.16': 'npu:1', 'model.language_model.layers.17': 'npu:1', 'model.language_model.layers.18': 'npu:1', 'model.language_model.layers.19': 'npu:1', 'model.language_model.layers.20': 'npu:1', 'model.language_model.layers.21': 'npu:1', 'model.language_model.layers.22': 'npu:1', 'model.language_model.layers.23': 'npu:1', 'model.language_model.layers.24': 'npu:1', 'model.language_model.layers.25': 'npu:1', 'model.language_model.layers.26': 'npu:1', 'model.language_model.layers.27': 'npu:1', 'model.language_model.layers.28': 'npu:1', 'model.language_model.layers.29': 'npu:1', 'model.language_model.layers.30': 'npu:1', 'model.language_model.layers.31': 'npu:1', 'model.language_model.layers.32': 'npu:1', 'model.language_model.layers.33': 'npu:1', 'model.language_model.layers.34': 'npu:1', 'model.language_model.layers.35': 'npu:1', 'model.language_model.layers.36': 'npu:1', 'model.language_model.layers.37': 'npu:1', 'model.language_model.layers.38': 'npu:1', 'model.language_model.layers.39': 'npu:1', 'model.language_model.layers.40': 'npu:1', 'model.language_model.layers.41': 'npu:1', 'model.language_model.layers.42': 'npu:1', 'model.language_model.layers.43': 'npu:2', 'model.language_model.layers.44': 'npu:2', 'model.language_model.layers.45': 'npu:2', 'model.language_model.layers.46': 'npu:2', 'model.language_model.layers.47': 'npu:2', 'model.language_model.layers.48': 'npu:2', 'model.language_model.layers.49': 'npu:2', 'model.language_model.layers.50': 'npu:2', 'model.language_model.layers.51': 'npu:2', 'model.language_model.layers.52': 'npu:2', 'model.language_model.layers.53': 'npu:2', 'model.language_model.layers.54': 'npu:2', 'model.language_model.layers.55': 'npu:2', 'model.language_model.layers.56': 'npu:2', 'model.language_model.layers.57': 'npu:2', 'model.language_model.layers.58': 'npu:2', 'model.language_model.layers.59': 'npu:2', 'model.language_model.layers.60': 'npu:2', 'model.language_model.layers.61': 'npu:2', 'model.language_model.layers.62': 'npu:2', 'model.language_model.layers.63': 'npu:2', 'model.language_model.norm': 'npu:2', 'model.language_model.rotary_emb': 'npu:2', 'lm_head': 'npu:2'}
+Transformer device map: {'proj_in': 'npu:3', 'audio_proj_in': 'npu:3', 'context_embedder': 'npu:3', 'time_proj': 'npu:3', 'time_embedder': 'npu:3', 'rope': 'npu:3', 'token_refiner': 'npu:3', 'transformer_blocks.0': 'npu:3', 'transformer_blocks.1': 'npu:3', 'transformer_blocks.2': 'npu:3', 'transformer_blocks.3': 'npu:3', 'transformer_blocks.4': 'npu:3', 'transformer_blocks.5': 'npu:3', 'transformer_blocks.6': 'npu:3', 'transformer_blocks.7': 'npu:3', 'transformer_blocks.8': 'npu:4', 'transformer_blocks.9': 'npu:4', 'transformer_blocks.10': 'npu:4', 'transformer_blocks.11': 'npu:4', 'transformer_blocks.12': 'npu:4', 'transformer_blocks.13': 'npu:4', 'transformer_blocks.14': 'npu:4', 'transformer_blocks.15': 'npu:4', 'transformer_blocks.16': 'npu:4', 'transformer_blocks.17': 'npu:4', 'transformer_blocks.18': 'npu:4', 'transformer_blocks.19': 'npu:4', 'transformer_blocks.20': 'npu:4', 'transformer_blocks.21': 'npu:4', 'transformer_blocks.22': 'npu:5', 'transformer_blocks.23': 'npu:5', 'transformer_blocks.24': 'npu:5', 'transformer_blocks.25': 'npu:5', 'transformer_blocks.26': 'npu:5', 'transformer_blocks.27': 'npu:5', 'transformer_blocks.28': 'npu:5', 'transformer_blocks.29': 'npu:5', 'transformer_blocks.30': 'npu:5', 'transformer_blocks.31': 'npu:5', 'transformer_blocks.32': 'npu:5', 'transformer_blocks.33': 'npu:5', 'transformer_blocks.34': 'npu:5', 'transformer_blocks.35': 'npu:5', 'transformer_blocks.36': 'npu:6', 'transformer_blocks.37': 'npu:6', 'transformer_blocks.38': 'npu:6', 'transformer_blocks.39': 'npu:6', 'transformer_blocks.40': 'npu:6', 'transformer_blocks.41': 'npu:6', 'transformer_blocks.42': 'npu:6', 'transformer_blocks.43': 'npu:6', 'transformer_blocks.44': 'npu:6', 'transformer_blocks.45': 'npu:6', 'transformer_blocks.46': 'npu:6', 'transformer_blocks.47': 'npu:6', 'transformer_blocks.48': 'npu:6', 'transformer_blocks.49': 'npu:6', 'norm_out': 'npu:3', 'proj_out': 'npu:3', 'audio_proj_out': 'npu:3'}
+rank=0 row=0: downloading Picture 1 and 3 references
+[W1013 19:16:16.302197206 compiler_depend.ts:117] Warning: Driver Version: �3��� is invalid or not supported yet. (function operator())
+100%|##########| 8/8 [06:09<00:00, 46.15s/it]
+Encoding video chunks: 100%|##########| 1/1 [00:06<00:00,  6.18s/it]
+rank=0 [====================] 1/1 (100.0%) skipped=0 generated=1 row=0 elapsed=534s eta=0s
+rank=0 complete: s3://bucket-8713-huanan/code/jwx1416454/test_20261013/rank0/results.jsonl
+[ma-user MiniMax_huawei]$bash test_infer_acc_lora_cloud.sh 
+[2026-10-13 19:38:51] ERROR: ValueError: Both RANK_ID and RANK_SIZE must be set
+[ma-user MiniMax_huawei]$export RANK_ID=0
+[ma-user MiniMax_huawei]$export RANK_SIZE=8
+[ma-user MiniMax_huawei]$export DEVICE_ID=0
+[ma-user MiniMax_huawei]$bash test_infer_acc_lora_cloud.sh 
+[2026-10-13 19:40:23] Model rank 0/1, local device rank=0, visible NPUs=0,1,2,3,4,5,6,7
+^CTraceback (most recent call last):
+  File "/home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_cloud.py", line 390, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_cloud.py", line 373, in main
+    result, lock, state = coordinate(directory, local_rank, args.follower_timeout)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_cloud.py", line 291, in coordinate
+    time.sleep(1)
+KeyboardInterrupt
+
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$bash test_infer_acc_lora_cloud.sh 
+[2026-10-13 19:49:18] Model rank 0/1, local device rank=0, visible NPUs=0,1,2,3,4,5,6,7
+[2026-10-13 19:49:18] Launcher registration [1/8]; registered local ranks=['0']
+^CTraceback (most recent call last):
+  File "/home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_cloud.py", line 438, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_cloud.py", line 421, in main
+    result, lock, state = coordinate(directory, local_rank, args.follower_timeout)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_cloud.py", line 333, in coordinate
+    time.sleep(1)
+KeyboardInterrupt
+
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$^C
+[ma-user MiniMax_huawei]$bash test_infer_acc_lora_cloud.sh 
+[2026-10-13 19:52:48] Model rank 0/1, local device rank=0, visible NPUs=0,1,2,3,4,5,6,7
+[2026-10-13 19:52:48] [1/4] Download input JSONL s3://bucket-8713-huanan/code/jwx1416454/ID_cross_train_data_0914_Final/final_qwen3.8_caption.jsonl: started
+[2026-10-13 19:52:49] [1/4] Download input JSONL s3://bucket-8713-huanan/code/jwx1416454/ID_cross_train_data_0914_Final/final_qwen3.8_caption.jsonl: completed in 0.9s
+[2026-10-13 19:52:49] Model rank 0/1: rows [0, 6887), 6887 of 6887 JSONL records
+[2026-10-13 19:52:49] [2/4] Prepare MiniMax-H3 model: started
+[2026-10-13 19:52:49] Waiting for model cache lock be04f20140561820bc6c: started
+[2026-10-13 19:52:49] Waiting for model cache lock be04f20140561820bc6c: completed in 0.0s
+[2026-10-13 19:52:49] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3 -> /cache/minimax/be04f20140561820bc6c.downloading-5f136468a85d4cd3a3b604edcd481b58
+[2026-10-13 19:52:49] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: started
+INFO:root:Multiprocessing connection patch for bpo-17560 not applied, not an applicable Python version: 3.11.11 (main, Dec 11 2024, 16:19:35) [GCC 11.2.0]
+INFO:root:Listing OBS: 1000
+INFO:root:Listing OBS: 2000
+INFO:root:List OBS time cost: 2.22 seconds.
+[2026-10-13 19:53:19] [2/4] Prepare MiniMax-H3 model: still running, elapsed=30s
+[2026-10-13 19:53:19] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: still running, elapsed=30s
+[2026-10-13 19:53:49] [2/4] Prepare MiniMax-H3 model: still running, elapsed=60s
+[2026-10-13 19:53:49] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: still running, elapsed=60s
+[2026-10-13 19:54:19] [2/4] Prepare MiniMax-H3 model: still running, elapsed=90s
+[2026-10-13 19:54:19] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: still running, elapsed=90s
+[2026-10-13 19:54:49] [2/4] Prepare MiniMax-H3 model: still running, elapsed=120s
+[2026-10-13 19:54:49] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: still running, elapsed=120s
+[2026-10-13 19:55:19] [2/4] Prepare MiniMax-H3 model: still running, elapsed=150s
+[2026-10-13 19:55:19] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: still running, elapsed=150s
+INFO:root:1000/2458
+INFO:root:2000/2458
+INFO:root:Copy parallel total time cost: 167.89 seconds.
+[2026-10-13 19:55:37] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3: completed in 167.9s
+[2026-10-13 19:55:37] Model cache ready: /cache/minimax/be04f20140561820bc6c
+[2026-10-13 19:55:37] [2/4] Prepare MiniMax-H3 model: completed in 167.9s
+[2026-10-13 19:55:37] [3/4] Prepare Acc-LoRA: started
+[2026-10-13 19:55:37] Waiting for model cache lock 6cfc810461044f06d3a0: started
+[2026-10-13 19:55:37] Waiting for model cache lock 6cfc810461044f06d3a0: completed in 0.0s
+[2026-10-13 19:55:37] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3-Acc-LoRAs -> /cache/acc_lora/6cfc810461044f06d3a0.downloading-2fa933d1c006405f8d6737080734b2d8
+[2026-10-13 19:55:37] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3-Acc-LoRAs: started
+INFO:root:Multiprocessing connection patch for bpo-17560 not applied, not an applicable Python version: 3.11.11 (main, Dec 11 2024, 16:19:35) [GCC 11.2.0]
+INFO:root:List OBS time cost: 0.40 seconds.
+INFO:root:Copy parallel total time cost: 6.13 seconds.
+[2026-10-13 19:55:43] Downloading s3://bucket-8713-huanan/code/jwx1416454/pretrained_models/MiniMax-H3-Acc-LoRAs: completed in 6.1s
+[2026-10-13 19:55:43] Model cache ready: /cache/acc_lora/6cfc810461044f06d3a0
+[2026-10-13 19:55:43] [3/4] Prepare Acc-LoRA: completed in 6.1s
+[2026-10-13 19:55:43] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/work/jwx1416454/MiniMax_huawei/infer_acc_lora_jsonl_8npu.py --input_jsonl /cache/acc_lora_runs/0642953423403fa6662b/rank0/input.jsonl --st 0 --en 6887 --rank 0 --model_path /cache/minimax/be04f20140561820bc6c --acc_lora_path /cache/acc_lora/6cfc810461044f06d3a0/MiniMax-H3-Ref2VA-Acc-8Step.safetensors --train_url s3://bucket-8713-huanan/code/jwx1416454/test_20261013_cloud --first_frame_s3_root s3://bucket-8713-huanan/code/jwx1416454/ID_cross_train_data_0914_Final/first_frames --reference_s3_root s3://bucket-4931-huanan/data/l00966586/ID_cross_train_data_v1/face_imgs/ --result_jsonl_name results.jsonl --cache_dir /cache/acc_lora_runs/0642953423403fa6662b/rank0/worker --visible_devices 0,1,2,3,4,5,6,7 --device_type npu --num_frames 124 --ref_image_short_edge 512 --transformer_entry_memory_gib 14 --ff_chunk_size 1024
+[2026-10-13 19:55:43] [4/4] Starting inference; worker loading/denoising/sample progress follows
+rank=0: records [0, 6887), total=6887
