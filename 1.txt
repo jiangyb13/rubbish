@@ -1,88 +1,47 @@
-37] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=84s
-[21:12:46] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=99s
-[21:12:49] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=99s
-[21:12:50] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=103s
-[21:12:50] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=98s
-[21:12:51] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=100s
-[21:12:52] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=98s
-[21:12:52] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=99s
-[21:13:01] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=114s
-[2026-10-16 21:13:03] Download model before preprocessing: still running, elapsed=120s
-[2026-10-16 21:13:03] Downloading s3://bucket-8713-huanan/code/jwx1520881/MiniMax-H3: still running, elapsed=120s
-[21:13:04] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=114s
-[21:13:05] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=118s
-[21:13:06] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=115s
-[21:13:06] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=114s
-[21:13:07] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=114s
-[21:13:07] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=114s
-INFO:root:1000/2454
-INFO:root:2000/2454
-[21:13:16] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=129s
-[21:13:19] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=129s
-[21:13:20] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=132s
-INFO:root:Copy parallel total time cost: 137.71 seconds.
-[2026-10-16 21:13:21] Downloading s3://bucket-8713-huanan/code/jwx1520881/MiniMax-H3: completed in 137.7s
-[2026-10-16 21:13:21] Model cache ready: /cache/generated_lora/models/e5d9ee678049e5f4a87e
-[2026-10-16 21:13:21] Download model before preprocessing: completed in 137.7s
-[21:13:21] [2/3] Encode downloaded local data to training caches
-[21:13:21] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 0 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_0 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:21] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=130s
-[21:13:22] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=129s
-[21:13:22] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=129s
-[21:13:23] Waiting for /cache/generated_lora/f84880d1fdb4ba9e2bbd/model.path; elapsed=130s
-[21:13:26] [2/3] Encode downloaded local data to training caches
-[21:13:26] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 2 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_2 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:29] [2/3] Encode downloaded local data to training caches
-[21:13:29] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 6 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_6 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:30] [2/3] Encode downloaded local data to training caches
-[21:13:30] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 5 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_5 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:31] [2/3] Encode downloaded local data to training caches
-[21:13:31] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 4 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_4 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:32] [2/3] Encode downloaded local data to training caches
-[21:13:32] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 1 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_1 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:32] [2/3] Encode downloaded local data to training caches
-[21:13:32] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 7 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_7 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-[21:13:33] [2/3] Encode downloaded local data to training caches
-[21:13:33] RUN: /home/ma-user/anaconda/bin/python -u /home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py --jsonl_path /cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl --end_index -1 --dataset_base_path /cache/generated_lora/f84880d1fdb4ba9e2bbd --video_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --first_frame_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --reference_image_data_root /cache/generated_lora/f84880d1fdb4ba9e2bbd --model_source /cache/generated_lora/models/e5d9ee678049e5f4a87e --output_path s3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed --conditioning_mode hybrid --task sft:data_process --extra_inputs input_image,references --dataset_repeat 1 --summary_run_id hybrid_lora_generated_v3 --shard_id 3 --num_shards 112 --cloud_cache_dir /cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_3 --resolution_mode fixed --resolution_seed 42 --num_frames 124 --ref_image_short_edge 512 --width 1344 --height 768
-Traceback (most recent call last):
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py", line 107, in <module>
-    from train import (  # noqa: E402
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/examples/minimax_h3/model_training/train.py", line 14, in <module>
-    from diffsynth.utils.context_parallel import initialize_context_parallel, get_cp_group
-ModuleNotFoundError: No module named 'diffsynth.utils.context_parallel'
-[ERROR] 2026-10-16-21:13:42 (PID:124551, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-Traceback (most recent call last):
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_generated_lora_cloud.py", line 321, in <module>
-    main()
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_generated_lora_cloud.py", line 285, in main
-    run('train_cloud_prepare_data.py', [
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_generated_lora_cloud.py", line 172, in run
-    subprocess.run(command, cwd=ROOT, check=True)
-  File "/home/ma-user/anaconda/lib/python3.11/subprocess.py", line 571, in run
-    raise CalledProcessError(retcode, process.args,
-subprocess.CalledProcessError: Command '['/home/ma-user/anaconda/bin/python', '-u', '/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/train_cloud_prepare_data.py', '--jsonl_path', '/cache/generated_lora/f84880d1fdb4ba9e2bbd/local_training_data.jsonl', '--end_index', '-1', '--dataset_base_path', '/cache/generated_lora/f84880d1fdb4ba9e2bbd', '--video_data_root', '/cache/generated_lora/f84880d1fdb4ba9e2bbd', '--first_frame_data_root', '/cache/generated_lora/f84880d1fdb4ba9e2bbd', '--reference_image_data_root', '/cache/generated_lora/f84880d1fdb4ba9e2bbd', '--model_source', '/cache/generated_lora/models/e5d9ee678049e5f4a87e', '--output_path', 's3://bucket-8713-huanan/code/jwx1416454/train_task/hybrid_lora_train_minimax_generated/processed', '--conditioning_mode', 'hybrid', '--task', 'sft:data_process', '--extra_inputs', 'input_image,references', '--dataset_repeat', '1', '--summary_run_id', 'hybrid_lora_generated_v3', '--shard_id', '0', '--num_shards', '112', '--cloud_cache_dir', '/cache/generated_lora/f84880d1fdb4ba9e2bbd/encoder_0', '--resolution_mode', 'fixed', '--resolution_seed', '42', '--num_frames', '124', '--ref_image_short_edge', '512', '--width', '1344', '--height', '768']' returned non-zero exit status 1.
-The diag job starts. Please wait. Job id: [20261016211558336499_4c91f6d9-452e-4fed-b90d-be48ce41a3ac], run log file is [ascend_faultdiag_127335.log].
-+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|                                                                                     Ascend-fd Fault-Diag Report                                                                                      |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|   版本信息   |    类型    | 版本                                                                                                                                                                     |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              | Fault-Diag | 26.1.0.post20260721154651                                                                                                                                                |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| 根因节点分析 |    类型    | 描述                                                                                                                                                                     |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              |    说明    | 未诊断出根因节点，故障事件分析将尝试检测全部设备                                                                                                                         |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              |  根因节点  | ['worker-0 device-0', 'worker-1 device-0', 'worker-2 device-0', 'worker-3 device-0', 'worker-4 device-0', 'worker-5 device-0', 'worker-6 device-0', 'worker-7 device-0', |
-|              |            |  'worker-8 device-0', 'worker-9 device-0', 'worker-10 device-0', 'worker-11 device-0', 'worker-12 device-0', 'worker-13 device-0']                                       |
-|              |  现象描述  | 涉及到14/14个worker，每个worker上的问题device一致，为device-0。PyTorch UNKNOWN 模块上报 ERR99999 故障码。                                                                |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| 故障事件分析 |    类型    | 描述                                                                                                                                                                     |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              |    说明    | 诊断出多个故障，已按照优先级排序，请重点排查靠前的故障                                                                                                                   |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| 疑似根因故障 |   状态码   | AISW_PyTorch_ERRCODE_Common_ERR99999                                                                                                                                     |
-|              |  故障分类  | 类型:Software/User 组件:AI Framework 模块:CANN/Framework                                                                                                                 |
-|              |  故障设备  | ['worker-0 device-0', 'worker-1 device-0', 'worker-2 device-0', 'worker-3 device-0', 'worker-4 device-0', 'worker-5 device-0', 'worker-6 device-0', 'worker-7 device-0', |
-|              |            |  'worker-8 device-0', 'worker-9 device-0', 'worker-10 device-0', 'worker-11 device-0', 'worker-12 device-0', 'worker-13 device-0']                                       |
-|              |  故障名称  | PyTorch上报错误码                                                                                         
+① golden.txt文件中有gaze_x=25.175 cm（有对应图像）和gaze_x=-23.692 cm（只有标签）。这些是有意设置的屏幕外注视点，还是采用了特殊的标签换算规则？若是屏幕外点，目标放在哪里、如何测量位置，正式测试是否计入？专家这边能否提供几个已知注视点及其gaze_x/y 标签供我们核对？
+A：如果标签对应的图在目录里面找不到的是图漏了。是有意设置的屏幕外注视点。
+手机贴在电脑屏幕上，电脑屏幕上随机出的点，根据点在电脑屏幕上的像素坐标转换得到，像素值转cm值，正式测试计入。
+已知注视点及其gaze xy？golden.txt已经提供相关信息，可否提供更多需求说明？
+
+② 正式测试是否与样例一样，使用以前摄像头为原点、单位为厘米的 gaze_x/y？X、Y 轴正方向分别如何定义？
+A：正式测试与样例一样。使用以前摄像头为原点、单位为厘米的 gaze_x/y。方向定义如下：
+ 
+
+③ 采集设备是手机吗？手机是否固定、拍摄距离是多少？屏幕内注视点如何呈现和选取，每个点停留多久，何时拍照并写入标签？
+A：采集设备是手机，手机固定，拍摄距离30-60cm，采集apk上有ui呈现随机点，引导用户注视该点，停留2-3s，拍照为10fps常开固定间隔采图。
+
+
+④ 图像保存前是否做过前摄镜像、横竖屏旋转、裁剪、缩放、灰度化或去畸变？
+A：保存的图像为原图。前摄镜像不做此操作，其他的操作是算法侧做，不在存图时做。
+
+
+⑤ 正式推理时，除了图像，还会提供并允许使用相机内参、设备信息、用户或会话编号吗？
+A：允许使用内参，不使用其他信息。
+
+⑥ “90% 误差小于 2 cm”是按帧、注视点还是用户统计？没有有效预测的图像如何计分？
+A：按测试集所有帧统计。测试集内均为可有效预测的图像。
+
+⑦ 多数会话的前13个编号有标签却没有图像，另有少数会话保留了图像。这13个点是什么用途？正式测试会使用其中有图像的样本吗？
+A：前13个点是屏幕外的点。正式测试可以参考，但是因为在屏幕外，意义不大，建议重点评估屏幕内。
+
+
+数据集说明
+
+数据采集方法：
+采集距离25cm~60cm，采集设备为手机，固定在用户前方，用户头部姿态可以大范围变化，注视点大多数为手机屏幕上的点，少部分为屏幕外的点
+
+数据标注（golden.txt）：
+name: 用户id
+uni_vec：相机坐标系下用户的注视方向（3d），起点为相机坐标系下用户鼻子3d位置（通过估计得到、精度不高），终点为注视点（相机坐标系下）
+gaze_x, gaze_y：注视点相对相机的x, y坐标，单位cm
+
+camera_intrinsics.npy 文件为相机参数，包含相机内参矩阵与畸变系数。
+
+jsonl case 例子：
+{'name': 'p75_084932_0000', 'uni_vec': [0.03760824658285965, 0.04040570941463, -0.9984753369190765], 'gaze_x': 4.310140625000001, 'gaze_y': 0.5216203703703703}, {'name': 'p75_084932_0001', 'uni_vec': [0.040257714001837815, 0.06066427172980829, -0.9973460595995947], 'gaze_x': 4.55721875, 'gaze_y': 1.4275925925925925}, {'name': 'p75_084932_0002', 'uni_vec': [0.03962929507282068, 0.2060726125971465, -0.9777339092562033], 'gaze_x': 4.584671875000001, 'gaze_y': 7.687037037037037}, {'name': 'p75_084932_0003', 'uni_vec': [0.046399691921795834, 0.25240557767222194, -0.9665084029378712], 'gaze_x': 4.83175, 'gaze_y': 9.965694444444445}, {'name': 'p75_084932_0004', 'uni_vec': [0.05078674225511638, 0.4056262805480074, -0.912626992445381], 'gaze_x': 5.188640625000001, 'gaze_y': 17.817453703703702}, {'name': 'p75_084932_0005', 'uni_vec': [-0.008738714544575562, -0.02848672672840959, -0.9995559720537962], 'gaze_x': 2.1138906250000002, 'gaze_y': -2.4433796296296295}, {'name': 'p75_084932_0006', 'uni_vec': [-0.032372226518400195, 0.05126796138427701, -0.9981601249728129], 'gaze_x': 0.5490625, 'gaze_y': 0.24708333333333332}, {'name': 'p75_084932_0007', 'uni_vec': [-0.05558623650723185, 0.4038996880321457, -0.9131129241876371], 'gaze_x': -0.9608593750000001, 'gaze_y': 18.09199074074074}, {'name': 'p75_084932_0008', 'uni_vec': [-0.12566448014890394, 0.05333199016602486, -0.9906382474212454], 'gaze_x': -3.9807031250000002, 'gaze_y': 0.46671296296296294}, {'name': 'p75_084932_0009', 'uni_vec': [-0.1289543967951962, 0.14399181934742045, -0.9811407236009557], 'gaze_x': -4.282687500000001, 'gaze_y': 4.639675925925926}, {'name': 'p75_084932_0010', 'uni_vec': [-0.1287990513195843, 0.28936167292558745, -0.9485149585646399], 'gaze_x': -4.419953125, 'gaze_y': 11.77763888888889}, {'name': 'p75_084932_0011', 'uni_vec': [-0.12334439798804193, 0.39026704454219685, -0.9124022103377799], 'gaze_x': -4.33759375, 'gaze_y': 17.323287037037037}, {'name': 'p75_084932_0012', 'uni_vec': [-0.39944657569509623, 0.14252266384119272, -0.9056101387777592], 'gaze_x': -17.954343750000003, 'gaze_y': 5.161296296296296}, {'name': 'p75_084932_0013', 'uni_vec': [-0.007618803213334935, 0.08166237015491919, -0.9966309302536609], 'gaze_x': 2.36096875, 'gaze_y': 2.0041203703703703}, {'name': 'p75_084932_0014', 'uni_vec': [-0.09739666171797569, 0.07525678416707103, -0.9923962448150563], 'gaze_x': -1.7570000000000001, 'gaze_y': 1.7021296296296295}, {'name': 'p75_084932_0015', 'uni_vec': [-0.09807582164095388, 0.1635047768108846, -0.9816553983804474], 'gaze_x': -1.8119062500000003, 'gaze_y': 5.682916666666667}, {'name': 'p75_084932_0016', 'uni_vec': [-0.09235327004745622, 0.24621691111360036, -0.9648046984717783], 'gaze_x': -1.70209375, 'gaze_y': 9.471527777777778}, {'name': 'p75_084932_0017', 'uni_vec': [-0.09018858838266881, 0.3389302630186294, -0.9364786678486938], 'gaze_x': -1.784453125, 'gaze_y': 14.330833333333334}, {'name': 'p75_084932_0018', 'uni_vec': [-0.004185997341982851, 0.24722015855085153, -0.9689502931690277], 'gaze_x': 2.3060625000000003, 'gaze_y': 9.608796296296298}
+
+相机内参：
+{'mtx': array([[554.73597482,   0.        , 382.92987391],
+      [  0.        , 554.84643608, 514.44240178],
+      [  0.        ,   0.        ,   1.        ]]), 
+'distC': array([[-0.08800637,  0.33554064,  0.00142259,  0.00121936, -0.47625419]])}
