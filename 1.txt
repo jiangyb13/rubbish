@@ -1,242 +1,42 @@
-Loading models from: "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/video_vae/source/model.safetensors"
-Loaded model: {
-    "model_name": "minimax_h3_video_vae",
-    "model_class": "diffsynth.models.minimax_h3_video_vae.MiniMaxH3VideoVAE",
-    "extra_kwargs": null
-}
-Loading models from: "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/audio_vae/model.safetensors"
-Loaded model: {
-    "model_name": "minimax_h3_audio_vae",
-    "model_class": "diffsynth.models.minimax_h3_audio_vae.MiniMaxH3AudioVAE",
-    "extra_kwargs": null
-}
-Using minimax_h3_text_encoder from [
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00001-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00002-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00003-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00004-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00005-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00006-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00007-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00008-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00009-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00010-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00011-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00012-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00013-of-00014.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00014-of-00014.safetensors"
-].
-Using minimax_h3_dit from [
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00001-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00002-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00003-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00004-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00005-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00006-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00007-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00008-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00009-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00010-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00011-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00012-of-00013.safetensors",
-    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00013-of-00013.safetensors"
-].
-Using minimax_h3_video_vae from "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/video_vae/source/model.safetensors".
-Using minimax_h3_audio_vae from "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/audio_vae/model.safetensors".
-No minimax_h3_controlnet models available. This is not an error.
-
-========== DIFFSYNTH QWEN TEXT ENCODER ==========
-model.visual                                                           -> npu:0
-model.language_model.embed_tokens                                      -> npu:0
-model.language_model.layers.0                                          -> npu:0
-model.language_model.layers.1                                          -> npu:0
-model.language_model.layers.2                                          -> npu:0
-model.language_model.layers.3                                          -> npu:0
-model.language_model.layers.4                                          -> npu:0
-model.language_model.layers.5                                          -> npu:0
-model.language_model.layers.6                                          -> npu:0
-model.language_model.layers.7                                          -> npu:0
-model.language_model.layers.8                                          -> npu:0
-model.language_model.layers.9                                          -> npu:0
-model.language_model.layers.10                                         -> npu:0
-model.language_model.layers.11                                         -> npu:0
-model.language_model.layers.12                                         -> npu:0
-model.language_model.layers.13                                         -> npu:0
-model.language_model.layers.14                                         -> npu:0
-model.language_model.layers.15                                         -> npu:0
-model.language_model.layers.16                                         -> npu:0
-model.language_model.layers.17                                         -> npu:0
-model.language_model.layers.18                                         -> npu:0
-model.language_model.layers.19                                         -> npu:0
-model.language_model.layers.20                                         -> npu:0
-model.language_model.layers.21                                         -> npu:0
-model.language_model.layers.22                                         -> npu:0
-model.language_model.layers.23                                         -> npu:0
-model.language_model.layers.24                                         -> npu:0
-model.language_model.layers.25.self_attn                               -> npu:0
-model.language_model.layers.25.mlp.gate_proj                           -> npu:0
-model.language_model.layers.25.mlp.up_proj                             -> npu:1
-model.language_model.layers.25.mlp.down_proj                           -> npu:1
-model.language_model.layers.25.mlp.act_fn                              -> npu:1
-model.language_model.layers.25.input_layernorm                         -> npu:1
-model.language_model.layers.25.post_attention_layernorm                -> npu:1
-model.language_model.layers.26                                         -> npu:1
-model.language_model.layers.27                                         -> npu:1
-model.language_model.layers.28                                         -> npu:1
-model.language_model.layers.29                                         -> npu:1
-model.language_model.layers.30                                         -> npu:1
-model.language_model.layers.31                                         -> npu:1
-model.language_model.layers.32                                         -> npu:1
-model.language_model.layers.33                                         -> npu:1
-model.language_model.layers.34                                         -> npu:1
-model.language_model.layers.35                                         -> npu:1
-model.language_model.layers.36                                         -> npu:1
-model.language_model.layers.37                                         -> npu:1
-model.language_model.layers.38                                         -> npu:1
-model.language_model.layers.39                                         -> npu:1
-model.language_model.layers.40                                         -> npu:1
-model.language_model.layers.41                                         -> npu:1
-model.language_model.layers.42                                         -> npu:1
-model.language_model.layers.43                                         -> npu:1
-model.language_model.layers.44                                         -> npu:1
-model.language_model.layers.45                                         -> npu:1
-model.language_model.layers.46                                         -> npu:1
-model.language_model.layers.47                                         -> npu:1
-model.language_model.layers.48                                         -> npu:1
-model.language_model.layers.49                                         -> npu:1
-model.language_model.norm                                              -> npu:1
-model.language_model.rotary_emb                                        -> npu:1
-=================================================
-
-========== ORIGINAL REF2VA DIT ==========
-video_patch_proj                                                       -> npu:3
-audio_patch_proj                                                       -> npu:3
-condition_proj                                                         -> npu:3
-time_embedder                                                          -> npu:3
-rope                                                                   -> npu:3
-token_refiner                                                          -> npu:3
-blocks.0                                                               -> npu:3
-blocks.1                                                               -> npu:3
-blocks.2                                                               -> npu:3
-blocks.3                                                               -> npu:3
-blocks.4                                                               -> npu:3
-blocks.5                                                               -> npu:3
-blocks.6                                                               -> npu:3
-blocks.7                                                               -> npu:3
-blocks.8                                                               -> npu:3
-blocks.9                                                               -> npu:3
-blocks.10                                                              -> npu:3
-blocks.11                                                              -> npu:3
-blocks.12                                                              -> npu:4
-blocks.13                                                              -> npu:4
-blocks.14                                                              -> npu:4
-blocks.15                                                              -> npu:4
-blocks.16                                                              -> npu:4
-blocks.17                                                              -> npu:4
-blocks.18                                                              -> npu:4
-blocks.19                                                              -> npu:4
-blocks.20                                                              -> npu:4
-blocks.21                                                              -> npu:4
-blocks.22                                                              -> npu:4
-blocks.23                                                              -> npu:4
-blocks.24                                                              -> npu:4
-blocks.25                                                              -> npu:4
-blocks.26                                                              -> npu:5
-blocks.27                                                              -> npu:5
-blocks.28                                                              -> npu:5
-blocks.29                                                              -> npu:5
-blocks.30                                                              -> npu:5
-blocks.31                                                              -> npu:5
-blocks.32                                                              -> npu:5
-blocks.33                                                              -> npu:5
-blocks.34                                                              -> npu:5
-blocks.35                                                              -> npu:5
-blocks.36                                                              -> npu:5
-blocks.37                                                              -> npu:5
-blocks.38                                                              -> npu:5
-blocks.39                                                              -> npu:5
-blocks.40                                                              -> npu:6
-blocks.41                                                              -> npu:6
-blocks.42                                                              -> npu:6
-blocks.43                                                              -> npu:6
-blocks.44                                                              -> npu:6
-blocks.45                                                              -> npu:6
-blocks.46                                                              -> npu:6
-blocks.47                                                              -> npu:6
-blocks.48                                                              -> npu:6
-blocks.49                                                              -> npu:6
-final_layer                                                            -> npu:3
-=========================================
-8-card layout ready: Qwen=[0, 1, 2], original Ref2VA DiT=[3, 4, 5, 6], video/audio VAE=7; audio_dtype=torch.float16; pipeline intermediates=npu:3
-[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/first_frame/260909_v1/yuchengdong/17.jpg
-[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/8.jpg
-[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/1.jpg
-[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/3.jpg
-[1/10] source_index=0, seed=42
-[1/10] first_frame=525x822, resized=510x800, output=512x800, scale=0.973236, padding_ltrb=(1, 0, 1, 0); full image retained
-/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/models/minimax_h3_video_vae.py:63: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at build/CMakeFiles/torch_npu.dir/compiler_depend.ts:335.)
-  return torch.cat([torch.zeros_like(x[:, :, :1]).expand(-1, -1, self.kernel_size[0] - 1, -1, -1), x], dim=2)
-
-  0%|          | 0/50 [00:00<?, ?it/s]
-  0%|          | 0/50 [00:00<?, ?it/s]
-Traceback (most recent call last):
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 455, in <module>
-    main()
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 408, in main
-    video, audio = pipe(
-                   ^^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 188, in __call__
-    noise_pred_video, noise_pred_audio = self.cfg_guided_model_fn(
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/diffusion/base_pipeline.py", line 335, in cfg_guided_model_fn
-    noise_pred_posi = model_fn(**inputs_posi, **inputs_shared, **inputs_others)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 1244, in model_fn_minimax_h3
-    v_video_rows, v_audio_rows = dit(
-                                 ^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1845, in _call_impl
-    return inner()
-           ^^^^^^^
-  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1772, in inner
-    args_kwargs_result = hook(self, args, kwargs)  # type: ignore[misc]
-                         ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_native_attention_vis.py", line 85, in layout_hook
-    indices, labels, frame_positions = parse_layout(
-                                       ^^^^^^^^^^^^^
-  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_attention_vis.py", line 106, in parse_layout
-    raise ValueError('Inconsistent video frame grids in packed sequence')
-ValueError: Inconsistent video frame grids in packed sequence
-[ERROR] 2026-10-27-19:42:30 (PID:491, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ModelArts Service Log]2026-10-27 19:42:42,134 - ERROR - proc-rank-0-device-0 (pid: 491) has exited with non-zero code: 1
-[ModelArts Service Log]2026-10-27 19:42:42,134 - INFO - Begin destroy training processes
-[ModelArts Service Log]2026-10-27 19:42:42,134 - INFO - proc-rank-7-device-7 (pid: 517) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,134 - INFO - proc-rank-6-device-6 (pid: 513) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-5-device-5 (pid: 510) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-4-device-4 (pid: 504) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-3-device-3 (pid: 499) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-2-device-2 (pid: 496) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-1-device-1 (pid: 493) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-0-device-0 (pid: 491) has exited before receiving the term signal
-[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - End destroy training processes
-time="2026-10-27T19:42:42+08:00" level=info msg="the run_train script is exiting..." Component=ShellScripts Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="the run_train 265 script is exited with 1" Component=ShellScripts Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="the run_train script is exiting..." Component=ShellScripts Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="the run_train 258 script is exited with 1" Component=ShellScripts Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="command is exit with 1" file="process.go:219" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="NPU training process exits with exit code 1, and the environment will be retained for 0s." file="process.go:285"
-time="2026-10-27T19:42:42+08:00" level=info msg="the environment has been retained for 0s." file="process.go:287"
-time="2026-10-27T19:42:42+08:00" level=info msg="the task will restart after terminating the user processes" file="process.go:445" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="kill user processes successfully" file="process.go:568" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="skip clear memarts socket dir" file="process.go:602" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="clear profiler file skip" file="process.go:610" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="detected pattern: map[]\n" file="process.go:244" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="start export latest ascend device log" file="ascend_log_handler.go:171" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="zombie process cleaner is exiting" file="cleaner_unix.go:53" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
-time="2026-10-27T19:42:42+08:00" level=info msg="device log watcher is running" file="ascend_log_handler.go:188"
-time="2026-10-27T19:43:55+08:00" level=info msg="device log export finished" file="ascend_log_handler.go:199" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+[2026-10-27 20:08:01] Native Ref2VA model rank=0/1, local device rank=5, devices=0,1,2,3,4,5,6,7
+[2026-10-27 20:08:01] Local device rank 5 waiting for the eight-NPU group leader
+[2026-10-27 20:08:01] Native Ref2VA model rank=0/1, local device rank=6, devices=0,1,2,3,4,5,6,7
+[2026-10-27 20:08:01] Local device rank 6 waiting for the eight-NPU group leader
+[2026-10-27 20:08:01] Native Ref2VA model rank=0/1, local device rank=7, devices=0,1,2,3,4,5,6,7
+[2026-10-27 20:08:01] Local device rank 7 waiting for the eight-NPU group leader
+[2026-10-27 20:08:02] Launcher registration [8/8]; registered local ranks=['0', '1', '2', '3', '4', '5', '6', '7']
+[2026-10-27 20:08:02] All eight launchers registered; starting this host's model worker
+[2026-10-27 20:08:02] [1/3] Download input JSONL: started
+[2026-10-27 20:08:03] [1/3] Download input JSONL: completed in 0.7s
+[2026-10-27 20:08:03] Model rank 0/1: selected=(0, 10), assigned=[0, 10), records=10
+[2026-10-27 20:08:03] [2/3] Prepare original Ref2VA model (no Acc-LoRA): started
+[2026-10-27 20:08:03] [2/3] Prepare original Ref2VA model (no Acc-LoRA): failed after 0.0s
+[2026-10-27 20:08:03] ERROR: TypeError: download_model() got an unexpected keyword argument 'refresh'
+The diag job starts. Please wait. Job id: [20261027200912615945_62434aae-0cc0-443b-b384-49c2d4e464bf], run log file is [ascend_faultdiag_2751.log].
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|                                                                                     Ascend-fd Fault-Diag Report                                                                                      |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|   版本信息   |    类型    | 版本                                                                                                                                                                     |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|              | Fault-Diag | 26.1.0.post20260721154651                                                                                                                                                |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| 根因节点分析 |    类型    | 描述                                                                                                                                                                     |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|              |    说明    | 未诊断出根因节点，故障事件分析将尝试检测全部设备                                                                                                                         |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|              |  根因节点  | ['worker-0 device-0', 'worker-0 device-3', 'worker-0 device-4', 'worker-0 device-5', 'worker-0 device-7']                                                                |
+|              |  现象描述  | 芯片OS初始化启动完成，包括冷复位和热复位，通常是设备故障或版本升级导致的冷复位或热复位。                                                                                 |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| 故障事件分析 |    类型    | 描述                                                                                                                                                                     |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| 疑似根因故障 |   状态码   | 0x8C2FA009                                                                                                                                                               |
+|              |  故障分类  | 类型:Hardware 组件:NPU 模块:OS                                                                                                                                           |
+|              |  故障设备  | ['worker-0 device-0', 'worker-0 device-3', 'worker-0 device-4', 'worker-0 device-5', 'worker-0 device-7']                                                                |
+|              |  故障名称  | 芯片初始化启动完成                                                                                                                                                       |
+|              |  故障描述  | 芯片OS初始化启动完成，包括冷复位和热复位，通常是设备故障或版本升级导致的冷复位或热复位。                                                                                 |
+|              |  建议方案  | 1. 无需操作。                                                                                                                                                            |
+|              |  关键日志  | [EVENT] DRV(2557,dms_poll_task):1970-01-01-00:00:11.660.251 [dms_event.c:1392][fault_manager][   10.720611] event_id=0x8c2fa009; device_id=0; node_type=0x617[OS_Linux]; |
+|              |            |  node_id=1; sub_node_id=0; event_type=0x9[OS init]; severity=0[OK]; assertion=2[One time event]; description=[OS init]; os_id=0; event_serial_num=1; notify_serial_num=0 |
+|              |            | ; event_raised_time=10660 ms.                                                                                                                                            |
++--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+The diag job is complete.
