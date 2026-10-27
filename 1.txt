@@ -1,42 +1,213 @@
-[2026-10-27 20:08:01] Native Ref2VA model rank=0/1, local device rank=5, devices=0,1,2,3,4,5,6,7
-[2026-10-27 20:08:01] Local device rank 5 waiting for the eight-NPU group leader
-[2026-10-27 20:08:01] Native Ref2VA model rank=0/1, local device rank=6, devices=0,1,2,3,4,5,6,7
-[2026-10-27 20:08:01] Local device rank 6 waiting for the eight-NPU group leader
-[2026-10-27 20:08:01] Native Ref2VA model rank=0/1, local device rank=7, devices=0,1,2,3,4,5,6,7
-[2026-10-27 20:08:01] Local device rank 7 waiting for the eight-NPU group leader
-[2026-10-27 20:08:02] Launcher registration [8/8]; registered local ranks=['0', '1', '2', '3', '4', '5', '6', '7']
-[2026-10-27 20:08:02] All eight launchers registered; starting this host's model worker
-[2026-10-27 20:08:02] [1/3] Download input JSONL: started
-[2026-10-27 20:08:03] [1/3] Download input JSONL: completed in 0.7s
-[2026-10-27 20:08:03] Model rank 0/1: selected=(0, 10), assigned=[0, 10), records=10
-[2026-10-27 20:08:03] [2/3] Prepare original Ref2VA model (no Acc-LoRA): started
-[2026-10-27 20:08:03] [2/3] Prepare original Ref2VA model (no Acc-LoRA): failed after 0.0s
-[2026-10-27 20:08:03] ERROR: TypeError: download_model() got an unexpected keyword argument 'refresh'
-The diag job starts. Please wait. Job id: [20261027200912615945_62434aae-0cc0-443b-b384-49c2d4e464bf], run log file is [ascend_faultdiag_2751.log].
-+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|                                                                                     Ascend-fd Fault-Diag Report                                                                                      |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|   版本信息   |    类型    | 版本                                                                                                                                                                     |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              | Fault-Diag | 26.1.0.post20260721154651                                                                                                                                                |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| 根因节点分析 |    类型    | 描述                                                                                                                                                                     |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              |    说明    | 未诊断出根因节点，故障事件分析将尝试检测全部设备                                                                                                                         |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              |  根因节点  | ['worker-0 device-0', 'worker-0 device-3', 'worker-0 device-4', 'worker-0 device-5', 'worker-0 device-7']                                                                |
-|              |  现象描述  | 芯片OS初始化启动完成，包括冷复位和热复位，通常是设备故障或版本升级导致的冷复位或热复位。                                                                                 |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| 故障事件分析 |    类型    | 描述                                                                                                                                                                     |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| 疑似根因故障 |   状态码   | 0x8C2FA009                                                                                                                                                               |
-|              |  故障分类  | 类型:Hardware 组件:NPU 模块:OS                                                                                                                                           |
-|              |  故障设备  | ['worker-0 device-0', 'worker-0 device-3', 'worker-0 device-4', 'worker-0 device-5', 'worker-0 device-7']                                                                |
-|              |  故障名称  | 芯片初始化启动完成                                                                                                                                                       |
-|              |  故障描述  | 芯片OS初始化启动完成，包括冷复位和热复位，通常是设备故障或版本升级导致的冷复位或热复位。                                                                                 |
-|              |  建议方案  | 1. 无需操作。                                                                                                                                                            |
-|              |  关键日志  | [EVENT] DRV(2557,dms_poll_task):1970-01-01-00:00:11.660.251 [dms_event.c:1392][fault_manager][   10.720611] event_id=0x8c2fa009; device_id=0; node_type=0x617[OS_Linux]; |
-|              |            |  node_id=1; sub_node_id=0; event_type=0x9[OS init]; severity=0[OK]; assertion=2[One time event]; description=[OS init]; os_id=0; event_serial_num=1; notify_serial_num=0 |
-|              |            | ; event_raised_time=10660 ms.                                                                                                                                            |
-+--------------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+========================================
+[2026-10-27 20:18:47] Local rank 1: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:18:47] Local rank 3: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:18:47] Local rank 2: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:18:47] Local rank 4: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:18:47] Local rank 5: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:18:47] Local rank 6: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:18:47] Local rank 7: waiting; acknowledged=True, leader_phase=running
+8-card layout ready: Qwen=[0, 1, 2], original Ref2VA DiT=[3, 4, 5, 6], video/audio VAE=7; audio_dtype=torch.float16; pipeline intermediates=npu:3
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/first_frame/260909_v1/yuchengdong/17.jpg
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/8.jpg
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/1.jpg
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/3.jpg
+[1/10] source_index=0, seed=42
+[1/10] first_frame=525x822, resized=510x800, output=512x800, scale=0.973236, padding_ltrb=(1, 0, 1, 0); full image retained
+[2026-10-27 20:19:17] Local rank 1: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:17] Local rank 3: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:17] Local rank 2: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:17] Local rank 4: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:17] Local rank 5: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:17] Local rank 6: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:17] Local rank 7: waiting; acknowledged=True, leader_phase=running
+/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/models/minimax_h3_video_vae.py:63: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at build/CMakeFiles/torch_npu.dir/compiler_depend.ts:335.)
+  return torch.cat([torch.zeros_like(x[:, :, :1]).expand(-1, -1, self.kernel_size[0] - 1, -1, -1), x], dim=2)
+
+  0%|          | 0/50 [00:00<?, ?it/s]
+  0%|          | 0/50 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 461, in <module>
+    main()
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 414, in main
+    video, audio = pipe(
+                   ^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 188, in __call__
+    noise_pred_video, noise_pred_audio = self.cfg_guided_model_fn(
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/diffusion/base_pipeline.py", line 335, in cfg_guided_model_fn
+    noise_pred_posi = model_fn(**inputs_posi, **inputs_shared, **inputs_others)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 1244, in model_fn_minimax_h3
+    v_video_rows, v_audio_rows = dit(
+                                 ^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1845, in _call_impl
+    return inner()
+           ^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1772, in inner
+    args_kwargs_result = hook(self, args, kwargs)  # type: ignore[misc]
+                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_native_attention_vis.py", line 85, in layout_hook
+    indices, labels, frame_positions = parse_layout(
+                                       ^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_attention_vis.py", line 106, in parse_layout
+    raise ValueError('Inconsistent video frame grids in packed sequence')
+ValueError: Inconsistent video frame grids in packed sequence
+[ERROR] 2026-10-27-20:19:38 (PID:960, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[2026-10-27 20:19:47] Local rank 1: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:47] Local rank 3: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:47] Local rank 2: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:47] Local rank 4: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:47] Local rank 5: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:47] Local rank 6: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:47] Local rank 7: waiting; acknowledged=True, leader_phase=running
+[2026-10-27 20:19:50] Native worker finished: exit_code=1, output=s3://bucket-8713-huanan/code/jwx1416454/red2va_attn/rank0
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+[2026-10-27 20:19:50] Group leader finished; exit_code=1
+The diag job starts. Please wait. Job id: [20261027202122535173_dd5bd954-129e-438f-959d-483e32fba5ad], run log file is [ascend_faultdiag_4095.log].
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|                                                                          Ascend-fd Fault-Diag Report                                                                           |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+|   版本信息   |    类型    | 版本                                                                                                                                               |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+|              | Fault-Diag | 26.1.0.post20260721154651                                                                                                                          |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+| 根因节点分析 |    类型    | 描述                                                                                                                                               |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+|              |    说明    | 未诊断出根因节点，故障事件分析将尝试检测全部设备                                                                                                   |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+|              |  根因节点  | ['worker-0 device-0']                                                                                                                              |
+|              |  现象描述  | PyTorch UNKNOWN 模块上报 ERR99999 故障码。                                                                                                         |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+| 故障事件分析 |    类型    | 描述                                                                                                                                               |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+|              |    说明    | 诊断出多个故障，已按照优先级排序，请重点排查靠前的故障                                                                                             |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+| 疑似根因故障 |   状态码   | AISW_PyTorch_ERRCODE_Common_ERR99999                                                                                                               |
+|              |  故障分类  | 类型:Software/User 组件:AI Framework 模块:CANN/Framework                                                                                           |
+|              |  故障设备  | ['worker-0 device-0']                                                                                                                              |
+|              |  故障名称  | PyTorch上报错误码                                                                                                                                  |
+|              |  故障描述  | PyTorch UNKNOWN 模块上报 ERR99999 故障码。                                                                                                         |
+|              |  建议方案  | 1. PyTorch上报故障码，建议参考PyTorch官方文档中对应Error Code的案例解决，Error Code介绍：                                                          |
+|              |            |   https://www.hiascend.com/document/detail/zh/Pytorch/600/comref/troubleshooting/trbst_0003.html                                                   |
+|              |            | 2. 若无法解决，请联系华为工程师定位排查；                                                                                                          |
+|              |  关键日志  | Traceback (most recent call last):                                                                                                                 |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 461, in <module>                           |
+|              |            |                                                                                                                                                    |
+|              |            |     main()                                                                                                                                         |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 414, in main                               |
+|              |            |                                                                                                                                                    |
+|              |            |     video, audio = pipe(                                                                                                                           |
+|              |            |                                                                                                                                                    |
+|              |            |                    ^^^^^                                                                                                                           |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context                             |
+|              |            |                                                                                                                                                    |
+|              |            |     return func(*args, **kwargs)                                                                                                                   |
+|              |            |                                                                                                                                                    |
+|              |            |            ^^^^^^^^^^^^^^^^^^^^^                                                                                                                   |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 188, in __call__             |
+|              |            |                                                                                                                                                    |
+|              |            |     noise_pred_video, noise_pred_audio = self.cfg_guided_model_fn(                                                                                 |
+|              |            |                                                                                                                                                    |
+|              |            |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^                                                                                 |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/diffusion/base_pipeline.py", line 335, in cfg_guided_model_fn           |
+|              |            |                                                                                                                                                    |
+|              |            |     noise_pred_posi = model_fn(**inputs_posi, **inputs_shared, **inputs_others)                                                                    |
+|              |            |                                                                                                                                                    |
+|              |            |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                                                    |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 1244, in model_fn_minimax_h3 |
+|              |            |                                                                                                                                                    |
+|              |            |     v_video_rows, v_audio_rows = dit(                                                                                                              |
+|              |            |                                                                                                                                                    |
+|              |            |                                  ^^^^                                                                                                              |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl                          |
+|              |            |                                                                                                                                                    |
+|              |            |     return self._call_impl(*args, **kwargs)                                                                                                        |
+|              |            |                                                                                                                                                    |
+|              |            |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                                                                                        |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1845, in _call_impl                                  |
+|              |            |                                                                                                                                                    |
+|              |            |     return inner()                                                                                                                                 |
+|              |            |                                                                                                                                                    |
+|              |            |            ^^^^^^^                                                                                                                                 |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1772, in inner                                       |
+|              |            |                                                                                                                                                    |
+|              |            |     args_kwargs_result = hook(self, args, kwargs)  # type: ignore[misc]                                                                            |
+|              |            |                                                                                                                                                    |
+|              |            |                          ^^^^^^^^^^^^^^^^^^^^^^^^                                                                                                  |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_native_attention_vis.py", line 85, in layout_hook                      |
+|              |            |                                                                                                                                                    |
+|              |            |     indices, labels, frame_positions = parse_layout(                                                                                               |
+|              |            |                                                                                                                                                    |
+|              |            |                                        ^^^^^^^^^^^^^                                                                                               |
+|              |            |                                                                                                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_attention_vis.py", line 106, in parse_layout                           |
+|              |            |                                                                                                                                                    |
+|              |            |     raise ValueError('Inconsistent video frame grids in packed sequence')                                                                          |
+|              |            |                                                                                                                                                    |
+|              |            | ValueError: Inconsistent video frame grids in packed sequence                                                                                      |
+|              |            |                                                                                                                                                    |
+|              |            | [ERROR] 2026-10-27-20:19:38 (PID:960, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception                                                  |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
+|              |   状态码   | AISW_TRACEBACK_ValueError                                                                                                                          |
+|              |  故障分类  | 类型:User 组件:AI Framework 模块:Python                                                                                                            |
+|              |  故障设备  | ['worker-0 device-Unknown']                                                                                                                        |
+|              |  故障名称  | Python执行报错                                                                                                                                     |
+|              |  故障描述  | Python执行报错，并打印了相关Traceback信息。                                                                                                        |
+|              |  建议方案  | 1. 请根据Python Traceback信息排查错误；                                                                                                            |
+|              |            | 2. 若存在多个故障设备，每个报错的Traceback信息可能不一致，请在json报告中查看每个设备的具体Traceback信息；                                          |
+|              |  关键日志  | Traceback (most recent call last):                                                                                                                 |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 461, in <module>                           |
+|              |            |     main()                                                                                                                                         |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 414, in main                               |
+|              |            |     video, audio = pipe(                                                                                                                           |
+|              |            |                    ^^^^^                                                                                                                           |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context                             |
+|              |            |     return func(*args, **kwargs)                                                                                                                   |
+|              |            |            ^^^^^^^^^^^^^^^^^^^^^                                                                                                                   |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 188, in __call__             |
+|              |            |     noise_pred_video, noise_pred_audio = self.cfg_guided_model_fn(                                                                                 |
+|              |            |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^                                                                                 |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/diffusion/base_pipeline.py", line 335, in cfg_guided_model_fn           |
+|              |            |     noise_pred_posi = model_fn(**inputs_posi, **inputs_shared, **inputs_others)                                                                    |
+|              |            |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                                                    |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 1244, in model_fn_minimax_h3 |
+|              |            |     v_video_rows, v_audio_rows = dit(                                                                                                              |
+|              |            |                                  ^^^^                                                                                                              |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl                          |
+|              |            |     return self._call_impl(*args, **kwargs)                                                                                                        |
+|              |            |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                                                                                        |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1845, in _call_impl                                  |
+|              |            |     return inner()                                                                                                                                 |
+|              |            |            ^^^^^^^                                                                                                                                 |
+|              |            |   File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1772, in inner                                       |
+|              |            |     args_kwargs_result = hook(self, args, kwargs)  # type: ignore[misc]                                                                            |
+|              |            |                          ^^^^^^^^^^^^^^^^^^^^^^^^                                                                                                  |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_native_attention_vis.py", line 85, in layout_hook                      |
+|              |            |     indices, labels, frame_positions = parse_layout(                                                                                               |
+|              |            |                                        ^^^^^^^^^^^^^                                                                                               |
+|              |            |   File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_attention_vis.py", line 106, in parse_layout                           |
+|              |            |     raise ValueError('Inconsistent video frame grids in packed sequence')                                                                          |
+|              |            | ValueError: Inconsistent video frame grids in packed sequence                                                                                      |
++--------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
 The diag job is complete.
