@@ -1,49 +1,242 @@
-① golden.txt文件中有gaze_x=25.175 cm（有对应图像）和gaze_x=-23.692 cm（只有标签）。这些是有意设置的屏幕外注视点，还是采用了特殊的标签换算规则？若是屏幕外点，目标放在哪里、如何测量位置，正式测试是否计入？专家这边能否提供几个已知注视点及其gaze_x/y 标签供我们核对？
-A：如果标签对应的图在目录里面找不到的是图漏了。是有意设置的屏幕外注视点。
-手机贴在电脑屏幕上，电脑屏幕上随机出的点，根据点在电脑屏幕上的像素坐标转换得到，像素值转cm值，正式测试计入。
-已知注视点及其gaze xy？golden.txt已经提供相关信息，可否提供更多需求说明？
+Loading models from: "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/video_vae/source/model.safetensors"
+Loaded model: {
+    "model_name": "minimax_h3_video_vae",
+    "model_class": "diffsynth.models.minimax_h3_video_vae.MiniMaxH3VideoVAE",
+    "extra_kwargs": null
+}
+Loading models from: "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/audio_vae/model.safetensors"
+Loaded model: {
+    "model_name": "minimax_h3_audio_vae",
+    "model_class": "diffsynth.models.minimax_h3_audio_vae.MiniMaxH3AudioVAE",
+    "extra_kwargs": null
+}
+Using minimax_h3_text_encoder from [
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00001-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00002-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00003-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00004-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00005-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00006-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00007-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00008-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00009-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00010-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00011-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00012-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00013-of-00014.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/text_encoder/model-00014-of-00014.safetensors"
+].
+Using minimax_h3_dit from [
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00001-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00002-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00003-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00004-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00005-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00006-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00007-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00008-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00009-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00010-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00011-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00012-of-00013.safetensors",
+    "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/transformer/model-00013-of-00013.safetensors"
+].
+Using minimax_h3_video_vae from "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/video_vae/source/model.safetensors".
+Using minimax_h3_audio_vae from "/cache/minimax_h3_jsonl_infer/model_9426a891bb5b5852/audio_vae/model.safetensors".
+No minimax_h3_controlnet models available. This is not an error.
 
-② 正式测试是否与样例一样，使用以前摄像头为原点、单位为厘米的 gaze_x/y？X、Y 轴正方向分别如何定义？
-A：正式测试与样例一样。使用以前摄像头为原点、单位为厘米的 gaze_x/y。方向定义如下：
- 
+========== DIFFSYNTH QWEN TEXT ENCODER ==========
+model.visual                                                           -> npu:0
+model.language_model.embed_tokens                                      -> npu:0
+model.language_model.layers.0                                          -> npu:0
+model.language_model.layers.1                                          -> npu:0
+model.language_model.layers.2                                          -> npu:0
+model.language_model.layers.3                                          -> npu:0
+model.language_model.layers.4                                          -> npu:0
+model.language_model.layers.5                                          -> npu:0
+model.language_model.layers.6                                          -> npu:0
+model.language_model.layers.7                                          -> npu:0
+model.language_model.layers.8                                          -> npu:0
+model.language_model.layers.9                                          -> npu:0
+model.language_model.layers.10                                         -> npu:0
+model.language_model.layers.11                                         -> npu:0
+model.language_model.layers.12                                         -> npu:0
+model.language_model.layers.13                                         -> npu:0
+model.language_model.layers.14                                         -> npu:0
+model.language_model.layers.15                                         -> npu:0
+model.language_model.layers.16                                         -> npu:0
+model.language_model.layers.17                                         -> npu:0
+model.language_model.layers.18                                         -> npu:0
+model.language_model.layers.19                                         -> npu:0
+model.language_model.layers.20                                         -> npu:0
+model.language_model.layers.21                                         -> npu:0
+model.language_model.layers.22                                         -> npu:0
+model.language_model.layers.23                                         -> npu:0
+model.language_model.layers.24                                         -> npu:0
+model.language_model.layers.25.self_attn                               -> npu:0
+model.language_model.layers.25.mlp.gate_proj                           -> npu:0
+model.language_model.layers.25.mlp.up_proj                             -> npu:1
+model.language_model.layers.25.mlp.down_proj                           -> npu:1
+model.language_model.layers.25.mlp.act_fn                              -> npu:1
+model.language_model.layers.25.input_layernorm                         -> npu:1
+model.language_model.layers.25.post_attention_layernorm                -> npu:1
+model.language_model.layers.26                                         -> npu:1
+model.language_model.layers.27                                         -> npu:1
+model.language_model.layers.28                                         -> npu:1
+model.language_model.layers.29                                         -> npu:1
+model.language_model.layers.30                                         -> npu:1
+model.language_model.layers.31                                         -> npu:1
+model.language_model.layers.32                                         -> npu:1
+model.language_model.layers.33                                         -> npu:1
+model.language_model.layers.34                                         -> npu:1
+model.language_model.layers.35                                         -> npu:1
+model.language_model.layers.36                                         -> npu:1
+model.language_model.layers.37                                         -> npu:1
+model.language_model.layers.38                                         -> npu:1
+model.language_model.layers.39                                         -> npu:1
+model.language_model.layers.40                                         -> npu:1
+model.language_model.layers.41                                         -> npu:1
+model.language_model.layers.42                                         -> npu:1
+model.language_model.layers.43                                         -> npu:1
+model.language_model.layers.44                                         -> npu:1
+model.language_model.layers.45                                         -> npu:1
+model.language_model.layers.46                                         -> npu:1
+model.language_model.layers.47                                         -> npu:1
+model.language_model.layers.48                                         -> npu:1
+model.language_model.layers.49                                         -> npu:1
+model.language_model.norm                                              -> npu:1
+model.language_model.rotary_emb                                        -> npu:1
+=================================================
 
-③ 采集设备是手机吗？手机是否固定、拍摄距离是多少？屏幕内注视点如何呈现和选取，每个点停留多久，何时拍照并写入标签？
-A：采集设备是手机，手机固定，拍摄距离30-60cm，采集apk上有ui呈现随机点，引导用户注视该点，停留2-3s，拍照为10fps常开固定间隔采图。
+========== ORIGINAL REF2VA DIT ==========
+video_patch_proj                                                       -> npu:3
+audio_patch_proj                                                       -> npu:3
+condition_proj                                                         -> npu:3
+time_embedder                                                          -> npu:3
+rope                                                                   -> npu:3
+token_refiner                                                          -> npu:3
+blocks.0                                                               -> npu:3
+blocks.1                                                               -> npu:3
+blocks.2                                                               -> npu:3
+blocks.3                                                               -> npu:3
+blocks.4                                                               -> npu:3
+blocks.5                                                               -> npu:3
+blocks.6                                                               -> npu:3
+blocks.7                                                               -> npu:3
+blocks.8                                                               -> npu:3
+blocks.9                                                               -> npu:3
+blocks.10                                                              -> npu:3
+blocks.11                                                              -> npu:3
+blocks.12                                                              -> npu:4
+blocks.13                                                              -> npu:4
+blocks.14                                                              -> npu:4
+blocks.15                                                              -> npu:4
+blocks.16                                                              -> npu:4
+blocks.17                                                              -> npu:4
+blocks.18                                                              -> npu:4
+blocks.19                                                              -> npu:4
+blocks.20                                                              -> npu:4
+blocks.21                                                              -> npu:4
+blocks.22                                                              -> npu:4
+blocks.23                                                              -> npu:4
+blocks.24                                                              -> npu:4
+blocks.25                                                              -> npu:4
+blocks.26                                                              -> npu:5
+blocks.27                                                              -> npu:5
+blocks.28                                                              -> npu:5
+blocks.29                                                              -> npu:5
+blocks.30                                                              -> npu:5
+blocks.31                                                              -> npu:5
+blocks.32                                                              -> npu:5
+blocks.33                                                              -> npu:5
+blocks.34                                                              -> npu:5
+blocks.35                                                              -> npu:5
+blocks.36                                                              -> npu:5
+blocks.37                                                              -> npu:5
+blocks.38                                                              -> npu:5
+blocks.39                                                              -> npu:5
+blocks.40                                                              -> npu:6
+blocks.41                                                              -> npu:6
+blocks.42                                                              -> npu:6
+blocks.43                                                              -> npu:6
+blocks.44                                                              -> npu:6
+blocks.45                                                              -> npu:6
+blocks.46                                                              -> npu:6
+blocks.47                                                              -> npu:6
+blocks.48                                                              -> npu:6
+blocks.49                                                              -> npu:6
+final_layer                                                            -> npu:3
+=========================================
+8-card layout ready: Qwen=[0, 1, 2], original Ref2VA DiT=[3, 4, 5, 6], video/audio VAE=7; audio_dtype=torch.float16; pipeline intermediates=npu:3
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/first_frame/260909_v1/yuchengdong/17.jpg
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/8.jpg
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/1.jpg
+[cloud] download asset: s3://bucket-8713-huanan/code/jwx1520881/DiffSynth-Studio/test_set_v1/cross_face/260909_v1/yuchengdong/3.jpg
+[1/10] source_index=0, seed=42
+[1/10] first_frame=525x822, resized=510x800, output=512x800, scale=0.973236, padding_ltrb=(1, 0, 1, 0); full image retained
+/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/models/minimax_h3_video_vae.py:63: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at build/CMakeFiles/torch_npu.dir/compiler_depend.ts:335.)
+  return torch.cat([torch.zeros_like(x[:, :, :1]).expand(-1, -1, self.kernel_size[0] - 1, -1, -1), x], dim=2)
 
-
-④ 图像保存前是否做过前摄镜像、横竖屏旋转、裁剪、缩放、灰度化或去畸变？
-A：保存的图像为原图。前摄镜像不做此操作，其他的操作是算法侧做，不在存图时做。
-
-
-⑤ 正式推理时，除了图像，还会提供并允许使用相机内参、设备信息、用户或会话编号吗？
-A：允许使用内参，不使用其他信息。
-
-⑥ “90% 误差小于 2 cm”是按帧、注视点还是用户统计？没有有效预测的图像如何计分？
-A：按测试集所有帧统计。测试集内均为可有效预测的图像。
-
-⑦ 多数会话的前13个编号有标签却没有图像，另有少数会话保留了图像。这13个点是什么用途？正式测试会使用其中有图像的样本吗？
-A：前13个点是屏幕外的点。正式测试可以参考，但是因为在屏幕外，意义不大，建议重点评估屏幕内。
-
-
-数据集说明
-
-数据采集方法：
-采集距离25cm~60cm，采集设备为手机，固定在用户前方，用户头部姿态可以大范围变化，注视点大多数为手机屏幕上的点，少部分为屏幕外的点
-
-数据标注（golden.txt）：
-name: 用户id
-uni_vec：相机坐标系下用户的注视方向（3d），起点为相机坐标系下用户鼻子3d位置（通过估计得到、精度不高），终点为注视点（相机坐标系下）
-gaze_x, gaze_y：注视点相对相机的x, y坐标，单位cm
-
-camera_intrinsics.npy 文件为相机参数，包含相机内参矩阵与畸变系数。
-
-jsonl case 例子：
-{'name': 'p75_084932_0000', 'uni_vec': [0.03760824658285965, 0.04040570941463, -0.9984753369190765], 'gaze_x': 4.310140625000001, 'gaze_y': 0.5216203703703703}, {'name': 'p75_084932_0001', 'uni_vec': [0.040257714001837815, 0.06066427172980829, -0.9973460595995947], 'gaze_x': 4.55721875, 'gaze_y': 1.4275925925925925}, {'name': 'p75_084932_0002', 'uni_vec': [0.03962929507282068, 0.2060726125971465, -0.9777339092562033], 'gaze_x': 4.584671875000001, 'gaze_y': 7.687037037037037}, {'name': 'p75_084932_0003', 'uni_vec': [0.046399691921795834, 0.25240557767222194, -0.9665084029378712], 'gaze_x': 4.83175, 'gaze_y': 9.965694444444445}, {'name': 'p75_084932_0004', 'uni_vec': [0.05078674225511638, 0.4056262805480074, -0.912626992445381], 'gaze_x': 5.188640625000001, 'gaze_y': 17.817453703703702}, {'name': 'p75_084932_0005', 'uni_vec': [-0.008738714544575562, -0.02848672672840959, -0.9995559720537962], 'gaze_x': 2.1138906250000002, 'gaze_y': -2.4433796296296295}, {'name': 'p75_084932_0006', 'uni_vec': [-0.032372226518400195, 0.05126796138427701, -0.9981601249728129], 'gaze_x': 0.5490625, 'gaze_y': 0.24708333333333332}, {'name': 'p75_084932_0007', 'uni_vec': [-0.05558623650723185, 0.4038996880321457, -0.9131129241876371], 'gaze_x': -0.9608593750000001, 'gaze_y': 18.09199074074074}, {'name': 'p75_084932_0008', 'uni_vec': [-0.12566448014890394, 0.05333199016602486, -0.9906382474212454], 'gaze_x': -3.9807031250000002, 'gaze_y': 0.46671296296296294}, {'name': 'p75_084932_0009', 'uni_vec': [-0.1289543967951962, 0.14399181934742045, -0.9811407236009557], 'gaze_x': -4.282687500000001, 'gaze_y': 4.639675925925926}, {'name': 'p75_084932_0010', 'uni_vec': [-0.1287990513195843, 0.28936167292558745, -0.9485149585646399], 'gaze_x': -4.419953125, 'gaze_y': 11.77763888888889}, {'name': 'p75_084932_0011', 'uni_vec': [-0.12334439798804193, 0.39026704454219685, -0.9124022103377799], 'gaze_x': -4.33759375, 'gaze_y': 17.323287037037037}, {'name': 'p75_084932_0012', 'uni_vec': [-0.39944657569509623, 0.14252266384119272, -0.9056101387777592], 'gaze_x': -17.954343750000003, 'gaze_y': 5.161296296296296}, {'name': 'p75_084932_0013', 'uni_vec': [-0.007618803213334935, 0.08166237015491919, -0.9966309302536609], 'gaze_x': 2.36096875, 'gaze_y': 2.0041203703703703}, {'name': 'p75_084932_0014', 'uni_vec': [-0.09739666171797569, 0.07525678416707103, -0.9923962448150563], 'gaze_x': -1.7570000000000001, 'gaze_y': 1.7021296296296295}, {'name': 'p75_084932_0015', 'uni_vec': [-0.09807582164095388, 0.1635047768108846, -0.9816553983804474], 'gaze_x': -1.8119062500000003, 'gaze_y': 5.682916666666667}, {'name': 'p75_084932_0016', 'uni_vec': [-0.09235327004745622, 0.24621691111360036, -0.9648046984717783], 'gaze_x': -1.70209375, 'gaze_y': 9.471527777777778}, {'name': 'p75_084932_0017', 'uni_vec': [-0.09018858838266881, 0.3389302630186294, -0.9364786678486938], 'gaze_x': -1.784453125, 'gaze_y': 14.330833333333334}, {'name': 'p75_084932_0018', 'uni_vec': [-0.004185997341982851, 0.24722015855085153, -0.9689502931690277], 'gaze_x': 2.3060625000000003, 'gaze_y': 9.608796296296298}
-
-相机内参：
-{'mtx': array([[554.73597482,   0.        , 382.92987391],
-      [  0.        , 554.84643608, 514.44240178],
-      [  0.        ,   0.        ,   1.        ]]), 
-'distC': array([[-0.08800637,  0.33554064,  0.00142259,  0.00121936, -0.47625419]])}
-
-4个人，分别212张图片，183张图片图片，193张图片，281张图片，均为灰度、正脸（上半身）图，环境背景单一（基本一致），图片分辨率780*1040（抽测了十几个，都是这个分辨率）
+  0%|          | 0/50 [00:00<?, ?it/s]
+  0%|          | 0/50 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 455, in <module>
+    main()
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/infer_native_ref2va_with_ref.py", line 408, in main
+    video, audio = pipe(
+                   ^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 188, in __call__
+    noise_pred_video, noise_pred_audio = self.cfg_guided_model_fn(
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/diffusion/base_pipeline.py", line 335, in cfg_guided_model_fn
+    noise_pred_posi = model_fn(**inputs_posi, **inputs_shared, **inputs_others)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/diffsynth/pipelines/minimax_h3_audio_video.py", line 1244, in model_fn_minimax_h3
+    v_video_rows, v_audio_rows = dit(
+                                 ^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1845, in _call_impl
+    return inner()
+           ^^^^^^^
+  File "/home/ma-user/anaconda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1772, in inner
+    args_kwargs_result = hook(self, args, kwargs)  # type: ignore[misc]
+                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_native_attention_vis.py", line 85, in layout_hook
+    indices, labels, frame_positions = parse_layout(
+                                       ^^^^^^^^^^^^^
+  File "/home/ma-user/modelarts/user-job-dir/MiniMax_huawei-main/minimax_h3_attention_vis.py", line 106, in parse_layout
+    raise ValueError('Inconsistent video frame grids in packed sequence')
+ValueError: Inconsistent video frame grids in packed sequence
+[ERROR] 2026-10-27-19:42:30 (PID:491, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ModelArts Service Log]2026-10-27 19:42:42,134 - ERROR - proc-rank-0-device-0 (pid: 491) has exited with non-zero code: 1
+[ModelArts Service Log]2026-10-27 19:42:42,134 - INFO - Begin destroy training processes
+[ModelArts Service Log]2026-10-27 19:42:42,134 - INFO - proc-rank-7-device-7 (pid: 517) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,134 - INFO - proc-rank-6-device-6 (pid: 513) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-5-device-5 (pid: 510) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-4-device-4 (pid: 504) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-3-device-3 (pid: 499) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-2-device-2 (pid: 496) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-1-device-1 (pid: 493) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - proc-rank-0-device-0 (pid: 491) has exited before receiving the term signal
+[ModelArts Service Log]2026-10-27 19:42:42,135 - INFO - End destroy training processes
+time="2026-10-27T19:42:42+08:00" level=info msg="the run_train script is exiting..." Component=ShellScripts Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="the run_train 265 script is exited with 1" Component=ShellScripts Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="the run_train script is exiting..." Component=ShellScripts Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="the run_train 258 script is exited with 1" Component=ShellScripts Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="command is exit with 1" file="process.go:219" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="NPU training process exits with exit code 1, and the environment will be retained for 0s." file="process.go:285"
+time="2026-10-27T19:42:42+08:00" level=info msg="the environment has been retained for 0s." file="process.go:287"
+time="2026-10-27T19:42:42+08:00" level=info msg="the task will restart after terminating the user processes" file="process.go:445" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="kill user processes successfully" file="process.go:568" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="skip clear memarts socket dir" file="process.go:602" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="clear profiler file skip" file="process.go:610" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="detected pattern: map[]\n" file="process.go:244" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="start export latest ascend device log" file="ascend_log_handler.go:171" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="zombie process cleaner is exiting" file="cleaner_unix.go:53" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
+time="2026-10-27T19:42:42+08:00" level=info msg="device log watcher is running" file="ascend_log_handler.go:188"
+time="2026-10-27T19:43:55+08:00" level=info msg="device log export finished" file="ascend_log_handler.go:199" Command=bootstrap/run Component=ma-training-toolkit Container=modelarts-training Platform=ModelArts-Service
