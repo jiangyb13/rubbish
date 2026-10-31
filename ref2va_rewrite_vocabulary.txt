@@ -1,0 +1,650 @@
+视频生成 Prompt 中英文动作词库
+Video Generation Prompt Templates — Chinese / English
+============================================================================
+内容：头部姿态、面部表情、身体动作、镜头景别、相机角度与相机运动
+格式：编号 | 类别/部位 | 中文动作/描述 | 英文 Prompt
+条目总数：197
+说明：英文动作描述可拼接人物、场景和首帧描述使用。
+============================================================================
+
+
+# 一、头部姿态（Head Pose）
+============================================================================
+
+## 1. 静态姿态与单一变化
+----------------------------------------------------------------------------
+001 | 正面 | 正对镜头
+      EN: Faces the camera directly
+
+002 | 左转头 | 缓慢向左转头
+      EN: Slowly turns their head to the left
+
+003 | 右转头 | 缓慢向右转头
+      EN: Slowly turns their head to the right
+
+004 | 左侧脸 | 转头直到左侧脸朝向镜头
+      EN: Turns their head until their left profile is visible
+
+005 | 右侧脸 | 转头直到右侧脸朝向镜头
+      EN: Turns their head until their right profile is visible
+
+006 | 轻微转头 | 头部轻微向一侧转动
+      EN: Slightly turns their head to one side
+
+007 | 四分之三侧脸 | 将头部转至四分之三侧面角度
+      EN: Turns their head to a three-quarter view
+
+008 | 抬头 | 缓慢抬起头部
+      EN: Slowly raises their head
+
+009 | 低头 | 缓慢低下头部
+      EN: Slowly lowers their head
+
+010 | 仰头 | 向后仰头
+      EN: Tilts their head backward
+
+011 | 向左歪头 | 向左侧倾斜头部
+      EN: Tilts their head to the left
+
+012 | 向右歪头 | 向右侧倾斜头部
+      EN: Tilts their head to the right
+
+013 | 点头 | 上下点头一次
+      EN: Nods their head once
+
+014 | 摇头 | 左右摇头
+      EN: Shakes their head from side to side
+
+015 | 回头 | 转头看向身后
+      EN: Turns their head to look behind them
+
+
+## 2. 复合头部动作
+----------------------------------------------------------------------------
+016 | 左转头→回正 | 左转头→回正
+      EN: Turns their head to the left, then turns back to face the camera
+
+017 | 右转头→回正 | 右转头→回正
+      EN: Turns their head to the right, then turns back to face the camera
+
+018 | 左侧脸→右侧脸 | 左侧脸→右侧脸
+      EN: Turns their head from the left side to the right side
+
+019 | 正脸→侧脸→正脸 | 正脸→侧脸→正脸
+      EN: Turns their head to a side profile, then returns to face the camera
+
+020 | 低头→抬头 | 低头→抬头
+      EN: Lowers their head, then slowly raises it to face the camera
+
+021 | 抬头→低头→回正 | 抬头→低头→回正
+      EN: Looks upward, lowers their head, then returns to a neutral head position
+
+022 | 左歪头→右歪头 | 左歪头→右歪头
+      EN: Tilts their head to the left, then to the right
+
+023 | 转头→点头 | 转头→点头
+      EN: Turns their head to one side, then nods
+
+024 | 转头→低头→回正 | 转头→低头→回正
+      EN: Turns their head to the side, lowers it, then returns to face the camera
+
+025 | 低头→转头→抬头 | 低头→转头→抬头
+      EN: Lowers their head, turns to the side, then raises it
+
+026 | 回头看→转回正面 | 回头看→转回正面
+      EN: Looks over their shoulder, then turns back to face the camera
+
+
+# 二、面部表情（Facial Expression）
+============================================================================
+
+## 1. 基础情绪表情
+----------------------------------------------------------------------------
+027 | 平静自然 | 平静自然
+      EN: Maintains a calm, neutral expression
+
+028 | 轻微微笑 | 轻微微笑
+      EN: Shows a subtle smile
+
+029 | 闭嘴微笑 | 闭嘴微笑
+      EN: Smiles gently with their lips closed
+
+030 | 露齿微笑 | 露齿微笑
+      EN: Smiles broadly, showing their teeth
+
+031 | 开心大笑 | 开心大笑
+      EN: Laughs happily with their mouth open
+
+032 | 害羞微笑 | 害羞微笑
+      EN: Gives a shy, gentle smile
+
+033 | 得意微笑 | 得意微笑
+      EN: Smiles confidently
+
+034 | 单侧嘴角上扬 | 单侧嘴角上扬
+      EN: Raises one corner of their mouth in a smirk
+
+035 | 悲伤 | 悲伤
+      EN: Looks sad
+
+036 | 难过皱眉 | 难过皱眉
+      EN: Frowns with a sad expression
+
+037 | 生气 | 生气
+      EN: Shows an angry expression
+
+038 | 惊讶 | 惊讶
+      EN: Widens their eyes and opens their mouth in surprise
+
+039 | 疑惑 | 疑惑
+      EN: Shows a puzzled expression
+
+040 | 厌恶 | 厌恶
+      EN: Shows an expression of disgust
+
+041 | 害怕 | 害怕
+      EN: Shows a frightened expression
+
+042 | 严肃 | 严肃
+      EN: Maintains a serious expression
+
+043 | 思考 | 思考
+      EN: Shows a thoughtful expression
+
+044 | 无奈 | 无奈
+      EN: Gives a resigned expression
+
+
+## 2. 嘴部、眼部、眉毛及视线动作
+----------------------------------------------------------------------------
+045 | 嘴部 | 张开嘴巴
+      EN: Opens their mouth
+
+046 | 嘴部 | 缓慢闭上嘴巴
+      EN: Slowly closes their mouth
+
+047 | 嘴部 | 露出牙齿
+      EN: Parts their lips to show their teeth
+
+048 | 嘴部 | 抿嘴
+      EN: Presses their lips together
+
+049 | 嘴部 | 撅嘴
+      EN: Purses their lips
+
+050 | 嘴部 | 咬下嘴唇
+      EN: Gently bites their lower lip
+
+051 | 嘴部 | 鼓起脸颊
+      EN: Puffs out their cheeks
+
+052 | 嘴部 | 吹气
+      EN: Blows air through their lips
+
+053 | 嘴部 | 打哈欠
+      EN: Opens their mouth in a yawn
+
+054 | 嘴部 | 做说话口型
+      EN: Moves their lips as if speaking
+
+055 | 眼部 | 眨眼一次
+      EN: Blinks once
+
+056 | 眼部 | 连续眨眼
+      EN: Blinks several times
+
+057 | 眼部 | 缓慢闭眼
+      EN: Slowly closes their eyes
+
+058 | 眼部 | 睁开眼睛
+      EN: Slowly opens their eyes
+
+059 | 眼部 | 睁大眼睛
+      EN: Widens their eyes
+
+060 | 眼部 | 眯起眼睛
+      EN: Narrows their eyes
+
+061 | 眼部 | 左眼眨眼
+      EN: Winks with their left eye
+
+062 | 眼部 | 右眼眨眼
+      EN: Winks with their right eye
+
+063 | 眉毛 | 挑眉
+      EN: Raises their eyebrows
+
+064 | 眉毛 | 单侧挑眉
+      EN: Raises one eyebrow
+
+065 | 眉毛 | 皱眉
+      EN: Furrows their eyebrows
+
+066 | 眉毛 | 舒展眉毛
+      EN: Relaxes their eyebrows
+
+067 | 视线 | 向左看
+      EN: Shifts their gaze to the left
+
+068 | 视线 | 向右看
+      EN: Shifts their gaze to the right
+
+069 | 视线 | 向上看
+      EN: Looks upward with their eyes
+
+070 | 视线 | 向下看
+      EN: Looks downward with their eyes
+
+071 | 视线 | 看向镜头
+      EN: Makes direct eye contact with the camera
+
+
+## 3. 表情转换
+----------------------------------------------------------------------------
+072 | 平静→闭嘴微笑 | 平静→闭嘴微笑
+      EN: Changes from a neutral expression to a gentle closed-mouth smile
+
+073 | 平静→露齿微笑 | 平静→露齿微笑
+      EN: Gradually smiles, revealing their teeth
+
+074 | 微笑→大笑 | 微笑→大笑
+      EN: Their gentle smile gradually turns into a wide, open-mouthed laugh
+
+075 | 大笑→平静 | 大笑→平静
+      EN: Gradually stops laughing and returns to a neutral expression
+
+076 | 严肃→微笑 | 严肃→微笑
+      EN: Their serious expression gradually softens into a warm smile
+
+077 | 平静→惊讶 | 平静→惊讶
+      EN: Suddenly widens their eyes and opens their mouth in surprise
+
+078 | 惊讶→微笑 | 惊讶→微笑
+      EN: Their surprised expression gradually turns into a smile
+
+079 | 平静→皱眉 | 平静→皱眉
+      EN: Gradually furrows their eyebrows
+
+080 | 皱眉→舒展 | 皱眉→舒展
+      EN: Relaxes their furrowed brows
+
+081 | 微笑→悲伤 | 微笑→悲伤
+      EN: Their smile slowly fades into a sad expression
+
+082 | 生气→平静 | 生气→平静
+      EN: Their angry expression gradually relaxes
+
+083 | 闭眼→睁眼→微笑 | 闭眼→睁眼→微笑
+      EN: Slowly opens their eyes, then smiles gently
+
+084 | 低头沉思→抬头微笑 | 低头沉思→抬头微笑
+      EN: Looks down thoughtfully, then raises their head and smiles
+
+085 | 转头→回正→露齿微笑 | 转头→回正→露齿微笑
+      EN: Turns their head sideways, returns to face the camera, then smiles with visible teeth
+
+
+# 三、身体动作（Body Motion）
+============================================================================
+
+## 1. 上半身与基础动作
+----------------------------------------------------------------------------
+086 | 上半身 | 轻微呼吸
+      EN: Breathes naturally with subtle chest movement
+
+087 | 上半身 | 身体轻微晃动
+      EN: Gently sways their upper body
+
+088 | 上半身 | 身体前倾
+      EN: Leans their upper body forward
+
+089 | 上半身 | 身体后仰
+      EN: Leans their upper body backward
+
+090 | 上半身 | 身体向左倾斜
+      EN: Leans their upper body to the left
+
+091 | 上半身 | 身体向右倾斜
+      EN: Leans their upper body to the right
+
+092 | 上半身 | 耸肩
+      EN: Shrugs their shoulders
+
+093 | 上半身 | 左右转肩
+      EN: Rotates their shoulders slightly
+
+094 | 上半身 | 伸展身体
+      EN: Stretches their upper body
+
+095 | 上半身 | 双手抱胸
+      EN: Crosses their arms over their chest
+
+096 | 上半身 | 放下交叉双臂
+      EN: Uncrosses their arms and lowers them
+
+097 | 上半身 | 双手叉腰
+      EN: Places both hands on their hips
+
+098 | 上半身 | 双手自然下垂
+      EN: Lowers their arms to their sides
+
+099 | 上半身 | 双手合十
+      EN: Brings their palms together
+
+100 | 上半身 | 双手交握→松开
+      EN: Unclasps their hands and lets them relax
+
+
+## 2. 手部动作
+----------------------------------------------------------------------------
+101 | 手部 | 举起左手
+      EN: Raises their left hand
+
+102 | 手部 | 举起右手
+      EN: Raises their right hand
+
+103 | 手部 | 挥手
+      EN: Raises one hand and waves at the camera
+
+104 | 手部 | 挥手后放下
+      EN: Waves at the camera, then lowers their hand
+
+105 | 手部 | 鼓掌
+      EN: Claps their hands
+
+106 | 手部 | 竖大拇指
+      EN: Gives a thumbs-up
+
+107 | 手部 | 比 OK 手势
+      EN: Makes an OK gesture with one hand
+
+108 | 手部 | 比耶
+      EN: Makes a peace sign with their fingers
+
+109 | 手部 | 指向前方
+      EN: Points forward with one hand
+
+110 | 手部 | 指向自己
+      EN: Points toward themselves
+
+111 | 手部 | 搓手
+      EN: Rubs their hands together
+
+112 | 手部 | 张开双臂
+      EN: Opens their arms wide
+
+113 | 手部 | 伸手向前
+      EN: Reaches one hand forward
+
+114 | 手部 | 整理衣领
+      EN: Adjusts their collar
+
+115 | 手部 | 整理衣袖
+      EN: Adjusts their sleeves
+
+116 | 手部 | 抬手看手表
+      EN: Raises their wrist and looks at their watch
+
+117 | 手部 | 拿起物品
+      EN: Picks up an object
+
+118 | 手部 | 放下物品
+      EN: Places the object down
+
+
+## 3. 手脸交互（Hand-Face Interaction）
+----------------------------------------------------------------------------
+119 | 手脸交互 | 摸脸颊
+      EN: Gently touches their cheek, then lowers their hand
+
+120 | 手脸交互 | 摸下巴
+      EN: Touches their chin thoughtfully, then lowers their hand
+
+121 | 手脸交互 | 摸额头
+      EN: Touches their forehead, then lowers their hand
+
+122 | 手脸交互 | 挠头
+      EN: Scratches their head briefly, then lowers their hand
+
+123 | 手脸交互 | 抓头发
+      EN: Runs their fingers through their hair, then lowers their hand
+
+124 | 手脸交互 | 整理头发
+      EN: Adjusts their hair, then lowers their hand
+
+125 | 手脸交互 | 撩头发
+      EN: Brushes their hair away from their face
+
+126 | 手脸交互 | 揉眼睛
+      EN: Rubs one eye gently, then lowers their hand
+
+127 | 手脸交互 | 捂嘴
+      EN: Raises a hand to cover their mouth
+
+128 | 手脸交互 | 捂嘴→放下
+      EN: Covers their mouth briefly, then lowers their hand
+
+129 | 手脸交互 | 托腮
+      EN: Rests their chin on one hand
+
+130 | 手脸交互 | 戴眼镜
+      EN: Puts on a pair of glasses and adjusts them
+
+131 | 手脸交互 | 摘眼镜
+      EN: Removes their glasses and lowers their hand
+
+132 | 手脸交互 | 扶眼镜
+      EN: Adjusts their glasses with one hand
+
+133 | 手脸交互 | 戴帽子
+      EN: Puts a hat on their head and adjusts it
+
+134 | 手脸交互 | 摘帽子
+      EN: Removes their hat and lowers it
+
+135 | 手脸交互 | 扶帽檐
+      EN: Touches and adjusts the brim of their hat
+
+136 | 手脸交互 | 擦脸
+      EN: Gently wipes their face with one hand
+
+137 | 手脸交互 | 双手遮脸→移开
+      EN: Covers their face with both hands, then moves them away
+
+
+## 4. 身体转动与全身动作
+----------------------------------------------------------------------------
+138 | 全身 | 身体向左转
+      EN: Turns their upper body to the left
+
+139 | 全身 | 身体向右转
+      EN: Turns their upper body to the right
+
+140 | 全身 | 转身面对镜头
+      EN: Turns their body to face the camera
+
+141 | 全身 | 转身背对镜头
+      EN: Turns around to face away from the camera
+
+142 | 全身 | 背对镜头→转身回正
+      EN: Turns from facing away to face the camera
+
+143 | 全身 | 半转身
+      EN: Rotates their body halfway
+
+144 | 全身 | 原地转一圈
+      EN: Makes a full turn in place
+
+145 | 全身 | 向前走
+      EN: Walks forward naturally
+
+146 | 全身 | 向后退
+      EN: Takes a few steps backward
+
+147 | 全身 | 向左走
+      EN: Takes a few steps to the left
+
+148 | 全身 | 向右走
+      EN: Takes a few steps to the right
+
+149 | 全身 | 走向镜头
+      EN: Walks toward the camera
+
+150 | 全身 | 远离镜头
+      EN: Walks away from the camera
+
+151 | 全身 | 原地踏步
+      EN: Marches in place
+
+152 | 全身 | 坐下
+      EN: Slowly sits down on a chair
+
+153 | 全身 | 站起来
+      EN: Stands up from a seated position
+
+154 | 全身 | 弯腰
+      EN: Bends forward at the waist
+
+155 | 全身 | 蹲下
+      EN: Squats down
+
+156 | 全身 | 起跳
+      EN: Jumps lightly in place
+
+157 | 全身 | 挥手走开
+      EN: Waves at the camera, then walks away
+
+
+# 四、相机角度与运镜（Camera Angle & Movement）
+============================================================================
+
+## 1. 镜头景别（Shot Size）
+----------------------------------------------------------------------------
+158 | 景别 | 面部大特写
+      EN: Extreme close-up
+
+159 | 景别 | 头肩特写
+      EN: Close-up
+
+160 | 景别 | 胸部以上
+      EN: Medium close-up
+
+161 | 景别 | 腰部以上
+      EN: Medium shot
+
+162 | 景别 | 膝盖以上
+      EN: Medium long shot
+
+163 | 景别 | 全身
+      EN: Full shot
+
+
+## 2. 相机角度（Camera Angle）
+----------------------------------------------------------------------------
+164 | 角度 | 正面平视
+      EN: Eye-level frontal camera angle
+
+165 | 角度 | 轻微俯拍
+      EN: Slightly high-angle shot
+
+166 | 角度 | 高角度俯拍
+      EN: High-angle shot looking down at the subject
+
+167 | 角度 | 顶部俯拍
+      EN: Overhead shot
+
+168 | 角度 | 轻微仰拍
+      EN: Slightly low-angle shot
+
+169 | 角度 | 低角度仰拍
+      EN: Low-angle shot looking up at the subject
+
+170 | 角度 | 左侧 45°
+      EN: Camera positioned at a 45-degree angle to the subject's left
+
+171 | 角度 | 右侧 45°
+      EN: Camera positioned at a 45-degree angle to the subject's right
+
+172 | 角度 | 左侧 90°
+      EN: Side-view camera angle from the subject's left
+
+173 | 角度 | 右侧 90°
+      EN: Side-view camera angle from the subject's right
+
+174 | 角度 | 背面视角
+      EN: Rear-view camera angle
+
+175 | 角度 | 过肩视角
+      EN: Over-the-shoulder shot
+
+176 | 角度 | 倾斜镜头
+      EN: Dutch-angle shot with a tilted camera
+
+
+## 3. 相机运动（Camera Movement）
+----------------------------------------------------------------------------
+177 | 固定 | 镜头完全静止
+      EN: Static camera, fixed framing
+
+178 | 固定 | 相机固定，人物活动
+      EN: Locked-off camera, only the subject moves
+
+179 | Pan | 镜头向左水平摇动
+      EN: The camera slowly pans left
+
+180 | Pan | 镜头向右水平摇动
+      EN: The camera slowly pans right
+
+181 | Tilt | 镜头向上摇动
+      EN: The camera slowly tilts upward
+
+182 | Tilt | 镜头向下摇动
+      EN: The camera slowly tilts downward
+
+183 | Dolly | 相机向前推进
+      EN: The camera slowly dollies in toward the subject
+
+184 | Dolly | 相机向后拉远
+      EN: The camera slowly dollies out from the subject
+
+185 | Truck | 相机向左平移
+      EN: The camera tracks laterally to the left
+
+186 | Truck | 相机向右平移
+      EN: The camera tracks laterally to the right
+
+187 | Orbit | 相机向左环绕人物
+      EN: The camera slowly orbits around the subject to the left
+
+188 | Orbit | 相机向右环绕人物
+      EN: The camera slowly orbits around the subject to the right
+
+189 | Zoom | 镜头逐渐放大
+      EN: The camera slowly zooms in
+
+190 | Zoom | 镜头逐渐缩小
+      EN: The camera slowly zooms out
+
+191 | Pedestal | 相机垂直上升
+      EN: The camera rises vertically
+
+192 | Pedestal | 相机垂直下降
+      EN: The camera descends vertically
+
+193 | Tracking | 相机跟随人物移动
+      EN: The camera smoothly tracks the moving subject
+
+194 | Handheld | 轻微手持晃动
+      EN: Subtle handheld camera movement
+
+195 | Arc | 相机沿弧线移动
+      EN: The camera moves in a gentle arc around the subject
+
+196 | Crane | 摇臂上升
+      EN: The camera cranes upward
+
+197 | Crane | 摇臂下降
+      EN: The camera cranes downward
+
+----------------------------------------------------------------------------
+共 197 条。
