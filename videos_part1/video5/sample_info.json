@@ -1,0 +1,139 @@
+{
+  "movie": "BeforeSunset",
+  "shot": "BeforeSunset_shot_0450",
+  "person": "person_0016",
+  "pool": 863,
+  "person_shots": 56,
+  "frames": 178,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/BeforeSunset/shot_detection/shots/BeforeSunset_shot_0450.mp4",
+  "duration": 7.425,
+  "folder": "video5",
+  "reference_pool_images": 856,
+  "reference_pool_shots": 55,
+  "references": [
+    {
+      "file": "BeforeSunset_shot_0274_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/BeforeSunset/identity_matching/person_clusters/person_0016/full_orig/BeforeSunset_shot_0274_id0_frame0002.jpg",
+      "shot": "BeforeSunset_shot_0274",
+      "frame_idx": 2,
+      "person_id": "person_0016",
+      "crop": "BeforeSunset_shot_0274_id0_frame0002.png",
+      "bbox_xyxy": [
+        196,
+        0,
+        834,
+        721
+      ],
+      "original_size": [
+        981,
+        1075
+      ],
+      "crop_size": [
+        638,
+        721
+      ],
+      "original_path": "/data2/peiyao/videos/video5/BeforeSunset_shot_0274_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video5/ref_heads/BeforeSunset_shot_0274_id0_frame0002.png"
+    },
+    {
+      "file": "BeforeSunset_shot_0292_id1_frame0007.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/BeforeSunset/identity_matching/person_clusters/person_0016/full_orig/BeforeSunset_shot_0292_id1_frame0007.jpg",
+      "shot": "BeforeSunset_shot_0292",
+      "frame_idx": 7,
+      "person_id": "person_0016",
+      "crop": "BeforeSunset_shot_0292_id1_frame0007.png",
+      "bbox_xyxy": [
+        79,
+        0,
+        880,
+        964
+      ],
+      "original_size": [
+        880,
+        1036
+      ],
+      "crop_size": [
+        801,
+        964
+      ],
+      "original_path": "/data2/peiyao/videos/video5/BeforeSunset_shot_0292_id1_frame0007.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video5/ref_heads/BeforeSunset_shot_0292_id1_frame0007.png"
+    },
+    {
+      "file": "BeforeSunset_shot_0452_id0_frame0006.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/BeforeSunset/identity_matching/person_clusters/person_0016/full_orig/BeforeSunset_shot_0452_id0_frame0006.jpg",
+      "shot": "BeforeSunset_shot_0452",
+      "frame_idx": 6,
+      "person_id": "person_0016",
+      "crop": "BeforeSunset_shot_0452_id0_frame0006.png",
+      "bbox_xyxy": [
+        233,
+        0,
+        693,
+        509
+      ],
+      "original_size": [
+        729,
+        942
+      ],
+      "crop_size": [
+        460,
+        509
+      ],
+      "original_path": "/data2/peiyao/videos/video5/BeforeSunset_shot_0452_id0_frame0006.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video5/ref_heads/BeforeSunset_shot_0452_id0_frame0006.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "BeforeSunset_shot_0450.mp4": "552a3813410a0ca6d3a41d8e8838ac29da8be969010114ed696ff2548ba256e6",
+    "first_frame.png": "801e6d729f365cbf9354e87df29b99e626880f816083e750fc4f61f8b9e3f6ce",
+    "BeforeSunset_shot_0274_id0_frame0002.jpg": "43520ea7ba7c0f1e5bdc2267f3ea8580f411410a1e7ab3dd63e9a43c4a33310d",
+    "BeforeSunset_shot_0292_id1_frame0007.jpg": "4c1ff0699877eff7e2557f0e30a04de3e893d23524d2b5244fec6a74029f5fb5",
+    "BeforeSunset_shot_0452_id0_frame0006.jpg": "2a47ff67fad2895eb12fe1a8878b4c10266cc23ffa49c535103387878fd89288",
+    "ref_heads/BeforeSunset_shot_0274_id0_frame0002.png": "510f1f468c3ba5be8df9f8653a3ce58e8cefe64e7c923a1fb43deabb08a075e7",
+    "ref_heads/BeforeSunset_shot_0292_id1_frame0007.png": "21850c89f42ee9b3f46eed04bab37369e725822335223feba07d8d51972c89ac",
+    "ref_heads/BeforeSunset_shot_0452_id0_frame0006.png": "2c00cb1364c6d4f15c5f904963e53dcdfa276d4b709f543b06cddd79cee641ba"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video5/BeforeSunset_shot_0450.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video5/BeforeSunset_shot_0450.mp4",
+    "original_sha256": "ff2b9af1e4dce8743bad3b2b04e8d87f2de9dc3d01bfaa7d3000bdaeda9afe47",
+    "converted_sha256": "552a3813410a0ca6d3a41d8e8838ac29da8be969010114ed696ff2548ba256e6",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1908,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.424083",
+      "nb_frames": "178"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1908,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.424083",
+      "nb_frames": "178"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video5/BeforeSunset_shot_0450.mp4",
+  "first_frame": "/data2/peiyao/videos/video5/first_frame.png",
+  "curation": {
+    "previous_folder": "video5",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video5",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

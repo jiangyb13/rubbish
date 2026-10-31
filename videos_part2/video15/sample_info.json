@@ -1,0 +1,139 @@
+{
+  "movie": "LoveActually",
+  "shot": "LoveActually_shot_1316",
+  "person": "person_0036",
+  "pool": 374,
+  "person_shots": 70,
+  "frames": 202,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LoveActually/shot_detection/shots/LoveActually_shot_1316.mp4",
+  "duration": 8.426,
+  "folder": "video15",
+  "reference_pool_images": 365,
+  "reference_pool_shots": 69,
+  "references": [
+    {
+      "file": "LoveActually_shot_0104_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LoveActually/identity_matching/person_clusters/person_0036/full_orig/LoveActually_shot_0104_id0_frame0001.jpg",
+      "shot": "LoveActually_shot_0104",
+      "frame_idx": 1,
+      "person_id": "person_0036",
+      "crop": "LoveActually_shot_0104_id0_frame0001.png",
+      "bbox_xyxy": [
+        346,
+        0,
+        811,
+        596
+      ],
+      "original_size": [
+        989,
+        816
+      ],
+      "crop_size": [
+        465,
+        596
+      ],
+      "original_path": "/data2/peiyao/videos/video15/LoveActually_shot_0104_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video15/ref_heads/LoveActually_shot_0104_id0_frame0001.png"
+    },
+    {
+      "file": "LoveActually_shot_1353_id0_frame0003.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LoveActually/identity_matching/person_clusters/person_0036/full_orig/LoveActually_shot_1353_id0_frame0003.jpg",
+      "shot": "LoveActually_shot_1353",
+      "frame_idx": 3,
+      "person_id": "person_0036",
+      "crop": "LoveActually_shot_1353_id0_frame0003.png",
+      "bbox_xyxy": [
+        314,
+        0,
+        668,
+        504
+      ],
+      "original_size": [
+        785,
+        812
+      ],
+      "crop_size": [
+        354,
+        504
+      ],
+      "original_path": "/data2/peiyao/videos/video15/LoveActually_shot_1353_id0_frame0003.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video15/ref_heads/LoveActually_shot_1353_id0_frame0003.png"
+    },
+    {
+      "file": "LoveActually_shot_1397_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LoveActually/identity_matching/person_clusters/person_0036/full_orig/LoveActually_shot_1397_id0_frame0001.jpg",
+      "shot": "LoveActually_shot_1397",
+      "frame_idx": 1,
+      "person_id": "person_0036",
+      "crop": "LoveActually_shot_1397_id0_frame0001.png",
+      "bbox_xyxy": [
+        179,
+        0,
+        820,
+        768
+      ],
+      "original_size": [
+        1280,
+        816
+      ],
+      "crop_size": [
+        641,
+        768
+      ],
+      "original_path": "/data2/peiyao/videos/video15/LoveActually_shot_1397_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video15/ref_heads/LoveActually_shot_1397_id0_frame0001.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "LoveActually_shot_1316.mp4": "29b5c0b1cad5db9866f9f5c02e15a0ac26fd0fb6ce5daf2644553de7dc617059",
+    "first_frame.png": "c8c14f1330b14055f7d8046b26f825c484e3634c1c62e526bb37f22baf1f8e56",
+    "LoveActually_shot_0104_id0_frame0001.jpg": "91c3a9af47ce97635822d5c919b8512742ea0a1e6eb0e4dd6398db54321d4f86",
+    "LoveActually_shot_1353_id0_frame0003.jpg": "37cea84dd628960996d6a729b5699780ac38f02620cc01a6a5997c878429d15c",
+    "LoveActually_shot_1397_id0_frame0001.jpg": "112f2590dd6a89a2d8ec0313612c10d4745b2e3a4612f4ec3eb94f1f882ea41a",
+    "ref_heads/LoveActually_shot_0104_id0_frame0001.png": "f18b3ff3cb224e7a134bdef7350226986d136d894208bb184f1296a34498311f",
+    "ref_heads/LoveActually_shot_1353_id0_frame0003.png": "b1c17e41a834019a476c414690683cc4ebfa3a66e2ded65db0c48d44247a4574",
+    "ref_heads/LoveActually_shot_1397_id0_frame0001.png": "b4e5bef0a525e43ab983f01c8d0fe55d26a158c071ffdac4c2084a98b1df8742"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video15/LoveActually_shot_1316.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video17/LoveActually_shot_1316.mp4",
+    "original_sha256": "1d6ff90ce876cd6b13d4457256da7390e2b439db79abfed0871d51b22e41ed25",
+    "converted_sha256": "29b5c0b1cad5db9866f9f5c02e15a0ac26fd0fb6ce5daf2644553de7dc617059",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 816,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "8.425083",
+      "nb_frames": "202"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 816,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "8.425083",
+      "nb_frames": "202"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video15/LoveActually_shot_1316.mp4",
+  "first_frame": "/data2/peiyao/videos/video15/first_frame.png",
+  "curation": {
+    "previous_folder": "video17",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video17",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

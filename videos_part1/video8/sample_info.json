@@ -1,0 +1,139 @@
+{
+  "movie": "ChildrenOfHeaven",
+  "shot": "ChildrenOfHeaven_shot_0777",
+  "person": "person_0004",
+  "pool": 431,
+  "person_shots": 71,
+  "frames": 181,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/ChildrenOfHeaven/shot_detection/shots/ChildrenOfHeaven_shot_0777.mp4",
+  "duration": 6.04,
+  "folder": "video8",
+  "reference_pool_images": 423,
+  "reference_pool_shots": 70,
+  "references": [
+    {
+      "file": "ChildrenOfHeaven_shot_0006_id0_frame0003.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/ChildrenOfHeaven/identity_matching/person_clusters/person_0004/full_orig/ChildrenOfHeaven_shot_0006_id0_frame0003.jpg",
+      "shot": "ChildrenOfHeaven_shot_0006",
+      "frame_idx": 3,
+      "person_id": "person_0004",
+      "crop": "ChildrenOfHeaven_shot_0006_id0_frame0003.png",
+      "bbox_xyxy": [
+        190,
+        0,
+        592,
+        395
+      ],
+      "original_size": [
+        680,
+        1011
+      ],
+      "crop_size": [
+        402,
+        395
+      ],
+      "original_path": "/data2/peiyao/videos/video8/ChildrenOfHeaven_shot_0006_id0_frame0003.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video8/ref_heads/ChildrenOfHeaven_shot_0006_id0_frame0003.png"
+    },
+    {
+      "file": "ChildrenOfHeaven_shot_0405_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/ChildrenOfHeaven/identity_matching/person_clusters/person_0004/full_orig/ChildrenOfHeaven_shot_0405_id0_frame0002.jpg",
+      "shot": "ChildrenOfHeaven_shot_0405",
+      "frame_idx": 2,
+      "person_id": "person_0004",
+      "crop": "ChildrenOfHeaven_shot_0405_id0_frame0002.png",
+      "bbox_xyxy": [
+        277,
+        0,
+        1318,
+        901
+      ],
+      "original_size": [
+        1387,
+        1047
+      ],
+      "crop_size": [
+        1041,
+        901
+      ],
+      "original_path": "/data2/peiyao/videos/video8/ChildrenOfHeaven_shot_0405_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video8/ref_heads/ChildrenOfHeaven_shot_0405_id0_frame0002.png"
+    },
+    {
+      "file": "ChildrenOfHeaven_shot_0477_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/ChildrenOfHeaven/identity_matching/person_clusters/person_0004/full_orig/ChildrenOfHeaven_shot_0477_id0_frame0002.jpg",
+      "shot": "ChildrenOfHeaven_shot_0477",
+      "frame_idx": 2,
+      "person_id": "person_0004",
+      "crop": "ChildrenOfHeaven_shot_0477_id0_frame0002.png",
+      "bbox_xyxy": [
+        86,
+        0,
+        1031,
+        867
+      ],
+      "original_size": [
+        1085,
+        1008
+      ],
+      "crop_size": [
+        945,
+        867
+      ],
+      "original_path": "/data2/peiyao/videos/video8/ChildrenOfHeaven_shot_0477_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video8/ref_heads/ChildrenOfHeaven_shot_0477_id0_frame0002.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "ChildrenOfHeaven_shot_0777.mp4": "51cb90d8a6a85aad5799769c5be03a864a75ac7e3c91a035e0b0111961244ac9",
+    "first_frame.png": "dfcbd2b946a1a53558733f0bf465cf809b6bbbd6852d6f50fec94de75494c423",
+    "ChildrenOfHeaven_shot_0006_id0_frame0003.jpg": "529824df784236f603f1b82a76c0d5b9283767163e636ee181f47b51b6a896a7",
+    "ChildrenOfHeaven_shot_0405_id0_frame0002.jpg": "30d5e92871505801fd2fe55d9ac541a48bb773c84b517283f986dabaf798e751",
+    "ChildrenOfHeaven_shot_0477_id0_frame0002.jpg": "ddf54ed3cdf640c4e2f049d7b85b678b11d065492acc067e43ce19680122feff",
+    "ref_heads/ChildrenOfHeaven_shot_0006_id0_frame0003.png": "0a7d99bf5d4a327a8fbd32cb637fe56c477a15caa4d6793fc98beb180d157dfa",
+    "ref_heads/ChildrenOfHeaven_shot_0405_id0_frame0002.png": "d72c8a07ef21efb463665a5c88d685c685b7f18d25565ca9655a4171a0460903",
+    "ref_heads/ChildrenOfHeaven_shot_0477_id0_frame0002.png": "2408e808f40f1cd54d35236b08257bc35f93a7ea319735acd9360307431e9840"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video8/ChildrenOfHeaven_shot_0777.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video8/ChildrenOfHeaven_shot_0777.mp4",
+    "original_sha256": "b508cb6cc473c90fce457054368ab420d259cbd394cd309eff6d14668602fb7d",
+    "converted_sha256": "51cb90d8a6a85aad5799769c5be03a864a75ac7e3c91a035e0b0111961244ac9",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "30000/1001",
+      "duration": "6.039367",
+      "nb_frames": "181"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "30000/1001",
+      "duration": "6.039367",
+      "nb_frames": "181"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video8/ChildrenOfHeaven_shot_0777.mp4",
+  "first_frame": "/data2/peiyao/videos/video8/first_frame.png",
+  "curation": {
+    "previous_folder": "video8",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video8",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

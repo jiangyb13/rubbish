@@ -1,0 +1,85 @@
+{
+  "folder": "video3",
+  "local_video": "/data2/peiyao/videos/video3/EatDrinkManWoman_part_000_shot_0044.mp4",
+  "first_frame": "/data2/peiyao/videos/video3/first_frame.png",
+  "references": [
+    {
+      "file": "EatDrinkManWoman_part_001_shot_0019_id0_frame0000.jpg",
+      "crop": "EatDrinkManWoman_part_001_shot_0019_id0_frame0000.png",
+      "bbox_xyxy": [
+        180,
+        0,
+        1098,
+        818
+      ],
+      "original_size": [
+        1291,
+        1076
+      ],
+      "crop_size": [
+        918,
+        818
+      ],
+      "original_path": "/data2/peiyao/videos/video3/EatDrinkManWoman_part_001_shot_0019_id0_frame0000.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video3/ref_heads/EatDrinkManWoman_part_001_shot_0019_id0_frame0000.png"
+    },
+    {
+      "file": "EatDrinkManWoman_part_002_shot_0043_id0_frame0013.jpg",
+      "crop": "EatDrinkManWoman_part_002_shot_0043_id0_frame0013.png",
+      "bbox_xyxy": [
+        83,
+        0,
+        632,
+        614
+      ],
+      "original_size": [
+        831,
+        1022
+      ],
+      "crop_size": [
+        549,
+        614
+      ],
+      "original_path": "/data2/peiyao/videos/video3/EatDrinkManWoman_part_002_shot_0043_id0_frame0013.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video3/ref_heads/EatDrinkManWoman_part_002_shot_0043_id0_frame0013.png"
+    },
+    {
+      "file": "EatDrinkManWoman_part_004_shot_0037_id0_frame0000.jpg",
+      "crop": "EatDrinkManWoman_part_004_shot_0037_id0_frame0000.png",
+      "bbox_xyxy": [
+        28,
+        0,
+        949,
+        810
+      ],
+      "original_size": [
+        949,
+        1080
+      ],
+      "crop_size": [
+        921,
+        810
+      ],
+      "original_path": "/data2/peiyao/videos/video3/EatDrinkManWoman_part_004_shot_0037_id0_frame0000.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video3/ref_heads/EatDrinkManWoman_part_004_shot_0037_id0_frame0000.png"
+    }
+  ],
+  "reference_quality_checked": true,
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "curation": {
+    "previous_folder": "video3",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video3",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  },
+  "sha256": {
+    "EatDrinkManWoman_part_000_shot_0044.mp4": "5aacef479b348d60932d2fc66415bd245d59f776e19196ed5d424ec313757e46",
+    "first_frame.png": "d65c5af578f21a8e202405729432c697a0704f818e801283df603d40c3222490",
+    "EatDrinkManWoman_part_001_shot_0019_id0_frame0000.jpg": "5721816df6750c67de058a5e672a1544005652c57a721cb687eb46c2d4fd3fa4",
+    "EatDrinkManWoman_part_002_shot_0043_id0_frame0013.jpg": "8d2f581202c361993045d26416e62c5caf730c57d60963902efe820b6b5461d7",
+    "EatDrinkManWoman_part_004_shot_0037_id0_frame0000.jpg": "b5abf1b57965734da6864469ba4b7ed35463b405c7fb8c383e9ddf5d3f5ccfab",
+    "ref_heads/EatDrinkManWoman_part_001_shot_0019_id0_frame0000.png": "3fbc9700199c5b18acf105ddd0d16937778620374f697a0977fa1d89aa0a86d8",
+    "ref_heads/EatDrinkManWoman_part_002_shot_0043_id0_frame0013.png": "02eb81441453c33826ad30facfafd4bd7a435ebd93bc2277b478e1ee92f0d754",
+    "ref_heads/EatDrinkManWoman_part_004_shot_0037_id0_frame0000.png": "cbe99222a30c22afef24ef41d8ea63444de5f2d8b3ddc28190da791c49b6679e"
+  }
+}

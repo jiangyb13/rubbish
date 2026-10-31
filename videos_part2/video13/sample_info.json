@@ -1,0 +1,139 @@
+{
+  "movie": "LegendsOfTheFall",
+  "shot": "LegendsOfTheFall_shot_1286",
+  "person": "person_0018",
+  "pool": 334,
+  "person_shots": 73,
+  "frames": 165,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LegendsOfTheFall/shot_detection/shots/LegendsOfTheFall_shot_1286.mp4",
+  "duration": 6.924,
+  "folder": "video13",
+  "reference_pool_images": 327,
+  "reference_pool_shots": 72,
+  "references": [
+    {
+      "file": "LegendsOfTheFall_shot_0303_id0_frame0008.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LegendsOfTheFall/identity_matching/person_clusters/person_0018/full_orig/LegendsOfTheFall_shot_0303_id0_frame0008.jpg",
+      "shot": "LegendsOfTheFall_shot_0303",
+      "frame_idx": 8,
+      "person_id": "person_0018",
+      "crop": "LegendsOfTheFall_shot_0303_id0_frame0008.png",
+      "bbox_xyxy": [
+        366,
+        0,
+        782,
+        408
+      ],
+      "original_size": [
+        797,
+        970
+      ],
+      "crop_size": [
+        416,
+        408
+      ],
+      "original_path": "/data2/peiyao/videos/video13/LegendsOfTheFall_shot_0303_id0_frame0008.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video13/ref_heads/LegendsOfTheFall_shot_0303_id0_frame0008.png"
+    },
+    {
+      "file": "LegendsOfTheFall_shot_1268_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LegendsOfTheFall/identity_matching/person_clusters/person_0018/full_orig/LegendsOfTheFall_shot_1268_id0_frame0002.jpg",
+      "shot": "LegendsOfTheFall_shot_1268",
+      "frame_idx": 2,
+      "person_id": "person_0018",
+      "crop": "LegendsOfTheFall_shot_1268_id0_frame0002.png",
+      "bbox_xyxy": [
+        124,
+        0,
+        1100,
+        988
+      ],
+      "original_size": [
+        1249,
+        1040
+      ],
+      "crop_size": [
+        976,
+        988
+      ],
+      "original_path": "/data2/peiyao/videos/video13/LegendsOfTheFall_shot_1268_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video13/ref_heads/LegendsOfTheFall_shot_1268_id0_frame0002.png"
+    },
+    {
+      "file": "LegendsOfTheFall_shot_1774_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LegendsOfTheFall/identity_matching/person_clusters/person_0018/full_orig/LegendsOfTheFall_shot_1774_id0_frame0001.jpg",
+      "shot": "LegendsOfTheFall_shot_1774",
+      "frame_idx": 1,
+      "person_id": "person_0018",
+      "crop": "LegendsOfTheFall_shot_1774_id0_frame0001.png",
+      "bbox_xyxy": [
+        96,
+        0,
+        696,
+        510
+      ],
+      "original_size": [
+        740,
+        1040
+      ],
+      "crop_size": [
+        600,
+        510
+      ],
+      "original_path": "/data2/peiyao/videos/video13/LegendsOfTheFall_shot_1774_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video13/ref_heads/LegendsOfTheFall_shot_1774_id0_frame0001.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "LegendsOfTheFall_shot_1286.mp4": "52ed3ae5a8e208d98881559e3a50e0061d33f4386f4d579ee61ecedd83b49679",
+    "first_frame.png": "55f92be2e9f7b8ece6bc6cdbe673cd5d97dda7a33f1d5857e55ea6cd027c522f",
+    "LegendsOfTheFall_shot_0303_id0_frame0008.jpg": "6df9e462a49ad54486dfe20dbea086bf1e23303d56b33f05c310fbe10fca9e86",
+    "LegendsOfTheFall_shot_1268_id0_frame0002.jpg": "6373b51357bba736046a5ad5b18eda22cbe01b08bb0fc7f6c344d85b2891a4a8",
+    "LegendsOfTheFall_shot_1774_id0_frame0001.jpg": "f304f74bf39c6459a7dbe1e86e6a94b911bc74166fafe9731a076dba62c6da4b",
+    "ref_heads/LegendsOfTheFall_shot_0303_id0_frame0008.png": "fbf629ace8381c2f0db6362864da6f5d343c00fc6768e54e98647dd1bf3bed3c",
+    "ref_heads/LegendsOfTheFall_shot_1268_id0_frame0002.png": "9423bb092bf1e5719352a9f656798601fd3ab5879c7fe5bb278c6c0db7469fa8",
+    "ref_heads/LegendsOfTheFall_shot_1774_id0_frame0001.png": "03c39d13f5d97d9bc83442b245e227063f14ceb3a051a8f482f27942aa6edf0e"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video13/LegendsOfTheFall_shot_1286.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video15/LegendsOfTheFall_shot_1286.mp4",
+    "original_sha256": "74f006187e1df8fd0ed3eab49408e70c72869a40294f121b08d2d74009256b08",
+    "converted_sha256": "52ed3ae5a8e208d98881559e3a50e0061d33f4386f4d579ee61ecedd83b49679",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 1040,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "6.923583",
+      "nb_frames": "166"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 1040,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "6.923583",
+      "nb_frames": "166"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video13/LegendsOfTheFall_shot_1286.mp4",
+  "first_frame": "/data2/peiyao/videos/video13/first_frame.png",
+  "curation": {
+    "previous_folder": "video15",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video15",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

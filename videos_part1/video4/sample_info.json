@@ -1,0 +1,85 @@
+{
+  "folder": "video4",
+  "local_video": "/data2/peiyao/videos/video4/TheSixthSense_shot_0272.mp4",
+  "first_frame": "/data2/peiyao/videos/video4/first_frame.png",
+  "references": [
+    {
+      "file": "TheSixthSense_shot_0114_id0_frame0000.jpg",
+      "crop": "TheSixthSense_shot_0114_id0_frame0000.png",
+      "bbox_xyxy": [
+        447,
+        0,
+        952,
+        691
+      ],
+      "original_size": [
+        952,
+        1030
+      ],
+      "crop_size": [
+        505,
+        691
+      ],
+      "original_path": "/data2/peiyao/videos/video4/TheSixthSense_shot_0114_id0_frame0000.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video4/ref_heads/TheSixthSense_shot_0114_id0_frame0000.png"
+    },
+    {
+      "file": "TheSixthSense_shot_0161_id0_frame0002.jpg",
+      "crop": "TheSixthSense_shot_0161_id0_frame0002.png",
+      "bbox_xyxy": [
+        184,
+        0,
+        448,
+        345
+      ],
+      "original_size": [
+        711,
+        1012
+      ],
+      "crop_size": [
+        264,
+        345
+      ],
+      "original_path": "/data2/peiyao/videos/video4/TheSixthSense_shot_0161_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video4/ref_heads/TheSixthSense_shot_0161_id0_frame0002.png"
+    },
+    {
+      "file": "TheSixthSense_shot_0349_id0_frame0000.jpg",
+      "crop": "TheSixthSense_shot_0349_id0_frame0000.png",
+      "bbox_xyxy": [
+        381,
+        0,
+        920,
+        720
+      ],
+      "original_size": [
+        978,
+        1000
+      ],
+      "crop_size": [
+        539,
+        720
+      ],
+      "original_path": "/data2/peiyao/videos/video4/TheSixthSense_shot_0349_id0_frame0000.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video4/ref_heads/TheSixthSense_shot_0349_id0_frame0000.png"
+    }
+  ],
+  "reference_quality_checked": true,
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "curation": {
+    "previous_folder": "video4",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video4",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  },
+  "sha256": {
+    "TheSixthSense_shot_0272.mp4": "084d02091ed4c0fa7b208e88719f8ca7ce3c80fb3cbd6d8b3e4d5adeaec35b0c",
+    "first_frame.png": "1d2eff030ccb513283a48e3ec9557a3b034101146c12486e16aa7ea9eb97b7c5",
+    "TheSixthSense_shot_0114_id0_frame0000.jpg": "4bb8badc4b5568e60cb19da7171fcbdbba63e3af2598f4c7d4cb16c591e6fb86",
+    "TheSixthSense_shot_0161_id0_frame0002.jpg": "30781b17885e5ea04e190d2fe0beba2cdc545010497744a0c5786d5263ca2ab2",
+    "TheSixthSense_shot_0349_id0_frame0000.jpg": "695224204d6e98625817521717b4ef4b256f4a1dbc85e4865e990196ba3ac13a",
+    "ref_heads/TheSixthSense_shot_0114_id0_frame0000.png": "a063bff60be758b65297c75878ce39f823a08f2832e3bdeef9d36a326504f4f3",
+    "ref_heads/TheSixthSense_shot_0161_id0_frame0002.png": "8f510bab289c6c973f00c7cb74bd843eee48c72b26e2aa206c9cdef933263b2f",
+    "ref_heads/TheSixthSense_shot_0349_id0_frame0000.png": "b023dc5c88df7e764007ab91496d35675522eb989821c6d9d30d5ae6990ae292"
+  }
+}

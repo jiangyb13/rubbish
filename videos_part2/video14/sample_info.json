@@ -1,0 +1,139 @@
+{
+  "movie": "LetTheBulletsFly",
+  "shot": "LetTheBulletsFly_shot_1390",
+  "person": "person_0002",
+  "pool": 905,
+  "person_shots": 186,
+  "frames": 174,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LetTheBulletsFly/shot_detection/shots/LetTheBulletsFly_shot_1390.mp4",
+  "duration": 7.25,
+  "folder": "video14",
+  "reference_pool_images": 898,
+  "reference_pool_shots": 185,
+  "references": [
+    {
+      "file": "LetTheBulletsFly_shot_0204_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LetTheBulletsFly/identity_matching/person_clusters/person_0002/full_orig/LetTheBulletsFly_shot_0204_id0_frame0001.jpg",
+      "shot": "LetTheBulletsFly_shot_0204",
+      "frame_idx": 1,
+      "person_id": "person_0002",
+      "crop": "LetTheBulletsFly_shot_0204_id0_frame0001.png",
+      "bbox_xyxy": [
+        472,
+        0,
+        862,
+        425
+      ],
+      "original_size": [
+        1051,
+        816
+      ],
+      "crop_size": [
+        390,
+        425
+      ],
+      "original_path": "/data2/peiyao/videos/video14/LetTheBulletsFly_shot_0204_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video14/ref_heads/LetTheBulletsFly_shot_0204_id0_frame0001.png"
+    },
+    {
+      "file": "LetTheBulletsFly_shot_0684_id1_frame0013.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LetTheBulletsFly/identity_matching/person_clusters/person_0002/full_orig/LetTheBulletsFly_shot_0684_id1_frame0013.jpg",
+      "shot": "LetTheBulletsFly_shot_0684",
+      "frame_idx": 13,
+      "person_id": "person_0002",
+      "crop": "LetTheBulletsFly_shot_0684_id1_frame0013.png",
+      "bbox_xyxy": [
+        236,
+        0,
+        916,
+        493
+      ],
+      "original_size": [
+        1077,
+        746
+      ],
+      "crop_size": [
+        680,
+        493
+      ],
+      "original_path": "/data2/peiyao/videos/video14/LetTheBulletsFly_shot_0684_id1_frame0013.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video14/ref_heads/LetTheBulletsFly_shot_0684_id1_frame0013.png"
+    },
+    {
+      "file": "LetTheBulletsFly_shot_3408_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/LetTheBulletsFly/identity_matching/person_clusters/person_0002/full_orig/LetTheBulletsFly_shot_3408_id0_frame0001.jpg",
+      "shot": "LetTheBulletsFly_shot_3408",
+      "frame_idx": 1,
+      "person_id": "person_0002",
+      "crop": "LetTheBulletsFly_shot_3408_id0_frame0001.png",
+      "bbox_xyxy": [
+        422,
+        0,
+        835,
+        525
+      ],
+      "original_size": [
+        982,
+        772
+      ],
+      "crop_size": [
+        413,
+        525
+      ],
+      "original_path": "/data2/peiyao/videos/video14/LetTheBulletsFly_shot_3408_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video14/ref_heads/LetTheBulletsFly_shot_3408_id0_frame0001.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "LetTheBulletsFly_shot_1390.mp4": "113b939ee4f2ecc48d81e7539e705850a36f94dd34ff510750738d179f4eee71",
+    "first_frame.png": "e56b9d23ba2429db96db2250579d16d850abb3299eebaf4e7582f47f5ad3cf42",
+    "LetTheBulletsFly_shot_0204_id0_frame0001.jpg": "67556203906e8f953bfd1bece42cba8082bffc1d2d6b9abd871f3484361298a6",
+    "LetTheBulletsFly_shot_0684_id1_frame0013.jpg": "5dffacc836ede3e8133f395aa872dac7e63a6a0dca30a8379dadb83394e9f80f",
+    "LetTheBulletsFly_shot_3408_id0_frame0001.jpg": "6488dc3a00db7187d18720ef7462deffb97269535a09fb7186011dc53a4c8d5b",
+    "ref_heads/LetTheBulletsFly_shot_0204_id0_frame0001.png": "1a7655220e035295e99be7db0420cac5f71970d6817699c0fb0321e44bc41d43",
+    "ref_heads/LetTheBulletsFly_shot_0684_id1_frame0013.png": "b4c14c1ae6eed1b2807e6096ef89d145507f2afcda25012bb252639d25f4f02e",
+    "ref_heads/LetTheBulletsFly_shot_3408_id0_frame0001.png": "5eb24cd6bcfc1eafaf37318b0fdb36ba00314f712bd7e673668f32d7d643c2c6"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video14/LetTheBulletsFly_shot_1390.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video16/LetTheBulletsFly_shot_1390.mp4",
+    "original_sha256": "59ad0f95551b8ee781ca7dba43f5f0a789a8464efc27d4f6d3182de7eddba464",
+    "converted_sha256": "113b939ee4f2ecc48d81e7539e705850a36f94dd34ff510750738d179f4eee71",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 816,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24/1",
+      "duration": "7.250000",
+      "nb_frames": "174"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 816,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24/1",
+      "duration": "7.250000",
+      "nb_frames": "174"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video14/LetTheBulletsFly_shot_1390.mp4",
+  "first_frame": "/data2/peiyao/videos/video14/first_frame.png",
+  "curation": {
+    "previous_folder": "video16",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video16",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

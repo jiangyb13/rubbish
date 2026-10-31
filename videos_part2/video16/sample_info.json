@@ -1,0 +1,139 @@
+{
+  "movie": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl",
+  "shot": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1951",
+  "person": "person_0028",
+  "pool": 485,
+  "person_shots": 111,
+  "frames": 187,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl/shot_detection/shots/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1951.mp4",
+  "duration": 7.8,
+  "folder": "video16",
+  "reference_pool_images": 477,
+  "reference_pool_shots": 110,
+  "references": [
+    {
+      "file": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl/identity_matching/person_clusters/person_0028/full_orig/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.jpg",
+      "shot": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134",
+      "frame_idx": 4,
+      "person_id": "person_0028",
+      "crop": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.png",
+      "bbox_xyxy": [
+        77,
+        0,
+        957,
+        704
+      ],
+      "original_size": [
+        966,
+        800
+      ],
+      "crop_size": [
+        880,
+        704
+      ],
+      "original_path": "/data2/peiyao/videos/video16/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video16/ref_heads/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.png"
+    },
+    {
+      "file": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl/identity_matching/person_clusters/person_0028/full_orig/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.jpg",
+      "shot": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899",
+      "frame_idx": 2,
+      "person_id": "person_0028",
+      "crop": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.png",
+      "bbox_xyxy": [
+        15,
+        0,
+        770,
+        672
+      ],
+      "original_size": [
+        770,
+        800
+      ],
+      "crop_size": [
+        755,
+        672
+      ],
+      "original_path": "/data2/peiyao/videos/video16/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video16/ref_heads/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.png"
+    },
+    {
+      "file": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl/identity_matching/person_clusters/person_0028/full_orig/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.jpg",
+      "shot": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584",
+      "frame_idx": 9,
+      "person_id": "person_0028",
+      "crop": "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.png",
+      "bbox_xyxy": [
+        80,
+        0,
+        753,
+        625
+      ],
+      "original_size": [
+        1004,
+        762
+      ],
+      "crop_size": [
+        673,
+        625
+      ],
+      "original_path": "/data2/peiyao/videos/video16/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video16/ref_heads/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1951.mp4": "bf1c748992e28ff32d4330c1e1aedd771c2d1f6a71bd57d0774c47c5d0bc92cd",
+    "first_frame.png": "d0b1d0e5b0891641e71e4e1b21a959af579f55f9ed3e6f35ffa8af05133ac502",
+    "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.jpg": "acd0205d47c02a7c3b27aa81db199158600544e7095805588ea2a96705f2e3d1",
+    "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.jpg": "af8b9ae2d34614cfb8d3bdcac180d0a6af4a78edd7ec1e3d839bce311a129adb",
+    "PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.jpg": "f59f625bb7b9759e750c238f1fa62cef2221fdf2b89d30b342d0f601f830b9b5",
+    "ref_heads/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_0134_id0_frame0004.png": "356f0bba77d4ddb923adb90ce36fcf9816dd2d11cdd74901d95c1010bfee0db7",
+    "ref_heads/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1899_id0_frame0002.png": "ad11d43dcfb011ee4d83c2cfd1dd501b839856c5aad585a9bc3226cad5f805e4",
+    "ref_heads/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_2584_id0_frame0009.png": "045474f867fa1ae7a1c6448750edacbcab8179cac34eb549f2a4d6c3a2886b2c"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video16/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1951.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video19/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1951.mp4",
+    "original_sha256": "166aa48d554564e9a9ed9c7b47061e6d94969962df2de65f6fd56a14aff0addc",
+    "converted_sha256": "bf1c748992e28ff32d4330c1e1aedd771c2d1f6a71bd57d0774c47c5d0bc92cd",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 800,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.799458",
+      "nb_frames": "187"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 800,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.799458",
+      "nb_frames": "187"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video16/PiratesOfTheCaribbeanTheCurseOfTheBlackPearl_shot_1951.mp4",
+  "first_frame": "/data2/peiyao/videos/video16/first_frame.png",
+  "curation": {
+    "previous_folder": "video19",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video19",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

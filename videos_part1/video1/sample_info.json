@@ -1,0 +1,85 @@
+{
+  "folder": "video1",
+  "local_video": "/data2/peiyao/videos/video1/BeforeSunrise_shot_0007.mp4",
+  "first_frame": "/data2/peiyao/videos/video1/first_frame.png",
+  "references": [
+    {
+      "file": "BeforeSunrise_shot_0019_id0_frame0002.jpg",
+      "crop": "BeforeSunrise_shot_0019_id0_frame0002.png",
+      "bbox_xyxy": [
+        0,
+        0,
+        655,
+        888
+      ],
+      "original_size": [
+        655,
+        1008
+      ],
+      "crop_size": [
+        655,
+        888
+      ],
+      "original_path": "/data2/peiyao/videos/video1/BeforeSunrise_shot_0019_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video1/ref_heads/BeforeSunrise_shot_0019_id0_frame0002.png"
+    },
+    {
+      "file": "BeforeSunrise_shot_0158_id0_frame0043.jpg",
+      "crop": "BeforeSunrise_shot_0158_id0_frame0043.png",
+      "bbox_xyxy": [
+        0,
+        0,
+        678,
+        863
+      ],
+      "original_size": [
+        892,
+        980
+      ],
+      "crop_size": [
+        678,
+        863
+      ],
+      "original_path": "/data2/peiyao/videos/video1/BeforeSunrise_shot_0158_id0_frame0043.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video1/ref_heads/BeforeSunrise_shot_0158_id0_frame0043.png"
+    },
+    {
+      "file": "BeforeSunrise_shot_0318_id0_frame0007.jpg",
+      "crop": "BeforeSunrise_shot_0318_id0_frame0007.png",
+      "bbox_xyxy": [
+        245,
+        0,
+        652,
+        416
+      ],
+      "original_size": [
+        701,
+        990
+      ],
+      "crop_size": [
+        407,
+        416
+      ],
+      "original_path": "/data2/peiyao/videos/video1/BeforeSunrise_shot_0318_id0_frame0007.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video1/ref_heads/BeforeSunrise_shot_0318_id0_frame0007.png"
+    }
+  ],
+  "reference_quality_checked": true,
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "curation": {
+    "previous_folder": "video1",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video1",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  },
+  "sha256": {
+    "BeforeSunrise_shot_0007.mp4": "7e3e882d15dfe3d7a60bdb3c50f8be3df389637a9c0502ee997c2cd0e8db196f",
+    "first_frame.png": "60f417bda4e88bd417e3bbef61b7da9d78153705f7eb460622efef847ad01fed",
+    "BeforeSunrise_shot_0019_id0_frame0002.jpg": "9932ac1db20b5758c8062f7e22499d6c2edff29690ca1b2492a87766a6881684",
+    "BeforeSunrise_shot_0158_id0_frame0043.jpg": "1d8224a6ac31f7558c946ee2255b95a97cdf89fb5427c1b4fa97b4d410528e23",
+    "BeforeSunrise_shot_0318_id0_frame0007.jpg": "daa91428ba925f1833349e64eff559aa6819d0200c42aa6c255fa58273a183b6",
+    "ref_heads/BeforeSunrise_shot_0019_id0_frame0002.png": "629e2f486e7579fa45f656fc2ed036bede31857c26b64af60e330ae1be45565f",
+    "ref_heads/BeforeSunrise_shot_0158_id0_frame0043.png": "4b83a1f597a719d332facdb9f8e1f496b1c6798730abca216ac3f83e0dbc9ad4",
+    "ref_heads/BeforeSunrise_shot_0318_id0_frame0007.png": "8ca1ca074fc1a8f9af02486d37bae1db31cf05f575596839358caf2247df20cf"
+  }
+}

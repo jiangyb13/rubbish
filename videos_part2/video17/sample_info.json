@@ -1,0 +1,139 @@
+{
+  "movie": "Sunny",
+  "shot": "Sunny_shot_0585",
+  "person": "person_0005",
+  "pool": 639,
+  "person_shots": 115,
+  "frames": 173,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Sunny/shot_detection/shots/Sunny_shot_0585.mp4",
+  "duration": 7.258,
+  "folder": "video17",
+  "reference_pool_images": 632,
+  "reference_pool_shots": 114,
+  "references": [
+    {
+      "file": "Sunny_shot_0118_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Sunny/identity_matching/person_clusters/person_0005/full_orig/Sunny_shot_0118_id0_frame0001.jpg",
+      "shot": "Sunny_shot_0118",
+      "frame_idx": 1,
+      "person_id": "person_0005",
+      "crop": "Sunny_shot_0118_id0_frame0001.png",
+      "bbox_xyxy": [
+        182,
+        0,
+        824,
+        768
+      ],
+      "original_size": [
+        867,
+        816
+      ],
+      "crop_size": [
+        642,
+        768
+      ],
+      "original_path": "/data2/peiyao/videos/video17/Sunny_shot_0118_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video17/ref_heads/Sunny_shot_0118_id0_frame0001.png"
+    },
+    {
+      "file": "Sunny_shot_0546_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Sunny/identity_matching/person_clusters/person_0005/full_orig/Sunny_shot_0546_id0_frame0001.jpg",
+      "shot": "Sunny_shot_0546",
+      "frame_idx": 1,
+      "person_id": "person_0005",
+      "crop": "Sunny_shot_0546_id0_frame0001.png",
+      "bbox_xyxy": [
+        122,
+        0,
+        922,
+        621
+      ],
+      "original_size": [
+        1024,
+        816
+      ],
+      "crop_size": [
+        800,
+        621
+      ],
+      "original_path": "/data2/peiyao/videos/video17/Sunny_shot_0546_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video17/ref_heads/Sunny_shot_0546_id0_frame0001.png"
+    },
+    {
+      "file": "Sunny_shot_0962_id0_frame0004.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Sunny/identity_matching/person_clusters/person_0005/full_orig/Sunny_shot_0962_id0_frame0004.jpg",
+      "shot": "Sunny_shot_0962",
+      "frame_idx": 4,
+      "person_id": "person_0005",
+      "crop": "Sunny_shot_0962_id0_frame0004.png",
+      "bbox_xyxy": [
+        121,
+        0,
+        589,
+        535
+      ],
+      "original_size": [
+        934,
+        764
+      ],
+      "crop_size": [
+        468,
+        535
+      ],
+      "original_path": "/data2/peiyao/videos/video17/Sunny_shot_0962_id0_frame0004.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video17/ref_heads/Sunny_shot_0962_id0_frame0004.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "Sunny_shot_0585.mp4": "1bf5b31dd7ed084b278e939522e7548d3e773027d11386b2d06eaf95abdcbcbd",
+    "first_frame.png": "51c50f0a45ee67465ad7fcbc246240548dd69bb82d6d3d5fd2401c453cf47d16",
+    "Sunny_shot_0118_id0_frame0001.jpg": "77ca4391545ae02d0420cd23fcc5be17c43ef341048b4edf52d8faacb7f43d5b",
+    "Sunny_shot_0546_id0_frame0001.jpg": "b564d0cd67a7cef2ecfc5dd3833535cdfcb03dc7b3cddc4252ac003c2e59e5ed",
+    "Sunny_shot_0962_id0_frame0004.jpg": "15bf709498a6ed94fe8da14bf3cb6bcbf97595a4b2efe39705c4d448d88cf10d",
+    "ref_heads/Sunny_shot_0118_id0_frame0001.png": "0e80759bbaf05494f42c191eedace49d71872375e3186f1c6f405a5327d9d79c",
+    "ref_heads/Sunny_shot_0546_id0_frame0001.png": "36eea1a2f9865404112a30cd35164d362ee5fcf87938c1e4e8e4e23757291625",
+    "ref_heads/Sunny_shot_0962_id0_frame0004.png": "3677c8a01dc493df0e2c22a8d9be9f31984a3dc8d0b003e143e1dbce86923935"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video17/Sunny_shot_0585.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video20/Sunny_shot_0585.mp4",
+    "original_sha256": "10cb1187d3a5a287339d0f6dc7b1bedc2fea3d16ae3365109e2f2836310ba9b6",
+    "converted_sha256": "1bf5b31dd7ed084b278e939522e7548d3e773027d11386b2d06eaf95abdcbcbd",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 816,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.257250",
+      "nb_frames": "174"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 816,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.257250",
+      "nb_frames": "174"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video17/Sunny_shot_0585.mp4",
+  "first_frame": "/data2/peiyao/videos/video17/first_frame.png",
+  "curation": {
+    "previous_folder": "video20",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video20",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

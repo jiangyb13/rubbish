@@ -1,0 +1,139 @@
+{
+  "movie": "Braveheart",
+  "shot": "Braveheart_shot_2837",
+  "person": "person_0037",
+  "pool": 451,
+  "person_shots": 111,
+  "frames": 188,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Braveheart/shot_detection/shots/Braveheart_shot_2837.mp4",
+  "duration": 7.842,
+  "folder": "video7",
+  "reference_pool_images": 443,
+  "reference_pool_shots": 110,
+  "references": [
+    {
+      "file": "Braveheart_shot_0282_id0_frame0013.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Braveheart/identity_matching/person_clusters/person_0037/full_orig/Braveheart_shot_0282_id0_frame0013.jpg",
+      "shot": "Braveheart_shot_0282",
+      "frame_idx": 13,
+      "person_id": "person_0037",
+      "crop": "Braveheart_shot_0282_id0_frame0013.png",
+      "bbox_xyxy": [
+        30,
+        0,
+        1032,
+        810
+      ],
+      "original_size": [
+        1032,
+        818
+      ],
+      "crop_size": [
+        1002,
+        810
+      ],
+      "original_path": "/data2/peiyao/videos/video7/Braveheart_shot_0282_id0_frame0013.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video7/ref_heads/Braveheart_shot_0282_id0_frame0013.png"
+    },
+    {
+      "file": "Braveheart_shot_0923_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Braveheart/identity_matching/person_clusters/person_0037/full_orig/Braveheart_shot_0923_id0_frame0001.jpg",
+      "shot": "Braveheart_shot_0923",
+      "frame_idx": 1,
+      "person_id": "person_0037",
+      "crop": "Braveheart_shot_0923_id0_frame0001.png",
+      "bbox_xyxy": [
+        38,
+        0,
+        926,
+        679
+      ],
+      "original_size": [
+        954,
+        818
+      ],
+      "crop_size": [
+        888,
+        679
+      ],
+      "original_path": "/data2/peiyao/videos/video7/Braveheart_shot_0923_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video7/ref_heads/Braveheart_shot_0923_id0_frame0001.png"
+    },
+    {
+      "file": "Braveheart_shot_3110_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/Braveheart/identity_matching/person_clusters/person_0037/full_orig/Braveheart_shot_3110_id0_frame0002.jpg",
+      "shot": "Braveheart_shot_3110",
+      "frame_idx": 2,
+      "person_id": "person_0037",
+      "crop": "Braveheart_shot_3110_id0_frame0002.png",
+      "bbox_xyxy": [
+        73,
+        0,
+        874,
+        630
+      ],
+      "original_size": [
+        920,
+        818
+      ],
+      "crop_size": [
+        801,
+        630
+      ],
+      "original_path": "/data2/peiyao/videos/video7/Braveheart_shot_3110_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video7/ref_heads/Braveheart_shot_3110_id0_frame0002.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "Braveheart_shot_2837.mp4": "7b5c2794aba3859a5a3192f750245935e0aff1c7e7fe28dde61c52e56454a917",
+    "first_frame.png": "1f48a8f386fedfb02aae44e8089d8b3de84e9ddbee86e216eecd31277ed369a6",
+    "Braveheart_shot_0282_id0_frame0013.jpg": "c65a2d34592a40d8d592bd936950d86dc279ed41ff674b53c355254b371099c2",
+    "Braveheart_shot_0923_id0_frame0001.jpg": "f2c973c2541367c5dcbf97d6b61bede0f3b70c7347c0ccef6d5bb11e4883223e",
+    "Braveheart_shot_3110_id0_frame0002.jpg": "130a5f2f8273178ed3e402c70f980067854c348c2ee64bb4688f47fa9f925446",
+    "ref_heads/Braveheart_shot_0282_id0_frame0013.png": "e04e46309853155afcd7ecec99f749f49ebb2ba5ff5a442058d4f69325b16b6e",
+    "ref_heads/Braveheart_shot_0923_id0_frame0001.png": "ab145a29fcb8b144adcefb1792dd65d2d44923eca2943a83a6d87b6f7b58cbe0",
+    "ref_heads/Braveheart_shot_3110_id0_frame0002.png": "ce20e3aaf029ab55e740c695fc9e1d7575786e294e3c0215404452187b696f51"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video7/Braveheart_shot_2837.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video7/Braveheart_shot_2837.mp4",
+    "original_sha256": "0276865e587667e28b20dd5ac0689b48a688e38c0073bbea672ba49bb66bcff6",
+    "converted_sha256": "7b5c2794aba3859a5a3192f750245935e0aff1c7e7fe28dde61c52e56454a917",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 818,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.841167",
+      "nb_frames": "188"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 818,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.841167",
+      "nb_frames": "188"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video7/Braveheart_shot_2837.mp4",
+  "first_frame": "/data2/peiyao/videos/video7/first_frame.png",
+  "curation": {
+    "previous_folder": "video7",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video7",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

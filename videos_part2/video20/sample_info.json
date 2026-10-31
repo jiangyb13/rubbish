@@ -1,0 +1,139 @@
+{
+  "movie": "TheSoundOfMusic",
+  "shot": "TheSoundOfMusic_shot_1092",
+  "person": "person_0026",
+  "pool": 1025,
+  "person_shots": 153,
+  "frames": 181,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheSoundOfMusic/shot_detection/shots/TheSoundOfMusic_shot_1092.mp4",
+  "duration": 7.55,
+  "folder": "video20",
+  "reference_pool_images": 1022,
+  "reference_pool_shots": 152,
+  "references": [
+    {
+      "file": "TheSoundOfMusic_shot_0325_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheSoundOfMusic/identity_matching/person_clusters/person_0026/full_orig/TheSoundOfMusic_shot_0325_id0_frame0001.jpg",
+      "shot": "TheSoundOfMusic_shot_0325",
+      "frame_idx": 1,
+      "person_id": "person_0026",
+      "crop": "TheSoundOfMusic_shot_0325_id0_frame0001.png",
+      "bbox_xyxy": [
+        253,
+        0,
+        617,
+        451
+      ],
+      "original_size": [
+        906,
+        777
+      ],
+      "crop_size": [
+        364,
+        451
+      ],
+      "original_path": "/data2/peiyao/videos/video20/TheSoundOfMusic_shot_0325_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video20/ref_heads/TheSoundOfMusic_shot_0325_id0_frame0001.png"
+    },
+    {
+      "file": "TheSoundOfMusic_shot_0636_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheSoundOfMusic/identity_matching/person_clusters/person_0026/full_orig/TheSoundOfMusic_shot_0636_id0_frame0002.jpg",
+      "shot": "TheSoundOfMusic_shot_0636",
+      "frame_idx": 2,
+      "person_id": "person_0026",
+      "crop": "TheSoundOfMusic_shot_0636_id0_frame0002.png",
+      "bbox_xyxy": [
+        147,
+        0,
+        471,
+        449
+      ],
+      "original_size": [
+        735,
+        787
+      ],
+      "crop_size": [
+        324,
+        449
+      ],
+      "original_path": "/data2/peiyao/videos/video20/TheSoundOfMusic_shot_0636_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video20/ref_heads/TheSoundOfMusic_shot_0636_id0_frame0002.png"
+    },
+    {
+      "file": "TheSoundOfMusic_shot_0981_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheSoundOfMusic/identity_matching/person_clusters/person_0026/full_orig/TheSoundOfMusic_shot_0981_id0_frame0001.jpg",
+      "shot": "TheSoundOfMusic_shot_0981",
+      "frame_idx": 1,
+      "person_id": "person_0026",
+      "crop": "TheSoundOfMusic_shot_0981_id0_frame0001.png",
+      "bbox_xyxy": [
+        144,
+        0,
+        473,
+        477
+      ],
+      "original_size": [
+        801,
+        822
+      ],
+      "crop_size": [
+        329,
+        477
+      ],
+      "original_path": "/data2/peiyao/videos/video20/TheSoundOfMusic_shot_0981_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video20/ref_heads/TheSoundOfMusic_shot_0981_id0_frame0001.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "TheSoundOfMusic_shot_1092.mp4": "655d86d7ae23da7305636da2237b2659035efcd76aaa6e384d5cb672fe4b8c1b",
+    "first_frame.png": "a910fcdac7c985909fe20838e7a11d5c611747351bf99c6e7e432ae6229da988",
+    "TheSoundOfMusic_shot_0325_id0_frame0001.jpg": "f41a7b46d1437744e1f524fd4b074e5bb3be880e9a1d21b8c55d18011788067b",
+    "TheSoundOfMusic_shot_0636_id0_frame0002.jpg": "417a6469f1858b333596de0ac0ea520972007da23e5e9c925b3f97f7c4e7d1f4",
+    "TheSoundOfMusic_shot_0981_id0_frame0001.jpg": "094e445ea38856a063bb27d5b8b631a65ab8a299608222c3376dd0ae061c2677",
+    "ref_heads/TheSoundOfMusic_shot_0325_id0_frame0001.png": "c7b5fa38680474c092da1c2abf2b206116fd2e23cec10f61c5792686e9d90cbb",
+    "ref_heads/TheSoundOfMusic_shot_0636_id0_frame0002.png": "baaf8d4daa154a8fd4eed95c11c531b1f289b12942c3f546762d8ebf078c5ad2",
+    "ref_heads/TheSoundOfMusic_shot_0981_id0_frame0001.png": "5e1578486eb7c53640104bbdcccdbbae6214e0550b7eddbedd1ed119a699f26d"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video20/TheSoundOfMusic_shot_1092.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video24/TheSoundOfMusic_shot_1092.mp4",
+    "original_sha256": "640e8f323c758f9fd3e2fb33fb8d0262fd7db6747eef09aa526e2c4221aef566",
+    "converted_sha256": "655d86d7ae23da7305636da2237b2659035efcd76aaa6e384d5cb672fe4b8c1b",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 872,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.549208",
+      "nb_frames": "181"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 872,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.549208",
+      "nb_frames": "181"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video20/TheSoundOfMusic_shot_1092.mp4",
+  "first_frame": "/data2/peiyao/videos/video20/first_frame.png",
+  "curation": {
+    "previous_folder": "video24",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video24",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

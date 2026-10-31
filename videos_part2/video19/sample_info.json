@@ -1,0 +1,139 @@
+{
+  "movie": "TheMatrix",
+  "shot": "TheMatrix_shot_0727",
+  "person": "person_0009",
+  "pool": 572,
+  "person_shots": 136,
+  "frames": 182,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheMatrix/shot_detection/shots/TheMatrix_shot_0727.mp4",
+  "duration": 7.633,
+  "folder": "video19",
+  "reference_pool_images": 568,
+  "reference_pool_shots": 135,
+  "references": [
+    {
+      "file": "TheMatrix_shot_0129_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheMatrix/identity_matching/person_clusters/person_0009/full_orig/TheMatrix_shot_0129_id0_frame0002.jpg",
+      "shot": "TheMatrix_shot_0129",
+      "frame_idx": 2,
+      "person_id": "person_0009",
+      "crop": "TheMatrix_shot_0129_id0_frame0002.png",
+      "bbox_xyxy": [
+        80,
+        0,
+        440,
+        542
+      ],
+      "original_size": [
+        732,
+        796
+      ],
+      "crop_size": [
+        360,
+        542
+      ],
+      "original_path": "/data2/peiyao/videos/video19/TheMatrix_shot_0129_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video19/ref_heads/TheMatrix_shot_0129_id0_frame0002.png"
+    },
+    {
+      "file": "TheMatrix_shot_0733_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheMatrix/identity_matching/person_clusters/person_0009/full_orig/TheMatrix_shot_0733_id0_frame0001.jpg",
+      "shot": "TheMatrix_shot_0733",
+      "frame_idx": 1,
+      "person_id": "person_0009",
+      "crop": "TheMatrix_shot_0733_id0_frame0001.png",
+      "bbox_xyxy": [
+        210,
+        0,
+        585,
+        464
+      ],
+      "original_size": [
+        779,
+        785
+      ],
+      "crop_size": [
+        375,
+        464
+      ],
+      "original_path": "/data2/peiyao/videos/video19/TheMatrix_shot_0733_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video19/ref_heads/TheMatrix_shot_0733_id0_frame0001.png"
+    },
+    {
+      "file": "TheMatrix_shot_2249_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheMatrix/identity_matching/person_clusters/person_0009/full_orig/TheMatrix_shot_2249_id0_frame0002.jpg",
+      "shot": "TheMatrix_shot_2249",
+      "frame_idx": 2,
+      "person_id": "person_0009",
+      "crop": "TheMatrix_shot_2249_id0_frame0002.png",
+      "bbox_xyxy": [
+        203,
+        0,
+        563,
+        462
+      ],
+      "original_size": [
+        1196,
+        769
+      ],
+      "crop_size": [
+        360,
+        462
+      ],
+      "original_path": "/data2/peiyao/videos/video19/TheMatrix_shot_2249_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video19/ref_heads/TheMatrix_shot_2249_id0_frame0002.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "TheMatrix_shot_0727.mp4": "c0d00b69e24662652689009f0128f27ef895dbd6e4126d53e965169276c0bb99",
+    "first_frame.png": "4f8e2893d87e16e4abdb0a3ac7b090315f3595c87094d1ffbbbd696a6b009e74",
+    "TheMatrix_shot_0129_id0_frame0002.jpg": "8c76336d098e0dbde20dc3d2d424ab3ba5ac5aafd0eda8aa9b2cde85fc44b6a3",
+    "TheMatrix_shot_0733_id0_frame0001.jpg": "7afe79847bbaa891bf9389b5a9f72ee9be6f30a486c5a2ab6cbb832ebb53b733",
+    "TheMatrix_shot_2249_id0_frame0002.jpg": "d807b8b21c7c9d55aa24b6847df91ebc89627b94472a414a5299857196da4471",
+    "ref_heads/TheMatrix_shot_0129_id0_frame0002.png": "d47560c670ed35e0c06422410d3d2155c8013246018ec11673f4b1a46d1323b7",
+    "ref_heads/TheMatrix_shot_0733_id0_frame0001.png": "f44dc34b9129bee4f64850b2a0557da5e86726a049dd4c9233319f61f384b8aa",
+    "ref_heads/TheMatrix_shot_2249_id0_frame0002.png": "52ccfecd0b247f4c90d6dbcd98c4a1ce3bce38c849d08bfe8207dc9d5fc7e1da"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video19/TheMatrix_shot_0727.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video22/TheMatrix_shot_0727.mp4",
+    "original_sha256": "4d9792b465637a46e4e2258f3ee5e6ce8c054f34f2b7d558e5ba8e154910d474",
+    "converted_sha256": "c0d00b69e24662652689009f0128f27ef895dbd6e4126d53e965169276c0bb99",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 800,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.632625",
+      "nb_frames": "183"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 800,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "7.632625",
+      "nb_frames": "183"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video19/TheMatrix_shot_0727.mp4",
+  "first_frame": "/data2/peiyao/videos/video19/first_frame.png",
+  "curation": {
+    "previous_folder": "video22",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video22",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}

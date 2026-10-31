@@ -1,0 +1,139 @@
+{
+  "movie": "TheButterflyEffect",
+  "shot": "TheButterflyEffect_shot_1485",
+  "person": "person_0046",
+  "pool": 603,
+  "person_shots": 119,
+  "frames": 192,
+  "obj": "0",
+  "video": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheButterflyEffect/shot_detection/shots/TheButterflyEffect_shot_1485.mp4",
+  "duration": 8.008,
+  "folder": "video18",
+  "reference_pool_images": 595,
+  "reference_pool_shots": 118,
+  "references": [
+    {
+      "file": "TheButterflyEffect_shot_1052_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheButterflyEffect/identity_matching/person_clusters/person_0046/full_orig/TheButterflyEffect_shot_1052_id0_frame0002.jpg",
+      "shot": "TheButterflyEffect_shot_1052",
+      "frame_idx": 2,
+      "person_id": "person_0046",
+      "crop": "TheButterflyEffect_shot_1052_id0_frame0002.png",
+      "bbox_xyxy": [
+        337,
+        0,
+        1012,
+        746
+      ],
+      "original_size": [
+        1204,
+        1080
+      ],
+      "crop_size": [
+        675,
+        746
+      ],
+      "original_path": "/data2/peiyao/videos/video18/TheButterflyEffect_shot_1052_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video18/ref_heads/TheButterflyEffect_shot_1052_id0_frame0002.png"
+    },
+    {
+      "file": "TheButterflyEffect_shot_1227_id0_frame0001.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheButterflyEffect/identity_matching/person_clusters/person_0046/full_orig/TheButterflyEffect_shot_1227_id0_frame0001.jpg",
+      "shot": "TheButterflyEffect_shot_1227",
+      "frame_idx": 1,
+      "person_id": "person_0046",
+      "crop": "TheButterflyEffect_shot_1227_id0_frame0001.png",
+      "bbox_xyxy": [
+        85,
+        0,
+        1064,
+        951
+      ],
+      "original_size": [
+        1418,
+        1080
+      ],
+      "crop_size": [
+        979,
+        951
+      ],
+      "original_path": "/data2/peiyao/videos/video18/TheButterflyEffect_shot_1227_id0_frame0001.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video18/ref_heads/TheButterflyEffect_shot_1227_id0_frame0001.png"
+    },
+    {
+      "file": "TheButterflyEffect_shot_1341_id0_frame0002.jpg",
+      "source": "/mnt/nfs/data/peiyao/HUAWEI_CrossPairDataset_v5/outputs/TheButterflyEffect/identity_matching/person_clusters/person_0046/full_orig/TheButterflyEffect_shot_1341_id0_frame0002.jpg",
+      "shot": "TheButterflyEffect_shot_1341",
+      "frame_idx": 2,
+      "person_id": "person_0046",
+      "crop": "TheButterflyEffect_shot_1341_id0_frame0002.png",
+      "bbox_xyxy": [
+        630,
+        0,
+        1312,
+        855
+      ],
+      "original_size": [
+        1703,
+        1042
+      ],
+      "crop_size": [
+        682,
+        855
+      ],
+      "original_path": "/data2/peiyao/videos/video18/TheButterflyEffect_shot_1341_id0_frame0002.jpg",
+      "head_crop_path": "/data2/peiyao/videos/video18/ref_heads/TheButterflyEffect_shot_1341_id0_frame0002.png"
+    }
+  ],
+  "single_person_check": "Exactly one tracked object in one_shot_process metadata; six evenly spaced video frames visually checked for other people. Sampled review, not exhaustive frame-by-frame annotation.",
+  "reference_selection": "Visually selected from user-retained references, balancing face clarity and viewing-angle diversity. Exactly three original images retained; PNG head crops are exact pixel crops, without resize or synthesis.",
+  "reference_quality_checked": true,
+  "sha256": {
+    "TheButterflyEffect_shot_1485.mp4": "cce296e4e25918649a41a057c4d0bbcb996dd6462b7cba668372c409731d2af5",
+    "first_frame.png": "a8dc8b8884df6f7b52e8b99aa873fd5653172870b43525ecf1d715af59bb931c",
+    "TheButterflyEffect_shot_1052_id0_frame0002.jpg": "2034e75f9c1f21314848375d0a3fce856e2399cbb419cf9c39aa9404e80d2be8",
+    "TheButterflyEffect_shot_1227_id0_frame0001.jpg": "37c125a700f5822e38de46034029f1e91e91d3dec2baad3b9594ab5325ed572b",
+    "TheButterflyEffect_shot_1341_id0_frame0002.jpg": "3d5ac5c65c9cd7d6a645d6f3b2904bd1d19f3edc73d5958e8a68bcc7c4db6423",
+    "ref_heads/TheButterflyEffect_shot_1052_id0_frame0002.png": "9c55fded88b6a4516706296830014a351bb0eafeea0ab99b4c4c76f921b4d4f9",
+    "ref_heads/TheButterflyEffect_shot_1227_id0_frame0001.png": "d2298219c777b04e866f47a421db183dbc707e00adbf99d7cf1a394f651d1ede",
+    "ref_heads/TheButterflyEffect_shot_1341_id0_frame0002.png": "71d5b81056469161d6cc16312faa263a90bd74d6f820ec7eabbe36096ce788a7"
+  },
+  "video_decode_verified": true,
+  "transcode": {
+    "file": "/data2/peiyao/videos/video18/TheButterflyEffect_shot_1485.mp4",
+    "backup": "/data2/peiyao/videos_original_mp4/video21/TheButterflyEffect_shot_1485.mp4",
+    "original_sha256": "f29bb22d7b06f891bc55c2b077275d09aa2cea5e638585e5b03016e740b152c9",
+    "converted_sha256": "cce296e4e25918649a41a057c4d0bbcb996dd6462b7cba668372c409731d2af5",
+    "original_stream": {
+      "codec_name": "mpeg4",
+      "width": 1920,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "8.008000",
+      "nb_frames": "192"
+    },
+    "converted_stream": {
+      "codec_name": "h264",
+      "width": 1920,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "24000/1001",
+      "duration": "8.008000",
+      "nb_frames": "192"
+    },
+    "encoder": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "faststart": true,
+    "decode_verified": true
+  },
+  "local_video": "/data2/peiyao/videos/video18/TheButterflyEffect_shot_1485.mp4",
+  "first_frame": "/data2/peiyao/videos/video18/first_frame.png",
+  "curation": {
+    "previous_folder": "video21",
+    "backup": "/data2/peiyao/videos_curation_backup_20261030/video21",
+    "head_bbox_coordinates": "[left, top, right, bottom], original-image pixels; right and bottom exclusive",
+    "first_frame_extraction": "First decoded video frame, no timestamp seek."
+  }
+}
